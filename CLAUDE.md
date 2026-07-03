@@ -45,6 +45,10 @@ toast UI.
   and defines the global helpers `current_user()`, `require_login()`, `require_role()`, `flash_set()` /
   `flash_get()`, `url()` (see APP_BASE note below), and `e()` (htmlspecialchars).
 - `index.php`, `login.php`, `register.php`, `logout.php` — auth entry / role redirect.
+- `install.php` — standalone web installer (imports `schema.sql` + `seed.sql`, with a guarded
+  drop-and-reinstall). Deliberately does **not** use `bootstrap.php` (which selects the not-yet-created
+  DB); it reads only `config.php` and runs each `.sql` file on its own fresh PDO connection. Meant to be
+  deleted after setup.
 - `student/{dashboard,booking,my-bookings,profile}.php`, `admin/{dashboard,members,slots,ai-accounts,reports}.php`.
 - `includes/` — domain classes (all `static`-method, PDO-backed): `Database` (PDO singleton),
   `Auth`, `Booking`, `Member`, `AiAccount`, `SlotSettings`, `Report`, `Csrf`; plus the shared view
@@ -82,7 +86,8 @@ toast UI.
 1. Start WAMP (or at least its MariaDB service). If you need MariaDB without elevation, its daemon is
    `D:/wamp64/bin/mariadb/mariadb11.5.2/bin/mariadbd.exe --defaults-file=<...>/my.ini`; the CLI client is
    `mysql.exe` in the same `bin/`, connect with `-u root -h 127.0.0.1 --port=3307`.
-2. Import once: `mysql ... < database/schema.sql` then `mysql ... rvc_apts < database/seed.sql`.
+2. Import once — either browse to `install.php` and click ติดตั้ง, or from the CLI:
+   `mysql ... < database/schema.sql` then `mysql ... rvc_apts < database/seed.sql`.
 3. Browse to the app under the WAMP docroot (e.g. `http://localhost/rvc.apts/login.php`).
 4. **Seeded login:** every seeded account's password is `Passw0rd!`. Admin = `admin@rvc.ac.th`; primary
    demo student = `somchai@rvc.ac.th` (has the 5 seeded bookings). Seed dates are relative to import day

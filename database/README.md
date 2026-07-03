@@ -1,6 +1,18 @@
 # Database setup — rvc_apts (MariaDB 10+)
 
-The PHP app (`../login.php` etc.) needs the `rvc_apts` MariaDB database. Import it once:
+The PHP app (`../login.php` etc.) needs the `rvc_apts` MariaDB database.
+
+## Easiest: the web installer
+
+With WAMP's MariaDB running, browse to **`../install.php`** (e.g.
+`http://localhost/rvc.apts/install.php`) and click **ติดตั้งฐานข้อมูล**. It imports
+`schema.sql` + `seed.sql` for you, checks readiness (PHP version, `pdo_mysql`, DB
+connection), and can drop & reinstall if the database already exists. **Delete
+`install.php` afterwards** — it can wipe the database.
+
+## Or import from the CLI
+
+Import it once:
 
 ```sh
 # WAMP MariaDB CLI (note: MariaDB is on port 3307, MySQL 9 uses 3306)
