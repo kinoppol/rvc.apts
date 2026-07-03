@@ -1,0 +1,113 @@
+(function () {
+  "use strict";
+
+  var root = document.getElementById("appRoot");
+
+  // ── Sidebar collapse ──
+  var sidebar = document.getElementById("sidebar");
+  var toggleBtn = document.getElementById("sidebarToggle");
+  if (sidebar && toggleBtn) {
+    if (localStorage.getItem("sidebarCollapsed") === "1") sidebar.classList.add("collapsed");
+    toggleBtn.addEventListener("click", function () {
+      sidebar.classList.toggle("collapsed");
+      localStorage.setItem("sidebarCollapsed", sidebar.classList.contains("collapsed") ? "1" : "0");
+    });
+  }
+
+  // ── Theme ──
+  var THEME_SEL_BG = "#2563EB", THEME_SEL_TXT = "white";
+  var THEME_IDLE_BG = "transparent", THEME_IDLE_TXT = "var(--bs-secondary-color)";
+
+  function resolveTheme(pref) {
+    if (pref === "system") {
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    return pref;
+  }
+
+  function applyTheme(pref) {
+    if (root) root.setAttribute("data-bs-theme", resolveTheme(pref));
+    document.querySelectorAll(".theme-btn").forEach(function (btn) {
+      var active = btn.dataset.theme === pref;
+      btn.style.background = active ? THEME_SEL_BG : THEME_IDLE_BG;
+      btn.style.color = active ? THEME_SEL_TXT : THEME_IDLE_TXT;
+    });
+    window.dispatchEvent(new CustomEvent("app:theme-changed", { detail: { theme: resolveTheme(pref) } }));
+  }
+
+  var storedTheme = localStorage.getItem("theme") || "system";
+  applyTheme(storedTheme);
+
+  document.querySelectorAll(".theme-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      localStorage.setItem("theme", btn.dataset.theme);
+      applyTheme(btn.dataset.theme);
+    });
+  });
+
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+    if ((localStorage.getItem("theme") || "system") === "system") applyTheme("system");
+  });
+
+  // ── Toast auto-dismiss ──
+  var toast = document.getElementById("appToast");
+  if (toast) {
+    setTimeout(function () {
+      toast.style.transition = "opacity .25s ease";
+      toast.style.opacity = "0";
+      setTimeout(function () { toast.remove(); }, 250);
+    }, 3200);
+  }
+
+  // ── Booking confirmation modal (student/booking.php) ──
+  var bookModal = document.getElementById("bookSlotModal");
+  if (bookModal) {
+    document.querySelectorAll(".slt-avail").forEach(function (cell) {
+      cell.addEventListener("click", function () {
+        document.getElementById("bookModalDate").value = cell.dataset.date;
+        document.getElementById("bookModalSlotIndex").value = cell.dataset.slotIndex;
+        document.getElementById("bookModalDayLabel").textContent = cell.dataset.dayLabel;
+        document.getElementById("bookModalSlotTime").textContent = cell.dataset.slotLabel + " (" + cell.dataset.slotTime + ")";
+        new bootstrap.Modal(bookModal).show();
+      });
+    });
+  }
+
+  // ── AI account edit modal (admin/ai-accounts.php) ──
+  document.querySelectorAll("[data-edit-account]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var modalEl = document.getElementById("editAccountModal");
+      modalEl.querySelector("[name=id]").value = btn.dataset.id;
+      modalEl.querySelector("[name=name]").value = btn.dataset.name;
+      modalEl.querySelector("[name=provider]").value = btn.dataset.provider;
+      modalEl.querySelector("[name=status]").value = btn.dataset.status;
+      new bootstrap.Modal(modalEl).show();
+    });
+  });
+
+  // ── Chart.js init hook for admin/dashboard.php ──
+  window.initUsageChart = function (canvasId, labels, datasets) {
+    var canvas = document.getElementById(canvasId);
+    if (!canvas || !window.Chart) return;
+    var render = function () {
+      var isDark = root.getAttribute("data-bs-theme") === "dark";
+      var gc = isDark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)";
+      var tc = isDark ? "#94A3B8" : "#64748B";
+      if (canvas._chart) canvas._chart.destroy();
+      canvas._chart = new Chart(canvas, {
+        type: "bar",
+        data: { labels: labels, datasets: datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: "top", labels: { color: tc, font: { size: 12 } } } },
+          scales: {
+            x: { grid: { color: gc }, ticks: { color: tc } },
+            y: { grid: { color: gc }, ticks: { color: tc, callback: function (v) { return v + "%"; } }, max: 100, min: 0 },
+          },
+        },
+      });
+    };
+    render();
+    window.addEventListener("app:theme-changed", render);
+  };
+})();
