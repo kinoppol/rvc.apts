@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *,*::before,*::after{font-family:'IBM Plex Sans Thai',system-ui,sans-serif;box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    /* ── Sidebar ── */
+    .sidebar{width:240px;min-width:240px;height:calc(100vh - 56px);overflow-y:auto;overflow-x:hidden;transition:width .22s cubic-bezier(.4,0,.2,1),min-width .22s cubic-bezier(.4,0,.2,1);flex-shrink:0;position:sticky;top:56px;border-right:1px solid var(--bs-border-color)}
+    .sidebar.collapsed{width:64px;min-width:64px}
+    .sb-label{white-space:nowrap;overflow:hidden;transition:opacity .15s,max-width .22s;max-width:160px}
+    .sidebar.collapsed .sb-label{opacity:0;max-width:0}
+    .sb-link{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:8px;color:var(--bs-secondary-color);text-decoration:none;font-size:14px;font-weight:500;margin:2px 8px;cursor:pointer;transition:background .12s,color .12s;position:relative;border:none;background:none;width:calc(100% - 16px);text-align:left}
+    .sb-link:hover{background:#EFF6FF;color:#2563EB}
+    .sb-link.active{background:#EFF6FF;color:#2563EB;font-weight:600}
+    .sb-link.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:18px;background:#2563EB;border-radius:0 2px 2px 0}
+    [data-bs-theme="dark"] .sb-link:hover{background:#172554;color:#93C5FD}
+    [data-bs-theme="dark"] .sb-link.active{background:#172554;color:#93C5FD}
+    [data-bs-theme="dark"] .sb-link.active::before{background:#60A5FA}
+    /* ── Auth ── */
+    .auth-bg{min-height:100vh;background:linear-gradient(140deg,#1D4ED8 0%,#2563EB 50%,#0EA5E9 100%);display:flex;align-items:center;justify-content:center;padding:24px}
+    .auth-card{background:white;border-radius:20px;padding:40px;width:100%;max-width:440px;box-shadow:0 24px 64px rgba(0,0,0,.18)}
+    .auth-card-wide{max-width:560px}
+    /* ── Slot calendar ── */
+    .slt{border-radius:8px;padding:8px 4px;min-height:74px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;user-select:none;font-size:11px;font-weight:500;transition:transform .12s,box-shadow .12s}
+    .slt-avail{background:#EFF6FF;color:#2563EB;border:1.5px solid #BFDBFE;cursor:pointer}
+    .slt-avail:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(37,99,235,.22)}
+    .slt-busy{background:#F1F5F9;color:#94A3B8;border:1.5px solid #E2E8F0;cursor:default}
+    .slt-mine{background:#2563EB;color:white;border:none;cursor:default}
+    .slt-now{background:#059669;color:white;border:none;cursor:default}
+    .slt-off{background:#F8FAFC;color:#CBD5E1;border:1.5px dashed #E2E8F0;cursor:default;opacity:.7}
+    [data-bs-theme="dark"] .slt-avail{background:#172554;color:#93C5FD;border-color:#1d4ed8}
+    [data-bs-theme="dark"] .slt-avail:hover{box-shadow:0 4px 12px rgba(37,99,235,.35)}
+    [data-bs-theme="dark"] .slt-busy{background:#1e293b;color:#475569;border-color:#334155}
+    [data-bs-theme="dark"] .slt-mine{background:#2563EB;color:white}
+    [data-bs-theme="dark"] .slt-off{background:#0f172a;color:#334155;border-color:#1e293b}
+    /* ── Modal ── */
+    .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1050;display:flex;align-items:center;justify-content:center;padding:16px}
+    .modal-box{background:white;border-radius:16px;padding:28px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.2);animation:pop-in .2s ease}
+    [data-bs-theme="dark"] .modal-box{background:#1e293b}
+    @keyframes pop-in{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
+    /* ── Toast ── */
+    .toast-fixed{position:fixed;bottom:24px;right:24px;z-index:9999;border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);animation:slide-up .25s ease;min-width:260px;max-width:360px;font-size:14px;font-weight:500}
+    @keyframes slide-up{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+    .toast-ok{background:#ECFDF5;color:#065F46;border:1px solid #6EE7B7}
+    .toast-warn{background:#FFFBEB;color:#92400E;border:1px solid #FCD34D}
+    .toast-err{background:#FEF2F2;color:#991B1B;border:1px solid #FCA5A5}
+    /* ── Misc ── */
+    @keyframes fade-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .page-anim{animation:fade-in .2s ease}
+    .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#2563EB,#0EA5E9);border-radius:8px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+    .card{border-radius:12px!important}
+    .btn{border-radius:8px!important}
+    .form-control,.form-select{border-radius:8px!important}
+    .day-today{width:28px;height:28px;border-radius:50%;background:#2563EB;color:white;display:inline-flex;align-items:center;justify-content:center;font-size:15px;font-weight:700}
+    .day-normal{font-size:16px;font-weight:700}
+    ::-webkit-scrollbar{width:5px;height:5px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:3px}
+    [data-bs-theme="dark"] ::-webkit-scrollbar-thumb{background:#475569}
+    .stat-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+    .section-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94A3B8;padding:16px 16px 6px}
+    .badge-ok{background:#DCFCE7;color:#166534;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
+    .badge-pend{background:#FEF3C7;color:#92400E;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
+    .badge-susp{background:#FEE2E2;color:#991B1B;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
+    .badge-up{background:#DBEAFE;color:#1e40af;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
+    [data-bs-theme="dark"] .badge-ok{background:#14532d;color:#86efac}
+    [data-bs-theme="dark"] .badge-pend{background:#451a03;color:#fcd34d}
+    [data-bs-theme="dark"] .badge-susp{background:#450a0a;color:#fca5a5}
+    [data-bs-theme="dark"] .badge-up{background:#172554;color:#93C5FD}
+    .info-box{background:#F0F7FF;border-radius:12px;padding:16px}
+    [data-bs-theme="dark"] .info-box{background:#172554}
+    .action-btn-ok{background:#DCFCE7;color:#166534;border:none;border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}
+    .action-btn-warn{background:#FEF3C7;color:#92400E;border:none;border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}
+    .action-btn-err{background:#FEE2E2;color:#991B1B;border:none;border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}
+    .action-btn-blue{background:#DBEAFE;color:#1e40af;border:none;border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}
+    [data-bs-theme="dark"] .action-btn-ok{background:#14532d;color:#86efac}
+    [data-bs-theme="dark"] .action-btn-warn{background:#451a03;color:#fcd34d}
+    [data-bs-theme="dark"] .action-btn-err{background:#450a0a;color:#fca5a5}
+    [data-bs-theme="dark"] .action-btn-blue{background:#172554;color:#93C5FD}
+    .nav-tab-active{color:#2563EB;border-bottom:2px solid #2563EB;font-weight:600}
+    .nav-tab-inactive{color:#64748B;border-bottom:2px solid transparent}
+  </style>
+</helmet>
+
+<!-- ══════════════════════════════════════════ ROOT ══════════════════════════════════════════ -->
+<div>
+
+  <!-- ─── AUTH PAGES ─── -->
+  <sc-if value="{{ showAuth }}" hint-placeholder-val="{{ true }}">
+    <div class="auth-bg">
+
+      <!-- LOGIN -->
+      <sc-if value="{{ isLoginPage }}" hint-placeholder-val="{{ true }}">
+        <div class="auth-card page-anim">
+          <!-- Brand -->
+          <div style="text-align:center;margin-bottom:28px">
+            <div class="logo-icon" style="width:56px;height:56px;border-radius:14px;margin:0 auto 12px">
+              <i class="bi bi-robot" style="color:white;font-size:26px"></i>
+            </div>
+            <h4 style="font-weight:700;color:#0F172A;margin:0">AI Pro Time-Sharing</h4>
+            <p style="color:#64748B;font-size:14px;margin:6px 0 0">ระบบจองคิวใช้งาน AI Pro — วิทยาลัย RVC</p>
+          </div>
+          <!-- Fields -->
+          <div style="margin-bottom:14px">
+            <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">อีเมลนักศึกษา</label>
+            <input type="email" class="form-control" placeholder="student@rvc.ac.th" style="font-size:14px">
+          </div>
+          <div style="margin-bottom:22px">
+            <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">รหัสผ่าน</label>
+            <input type="password" class="form-control" placeholder="••••••••" style="font-size:14px">
+          </div>
+          <!-- Demo buttons -->
+          <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:18px">
+            <button onClick="{{ onLoginStudent }}" type="button" class="btn btn-primary" style="background:linear-gradient(90deg,#2563EB,#0EA5E9);border:none;font-weight:600;padding:11px">
+              <i class="bi bi-person-fill me-2"></i>เข้าสู่ระบบ นักศึกษา (Demo)
+            </button>
+            <button onClick="{{ onLoginAdmin }}" type="button" class="btn btn-outline-primary" style="font-weight:600;padding:10px;border-color:#2563EB;color:#2563EB">
+              <i class="bi bi-shield-fill-check me-2"></i>เข้าสู่ระบบ ผู้ดูแลระบบ (Demo)
+            </button>
+          </div>
+          <p style="text-align:center;font-size:13px;color:#64748B;margin:0">
+            ยังไม่มีบัญชี? <a href="#" onClick="{{ onShowRegister }}" style="color:#2563EB;font-weight:600;text-decoration:none">สมัครสมาชิก</a>
+          </p>
+        </div>
+      </sc-if>
+
+      <!-- REGISTER -->
+      <sc-if value="{{ isRegisterPage }}">
+        <div class="auth-card auth-card-wide page-anim">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+            <div class="logo-icon" style="width:44px;height:44px;border-radius:11px">
+              <i class="bi bi-person-plus-fill" style="color:white;font-size:18px"></i>
+            </div>
+            <div>
+              <h5 style="font-weight:700;color:#0F172A;margin:0">สมัครสมาชิก</h5>
+              <p style="color:#64748B;font-size:13px;margin:0">AI Pro Time-Sharing System</p>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+            <div>
+              <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">ชื่อ-นามสกุล <span style="color:#DC2626">*</span></label>
+              <input type="text" class="form-control" placeholder="สมชาย ใจดี" style="font-size:13px">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">รหัสนักศึกษา <span style="color:#DC2626">*</span></label>
+              <input type="text" class="form-control" placeholder="6501CS001" style="font-size:13px">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">สาขาวิชา <span style="color:#DC2626">*</span></label>
+              <select class="form-select" style="font-size:13px">
+                <option>วิทยาการคอมพิวเตอร์</option>
+                <option>เทคโนโลยีสารสนเทศ</option>
+                <option>วิทยาการข้อมูล</option>
+                <option>วิศวกรรมซอฟต์แวร์</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">เบอร์โทรศัพท์</label>
+              <input type="tel" class="form-control" placeholder="08X-XXX-XXXX" style="font-size:13px">
+            </div>
+            <div style="grid-column:span 2">
+              <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">อีเมล <span style="color:#DC2626">*</span></label>
+              <input type="email" class="form-control" placeholder="student@rvc.ac.th" style="font-size:13px">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">รหัสผ่าน <span style="color:#DC2626">*</span></label>
+              <input type="password" class="form-control" placeholder="••••••••" style="font-size:13px">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">ยืนยันรหัสผ่าน <span style="color:#DC2626">*</span></label>
+              <input type="password" class="form-control" placeholder="••••••••" style="font-size:13px">
+            </div>
+          </div>
+          <div style="background:#FFF7ED;border-radius:8px;padding:10px 14px;margin-bottom:18px;font-size:12px;color:#92400E;display:flex;gap:8px;align-items:flex-start">
+            <i class="bi bi-info-circle-fill" style="margin-top:1px;flex-shrink:0"></i>
+            <span>หลังสมัครสมาชิก บัญชีของคุณจะอยู่ในสถานะ <strong>รอการอนุมัติ</strong> จนกว่าผู้ดูแลระบบจะตรวจสอบและอนุมัติ</span>
+          </div>
+          <button onClick="{{ onRegisterSubmit }}" type="button" class="btn btn-primary w-100" style="background:linear-gradient(90deg,#2563EB,#0EA5E9);border:none;font-weight:600;padding:11px;margin-bottom:12px">
+            <i class="bi bi-person-check-fill me-2"></i>สมัครสมาชิก
+          </button>
+          <p style="text-align:center;font-size:13px;color:#64748B;margin:0">
+            มีบัญชีแล้ว? <a href="#" onClick="{{ onShowLogin }}" style="color:#2563EB;font-weight:600;text-decoration:none">เข้าสู่ระบบ</a>
+          </p>
+        </div>
+      </sc-if>
+
+    </div>
+  </sc-if>
+
+  <!-- ─── APP SHELL ─── -->
+  <sc-if value="{{ isLoggedIn }}">
+    <div data-bs-theme="{{ bsTheme }}" class="bg-body" style="min-height:100vh;display:flex;flex-direction:column">
+
+      <!-- NAVBAR -->
+      <nav class="navbar navbar-expand bg-body" style="height:56px;padding:0 16px;position:sticky;top:0;z-index:200;border-bottom:1px solid var(--bs-border-color)">
+        <div style="display:flex;align-items:center;gap:10px;flex:1">
+          <button onClick="{{ onToggleSidebar }}" style="border:none;background:none;cursor:pointer;color:var(--bs-secondary-color);width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px" style-hover="background:var(--bs-secondary-bg)">
+            <i class="bi bi-list"></i>
+          </button>
+          <div class="logo-icon">
+            <i class="bi bi-robot" style="color:white;font-size:14px"></i>
+          </div>
+          <span style="font-weight:700;font-size:15px;white-space:nowrap">AI Pro <span style="color:#2563EB">Time-Sharing</span></span>
+        </div>
+
+        <!-- Theme toggle -->
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="display:flex;background:var(--bs-secondary-bg);border-radius:8px;padding:3px;gap:2px">
+            <button onClick="{{ setLightTheme }}" title="Light" style="border:none;cursor:pointer;width:30px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;background:{{ themeLightBg }};color:{{ themeLightColor }}">
+              <i class="bi bi-sun-fill"></i>
+            </button>
+            <button onClick="{{ setSystemTheme }}" title="System" style="border:none;cursor:pointer;width:30px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;background:{{ themeSystemBg }};color:{{ themeSystemColor }}">
+              <i class="bi bi-display"></i>
+            </button>
+            <button onClick="{{ setDarkTheme }}" title="Dark" style="border:none;cursor:pointer;width:30px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;background:{{ themeDarkBg }};color:{{ themeDarkColor }}">
+              <i class="bi bi-moon-fill"></i>
+            </button>
+          </div>
+          <!-- User avatar -->
+          <div style="display:flex;align-items:center;gap:8px;margin-left:4px">
+            <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#0EA5E9);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:13px">
+              {{ userInitial }}
+            </div>
+            <div style="line-height:1.2">
+              <div style="font-size:13px;font-weight:600">{{ userName }}</div>
+              <div style="font-size:11px;color:#64748B">{{ userRoleLabel }}</div>
+            </div>
+            <button onClick="{{ onLogout }}" class="btn btn-sm" style="background:transparent;border:1px solid var(--bs-border-color);color:var(--bs-secondary-color);font-size:12px;padding:4px 10px;margin-left:4px">
+              <i class="bi bi-box-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <!-- BODY: Sidebar + Main -->
+      <div style="display:flex;flex:1;overflow:hidden">
+
+        <!-- SIDEBAR -->
+        <aside class="{{ sidebarCls }}" style="background:var(--bs-body-bg)">
+          <div style="padding:8px 0">
+
+            <!-- Student menu -->
+            <sc-if value="{{ isStudent }}">
+              <div class="section-title"><span class="sb-label">เมนูนักศึกษา</span></div>
+              <button class="{{ sbSDash }}" onClick="{{ navToStudentDash }}">
+                <i class="bi bi-speedometer2" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i>
+                <span class="sb-label">หน้าหลัก</span>
+              </button>
+              <button class="{{ sbBooking }}" onClick="{{ navToBooking }}">
+                <i class="bi bi-calendar-plus" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i>
+                <span class="sb-label">จองคิว AI</span>
+              </button>
+              <button class="{{ sbMyBook }}" onClick="{{ navToMyBookings }}">
+                <i class="bi bi-journal-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i>
+                <span class="sb-label">การจองของฉัน</span>
+              </button>
+              <button class="{{ sbProfile }}" onClick="{{ navToProfile }}">
+                <i class="bi bi-person-circle" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i>
+                <span class="sb-label">โปรไฟล์</span>
+              </button>
+            </sc-if>
+
+            <!-- Admin menu -->
+            <sc-if value="{{ isAdmin }}">
+              <div class="section-title"><span class="sb-label">ผู้ดูแลระบบ</span></div>
+              <button class="{{ sbADash }}" onClick="{{ navToAdminDash }}">
+                <i class="bi bi-bar-chart-line" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i>
+                <span class="sb-label">ภาพรวมระบบ</span>
+              </button>
+              <button class="{{ sbMember }}" onClick="{{ navToMemberMgmt }}">
+                <i class="bi bi-people" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i>
+                <span class="sb-label">จัดการสมาชิก</span>
+                <sc-if value="{{ hasPending }}">
+                  <span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto">{{ pendingCount }}</span>
+                </sc-if>
+              </button>
+              <button class="{{ sbSlot }}" onClick="{{ navToSlotMgmt }}">
+                <i class="bi bi-calendar-range" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i>
+                <span class="sb-label">จัดการตารางเวลา</span>
+              </button>
+              <button class="{{ sbAI }}" onClick="{{ navToAIAccounts }}">
+                <i class="bi bi-cpu" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i>
+                <span class="sb-label">บัญชี AI Pool</span>
+              </button>
+              <button class="{{ sbReports }}" onClick="{{ navToReports }}">
+                <i class="bi bi-file-earmark-bar-graph" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i>
+                <span class="sb-label">รายงานสถิติ</span>
+              </button>
+            </sc-if>
+
+          </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main style="flex:1;overflow-y:auto;padding:24px;background:var(--bs-secondary-bg)">
+
+          <!-- ══ STUDENT DASHBOARD ══ -->
+          <sc-if value="{{ isStudentDash }}">
+            <div class="page-anim">
+              <div style="margin-bottom:22px">
+                <h5 style="font-weight:700;margin:0">สวัสดี, สมชาย 👋</h5>
+                <p style="color:#64748B;font-size:14px;margin:4px 0 0">วันศุกร์ที่ 3 กรกฎาคม 2569 · สัปดาห์ที่ 27</p>
+              </div>
+              <!-- Stat cards -->
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-bottom:22px">
+                <!-- Next booking -->
+                <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                  <div class="card-body" style="padding:18px">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+                      <div class="stat-icon" style="background:#EFF6FF"><i class="bi bi-calendar-check" style="color:#2563EB"></i></div>
+                      <span class="badge-up">พรุ่งนี้</span>
+                    </div>
+                    <div style="font-size:22px;font-weight:700;line-height:1">08:00–13:00</div>
+                    <div style="font-size:12px;color:#64748B;margin-top:4px">การจองถัดไป · Claude Pro #2</div>
+                  </div>
+                </div>
+                <!-- Hours used -->
+                <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                  <div class="card-body" style="padding:18px">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+                      <div class="stat-icon" style="background:#F0FDF4"><i class="bi bi-clock-history" style="color:#059669"></i></div>
+                    </div>
+                    <div style="font-size:22px;font-weight:700;line-height:1">5 <span style="font-size:14px;font-weight:400;color:#64748B">/ 10 ชม.</span></div>
+                    <div style="font-size:12px;color:#64748B;margin-top:4px">ชั่วโมงที่ใช้สัปดาห์นี้</div>
+                    <div style="background:#E2E8F0;border-radius:4px;height:4px;margin-top:10px;overflow:hidden">
+                      <div style="background:#059669;width:50%;height:100%;border-radius:4px"></div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Quota -->
+                <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                  <div class="card-body" style="padding:18px">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+                      <div class="stat-icon" style="background:#FFF7ED"><i class="bi bi-ticket-perforated" style="color:#EA580C"></i></div>
+                    </div>
+                    <div style="font-size:22px;font-weight:700;line-height:1">2 <span style="font-size:14px;font-weight:400;color:#64748B">/ 3 รอบ</span></div>
+                    <div style="font-size:12px;color:#64748B;margin-top:4px">โควต้าคงเหลือสัปดาห์นี้</div>
+                    <div style="display:flex;gap:4px;margin-top:10px">
+                      <div style="flex:1;height:6px;border-radius:3px;background:#2563EB"></div>
+                      <div style="flex:1;height:6px;border-radius:3px;background:#2563EB"></div>
+                      <div style="flex:1;height:6px;border-radius:3px;background:#E2E8F0"></div>
+                    </div>
+                  </div>
+                </div>
+                <!-- AI account -->
+                <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                  <div class="card-body" style="padding:18px">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+                      <div class="stat-icon" style="background:#F5F3FF"><i class="bi bi-robot" style="color:#7C3AED"></i></div>
+                      <span class="badge-ok">ออนไลน์</span>
+                    </div>
+                    <div style="font-size:18px;font-weight:700;line-height:1">Claude Pro #2</div>
+                    <div style="font-size:12px;color:#64748B;margin-top:4px">AI Account ที่ได้รับมอบหมาย</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Upcoming booking detail + Quick book -->
+              <div style="display:grid;grid-template-columns:1fr 320px;gap:14px;margin-bottom:22px">
+                <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                  <div class="card-body" style="padding:20px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                      <h6 style="font-weight:700;margin:0">การจองที่กำลังจะมาถึง</h6>
+                      <span class="badge-up">เหลือ 22 ชั่วโมง</span>
+                    </div>
+                    <div class="info-box">
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                        <div><div style="font-size:11px;color:#64748B;margin-bottom:3px">วันที่</div><div style="font-weight:600;font-size:14px">ศุกร์ 4 ก.ค. 2569</div></div>
+                        <div><div style="font-size:11px;color:#64748B;margin-bottom:3px">ช่วงเวลา</div><div style="font-weight:600;font-size:14px">เช้า (08:00–13:00)</div></div>
+                        <div><div style="font-size:11px;color:#64748B;margin-bottom:3px">ระยะเวลา</div><div style="font-weight:600;font-size:14px">5 ชั่วโมง</div></div>
+                        <div><div style="font-size:11px;color:#64748B;margin-bottom:3px">AI Account</div><div style="font-weight:600;font-size:14px">Claude Pro #2</div></div>
+                      </div>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:14px">
+                      <button onClick="{{ navToBooking }}" class="btn btn-primary" style="font-size:13px;background:#2563EB;border:none"><i class="bi bi-calendar-plus me-1"></i>จองคิวเพิ่ม</button>
+                      <button onClick="{{ onCancelUpcoming }}" class="btn btn-outline-danger" style="font-size:13px"><i class="bi bi-x-circle me-1"></i>ยกเลิก</button>
+                    </div>
+                  </div>
+                </div>
+                <!-- Quick stats -->
+                <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                  <div class="card-body" style="padding:20px">
+                    <h6 style="font-weight:700;margin:0 0 14px">สถิติการใช้งาน</h6>
+                    <div style="display:flex;flex-direction:column;gap:12px">
+                      <div style="display:flex;justify-content:space-between;align-items:center">
+                        <span style="font-size:13px;color:#64748B">จองทั้งหมด</span>
+                        <span style="font-weight:700">12 รอบ</span>
+                      </div>
+                      <div style="display:flex;justify-content:space-between;align-items:center">
+                        <span style="font-size:13px;color:#64748B">ชั่วโมงสะสม</span>
+                        <span style="font-weight:700">48 ชม.</span>
+                      </div>
+                      <div style="display:flex;justify-content:space-between;align-items:center">
+                        <span style="font-size:13px;color:#64748B">ยกเลิก</span>
+                        <span style="font-weight:700;color:#EF4444">1 รอบ</span>
+                      </div>
+                      <div style="background:var(--bs-border-color);height:1px"></div>
+                      <div style="display:flex;justify-content:space-between;align-items:center">
+                        <span style="font-size:13px;color:#64748B">อัตราการใช้งาน</span>
+                        <span style="font-weight:700;color:#059669">91.7%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Recent bookings table -->
+              <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                <div class="card-body" style="padding:20px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                    <h6 style="font-weight:700;margin:0">ประวัติการจองล่าสุด</h6>
+                    <button onClick="{{ navToMyBookings }}" style="font-size:12px;color:#2563EB;border:none;background:none;cursor:pointer;font-weight:600">ดูทั้งหมด <i class="bi bi-arrow-right"></i></button>
+                  </div>
+                  <div style="overflow-x:auto">
+                    <table style="width:100%;border-collapse:collapse;font-size:13px">
+                      <thead>
+                        <tr style="border-bottom:2px solid var(--bs-border-color)">
+                          <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748B;white-space:nowrap">วันที่</th>
+                          <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748B;white-space:nowrap">ช่วงเวลา</th>
+                          <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748B;white-space:nowrap">AI Account</th>
+                          <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748B">สถานะ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <sc-for list="{{ myBookingsSummary }}" as="b" hint-placeholder-count="3">
+                          <tr style="border-bottom:1px solid var(--bs-border-color)">
+                            <td style="padding:10px">{{ b.date }}</td>
+                            <td style="padding:10px">{{ b.slot }}</td>
+                            <td style="padding:10px;color:#64748B">{{ b.ai }}</td>
+                            <td style="padding:10px"><span class="{{ b.badgeCls }}">{{ b.statusLabel }}</span></td>
+                          </tr>
+                        </sc-for>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ══ BOOKING PAGE ══ -->
+          <sc-if value="{{ isBookingPage }}">
+            <div class="page-anim">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+                <div>
+                  <h5 style="font-weight:700;margin:0">จองคิว AI Pro</h5>
+                  <p style="color:#64748B;font-size:14px;margin:4px 0 0">คลิกช่วงเวลาสีฟ้าเพื่อจอง · โควต้าคงเหลือ 2/3 รอบ/สัปดาห์</p>
+                </div>
+                <!-- Week nav -->
+                <div style="display:flex;align-items:center;gap:8px">
+                  <button onClick="{{ onPrevWeek }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-chevron-left"></i></button>
+                  <span style="font-size:13px;font-weight:600;white-space:nowrap">{{ weekLabel }}</span>
+                  <button onClick="{{ onNextWeek }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-chevron-right"></i></button>
+                </div>
+              </div>
+
+              <!-- Legend -->
+              <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;font-size:12px">
+                <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#EFF6FF;border:1.5px solid #BFDBFE"></div>ว่าง (จองได้)</div>
+                <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#2563EB"></div>ของฉัน</div>
+                <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#059669"></div>กำลังใช้งาน</div>
+                <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#F1F5F9;border:1.5px solid #E2E8F0"></div>จองแล้ว</div>
+                <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;border:1.5px dashed #CBD5E1"></div>ปิด</div>
+              </div>
+
+              <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                <div class="card-body" style="padding:20px">
+                  <!-- Calendar grid -->
+                  <div style="display:flex;gap:6px;overflow-x:auto;min-width:0">
+                    <!-- Time labels -->
+                    <div style="flex-shrink:0;width:52px;padding-top:52px;display:flex;flex-direction:column;gap:6px">
+                      <div style="height:74px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:1px;padding-right:6px">
+                        <span style="font-size:10px;font-weight:600;color:#64748B">เช้า</span>
+                        <span style="font-size:9px;color:#94A3B8">08:00</span>
+                        <span style="font-size:9px;color:#94A3B8">13:00</span>
+                      </div>
+                      <div style="height:74px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:1px;padding-right:6px">
+                        <span style="font-size:10px;font-weight:600;color:#64748B">บ่าย</span>
+                        <span style="font-size:9px;color:#94A3B8">13:00</span>
+                        <span style="font-size:9px;color:#94A3B8">18:00</span>
+                      </div>
+                      <div style="height:74px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:1px;padding-right:6px">
+                        <span style="font-size:10px;font-weight:600;color:#64748B">เย็น</span>
+                        <span style="font-size:9px;color:#94A3B8">18:00</span>
+                        <span style="font-size:9px;color:#94A3B8">23:00</span>
+                      </div>
+                    </div>
+                    <!-- Day columns -->
+                    <sc-for list="{{ weekSlots }}" as="day" hint-placeholder-count="7">
+                      <div style="flex:1;min-width:80px;display:flex;flex-direction:column;gap:6px">
+                        <div style="height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+                          <span style="font-size:10px;font-weight:600;color:#94A3B8;letter-spacing:.05em">{{ day.dayName }}</span>
+                          <span class="{{ day.todayCls }}">{{ day.date }}</span>
+                        </div>
+                        <sc-for list="{{ day.slots }}" as="slot" hint-placeholder-count="3">
+                          <div class="{{ slot.cls }}" onClick="{{ slot.onClick }}">
+                            <i class="{{ slot.iconCls }}" style="font-size:13px;margin-bottom:2px"></i>
+                            <div style="font-size:10px;font-weight:600;line-height:1.2">{{ slot.label }}</div>
+                            <div style="font-size:9px;opacity:.7;margin-top:1px">{{ slot.statusText }}</div>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ══ MY BOOKINGS ══ -->
+          <sc-if value="{{ isMyBookings }}">
+            <div class="page-anim">
+              <h5 style="font-weight:700;margin:0 0 20px">การจองของฉัน</h5>
+              <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                <div class="card-body" style="padding:20px">
+                  <!-- Tab-like filter -->
+                  <div style="display:flex;gap:0;border-bottom:2px solid var(--bs-border-color);margin-bottom:20px">
+                    <button onClick="{{ setMBFilterAll }}" style="border:none;background:none;cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600" class="{{ mbAllCls }}">ทั้งหมด</button>
+                    <button onClick="{{ setMBFilterUp }}" style="border:none;background:none;cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600" class="{{ mbUpCls }}">กำลังจะมาถึง</button>
+                    <button onClick="{{ setMBFilterDone }}" style="border:none;background:none;cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600" class="{{ mbDoneCls }}">เสร็จสิ้น</button>
+                    <button onClick="{{ setMBFilterCancel }}" style="border:none;background:none;cursor:pointer;padding:8px 16px;font-size:13px;font-weight:600" class="{{ mbCancelCls }}">ยกเลิก</button>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:10px">
+                    <sc-for list="{{ myBookingsFiltered }}" as="bk" hint-placeholder-count="4">
+                      <div style="display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--bs-border-color);border-radius:10px">
+                        <div style="width:44px;height:44px;border-radius:10px;background:#EFF6FF;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                          <i class="bi bi-calendar3" style="color:#2563EB;font-size:18px"></i>
+                        </div>
+                        <div style="flex:1;min-width:0">
+                          <div style="font-weight:600;font-size:14px">{{ bk.slot }}</div>
+                          <div style="font-size:12px;color:#64748B;margin-top:2px">{{ bk.date }} · {{ bk.ai }}</div>
+                        </div>
+                        <span class="{{ bk.badgeCls }}">{{ bk.statusLabel }}</span>
+                        <sc-if value="{{ bk.canCancel }}">
+                          <button onClick="{{ bk.onCancel }}" class="action-btn-err"><i class="bi bi-x-circle me-1"></i>ยกเลิก</button>
+                        </sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ══ PROFILE ══ -->
+          <sc-if value="{{ isProfilePage }}">
+            <div class="page-anim">
+              <h5 style="font-weight:700;margin:0 0 20px">โปรไฟล์ส่วนตัว</h5>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:700px">
+                <div class="card" style="grid-column:span 2;border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                  <div class="card-body" style="padding:20px;display:flex;align-items:center;gap:16px">
+                    <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#0EA5E9);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:28px;flex-shrink:0">ส</div>
+                    <div>
+                      <div style="font-size:20px;font-weight:700">สมชาย ใจดี</div>
+                      <div style="color:#64748B;font-size:13px">6501CS001 · วิทยาการคอมพิวเตอร์</div>
+                      <span class="badge-ok" style="margin-top:6px;display:inline-block">อนุมัติแล้ว</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                  <div class="card-body" style="padding:20px">
+                    <h6 style="font-weight:700;margin:0 0 14px">ข้อมูลส่วนตัว</h6>
+                    <div style="display:flex;flex-direction:column;gap:12px">
+                      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">ชื่อ-นามสกุล</label><input class="form-control" value="สมชาย ใจดี" style="font-size:13px"></div>
+                      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">อีเมล</label><input class="form-control" value="somchai@rvc.ac.th" style="font-size:13px"></div>
+                      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">เบอร์โทร</label><input class="form-control" value="081-234-5678" style="font-size:13px"></div>
+                      <button onClick="{{ onSaveProfile }}" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px">บันทึกข้อมูล</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                  <div class="card-body" style="padding:20px">
+                    <h6 style="font-weight:700;margin:0 0 14px">เปลี่ยนรหัสผ่าน</h6>
+                    <div style="display:flex;flex-direction:column;gap:12px">
+                      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">รหัสผ่านปัจจุบัน</label><input type="password" class="form-control" placeholder="••••••••" style="font-size:13px"></div>
+                      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">รหัสผ่านใหม่</label><input type="password" class="form-control" placeholder="••••••••" style="font-size:13px"></div>
+                      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">ยืนยันรหัสผ่านใหม่</label><input type="password" class="form-control" placeholder="••••••••" style="font-size:13px"></div>
+                      <button onClick="{{ onChangePassword }}" class="btn btn-outline-primary" style="font-size:13px">เปลี่ยนรหัสผ่าน</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ══ ADMIN DASHBOARD ══ -->
+          <sc-if value="{{ isAdminDash }}">
+            <div class="page-anim">
+              <div style="margin-bottom:22px">
+                <h5 style="font-weight:700;margin:0">ภาพรวมระบบ</h5>
+                <p style="color:#64748B;font-size:14px;margin:4px 0 0">อัปเดตล่าสุด: วันนี้ 09:00 · สัปดาห์ที่ 27 ปีการศึกษา 2569</p>
+              </div>
+
+              <!-- Admin stat cards -->
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:22px">
+                <div class="card" style="border:none;background:linear-gradient(135deg,#2563EB,#1D4ED8);box-shadow:0 4px 16px rgba(37,99,235,.3)">
+                  <div class="card-body" style="padding:18px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                      <i class="bi bi-people-fill" style="color:rgba(255,255,255,.8);font-size:22px"></i>
+                      <span style="background:rgba(255,255,255,.2);color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">+8 สัปดาห์นี้</span>
+                    </div>
+                    <div style="font-size:32px;font-weight:700;color:white;line-height:1">{{ totalMembers }}</div>
+                    <div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:4px">สมาชิกทั้งหมด</div>
+                  </div>
+                </div>
+                <div class="card" style="border:none;background:linear-gradient(135deg,#F59E0B,#D97706);box-shadow:0 4px 16px rgba(245,158,11,.3)">
+                  <div class="card-body" style="padding:18px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                      <i class="bi bi-hourglass-split" style="color:rgba(255,255,255,.8);font-size:22px"></i>
+                      <span style="background:rgba(255,255,255,.2);color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">รีวิวด่วน</span>
+                    </div>
+                    <div style="font-size:32px;font-weight:700;color:white;line-height:1">{{ pendingCount }}</div>
+                    <div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:4px">รออนุมัติ</div>
+                  </div>
+                </div>
+                <div class="card" style="border:none;background:linear-gradient(135deg,#059669,#047857);box-shadow:0 4px 16px rgba(5,150,105,.3)">
+                  <div class="card-body" style="padding:18px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                      <i class="bi bi-activity" style="color:rgba(255,255,255,.8);font-size:22px"></i>
+                    </div>
+                    <div style="font-size:32px;font-weight:700;color:white;line-height:1">78<span style="font-size:18px">%</span></div>
+                    <div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:4px">อัตราการใช้งานวันนี้</div>
+                  </div>
+                </div>
+                <div class="card" style="border:none;background:linear-gradient(135deg,#7C3AED,#6D28D9);box-shadow:0 4px 16px rgba(124,58,237,.3)">
+                  <div class="card-body" style="padding:18px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                      <i class="bi bi-calendar2-check" style="color:rgba(255,255,255,.8);font-size:22px"></i>
+                    </div>
+                    <div style="font-size:32px;font-weight:700;color:white;line-height:1">48</div>
+                    <div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:4px">การจองสัปดาห์นี้</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Chart + AI Pool status -->
+              <div style="display:grid;grid-template-columns:1fr 300px;gap:14px;margin-bottom:14px">
+                <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                  <div class="card-body" style="padding:20px">
+                    <h6 style="font-weight:700;margin:0 0 4px">อัตราการใช้งาน AI (% ต่อวัน)</h6>
+                    <p style="color:#64748B;font-size:12px;margin:0 0 16px">สัปดาห์ปัจจุบัน เทียบรายบัญชี</p>
+                    <div style="height:220px;position:relative">
+                      <canvas id="adminUsageChart"></canvas>
+                    </div>
+                  </div>
+                </div>
+                <!-- AI Pool -->
+                <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                  <div class="card-body" style="padding:20px">
+                    <h6 style="font-weight:700;margin:0 0 16px">สถานะ AI Account Pool</h6>
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                      <sc-for list="{{ aiAccounts }}" as="ac" hint-placeholder-count="4">
+                        <div style="padding:12px;border:1px solid var(--bs-border-color);border-radius:10px">
+                          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                            <div style="font-size:13px;font-weight:600">{{ ac.name }}</div>
+                            <span class="{{ ac.statusCls }}">{{ ac.statusLabel }}</span>
+                          </div>
+                          <div style="font-size:11px;color:#64748B">{{ ac.type }} · {{ ac.usedToday }}/{{ ac.totalSlots }} slots วันนี้</div>
+                          <div style="background:var(--bs-border-color);border-radius:3px;height:4px;margin-top:8px;overflow:hidden">
+                            <div style="background:#2563EB;width:{{ ac.usagePct }};height:100%;border-radius:3px"></div>
+                          </div>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pending approvals quick view -->
+              <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                <div class="card-body" style="padding:20px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                    <div>
+                      <h6 style="font-weight:700;margin:0">รออนุมัติสมาชิก</h6>
+                      <p style="color:#64748B;font-size:12px;margin:2px 0 0">{{ pendingCount }} รายการรอการตรวจสอบ</p>
+                    </div>
+                    <button onClick="{{ navToMemberMgmt }}" class="btn btn-sm btn-primary" style="background:#2563EB;border:none;font-size:12px">ดูทั้งหมด</button>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <sc-for list="{{ pendingMembers }}" as="pm" hint-placeholder-count="3">
+                      <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bs-secondary-bg);border-radius:10px">
+                        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#0EA5E9);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px;flex-shrink:0">{{ pm.initial }}</div>
+                        <div style="flex:1;min-width:0">
+                          <div style="font-weight:600;font-size:14px">{{ pm.name }}</div>
+                          <div style="font-size:12px;color:#64748B">{{ pm.studentId }} · {{ pm.major }}</div>
+                        </div>
+                        <div style="display:flex;gap:6px">
+                          <button onClick="{{ pm.onApprove }}" class="action-btn-ok"><i class="bi bi-check-lg"></i> อนุมัติ</button>
+                          <button onClick="{{ pm.onReject }}" class="action-btn-err"><i class="bi bi-x-lg"></i></button>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ══ MEMBER MANAGEMENT ══ -->
+          <sc-if value="{{ isMemberMgmt }}">
+            <div class="page-anim">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+                <div>
+                  <h5 style="font-weight:700;margin:0">จัดการสมาชิก</h5>
+                  <p style="color:#64748B;font-size:14px;margin:4px 0 0">{{ totalMembers }} สมาชิก · {{ pendingCount }} รออนุมัติ</p>
+                </div>
+                <button class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px"><i class="bi bi-person-plus me-1"></i>เพิ่มสมาชิก</button>
+              </div>
+
+              <!-- Search + filter bar -->
+              <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);margin-bottom:14px">
+                <div class="card-body" style="padding:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+                  <div style="flex:1;min-width:200px;position:relative">
+                    <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:14px"></i>
+                    <input value="{{ searchQuery }}" onChange="{{ onSearchChange }}" type="text" class="form-control" placeholder="ค้นหาชื่อหรือรหัสนักศึกษา..." style="padding-left:36px;font-size:13px">
+                  </div>
+                  <!-- Filter chips -->
+                  <div style="display:flex;gap:6px;flex-wrap:wrap">
+                    <button onClick="{{ setFilterAll }}" class="{{ filterAllCls }}" style="border-radius:20px;font-size:12px;padding:5px 14px;border:1.5px solid;cursor:pointer;font-weight:600">ทั้งหมด ({{ totalMembers }})</button>
+                    <button onClick="{{ setFilterApproved }}" class="{{ filterOkCls }}" style="border-radius:20px;font-size:12px;padding:5px 14px;border:1.5px solid;cursor:pointer;font-weight:600">อนุมัติแล้ว ({{ approvedCount }})</button>
+                    <button onClick="{{ setFilterPending }}" class="{{ filterPendCls }}" style="border-radius:20px;font-size:12px;padding:5px 14px;border:1.5px solid;cursor:pointer;font-weight:600">รออนุมัติ ({{ pendingCount }})</button>
+                    <button onClick="{{ setFilterSuspended }}" class="{{ filterSuspCls }}" style="border-radius:20px;font-size:12px;padding:5px 14px;border:1.5px solid;cursor:pointer;font-weight:600">ระงับสิทธิ์</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Member table -->
+              <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                <div class="card-body" style="padding:0;overflow-x:auto">
+                  <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead>
+                      <tr style="border-bottom:2px solid var(--bs-border-color);background:var(--bs-secondary-bg)">
+                        <th style="padding:12px 16px;text-align:left;font-weight:600;color:#64748B;white-space:nowrap">สมาชิก</th>
+                        <th style="padding:12px 16px;text-align:left;font-weight:600;color:#64748B;white-space:nowrap">รหัส / สาขา</th>
+                        <th style="padding:12px 16px;text-align:left;font-weight:600;color:#64748B">สถานะ</th>
+                        <th style="padding:12px 16px;text-align:left;font-weight:600;color:#64748B;white-space:nowrap">ชม.สะสม</th>
+                        <th style="padding:12px 16px;text-align:left;font-weight:600;color:#64748B;white-space:nowrap">วันสมัคร</th>
+                        <th style="padding:12px 16px;text-align:center;font-weight:600;color:#64748B">การดำเนินการ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <sc-for list="{{ members }}" as="m" hint-placeholder-count="6">
+                        <tr style="border-bottom:1px solid var(--bs-border-color)">
+                          <td style="padding:12px 16px">
+                            <div style="display:flex;align-items:center;gap:10px">
+                              <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#EFF6FF,#DBEAFE);display:flex;align-items:center;justify-content:center;font-weight:700;color:#2563EB;font-size:14px;flex-shrink:0">{{ m.initial }}</div>
+                              <div>
+                                <div style="font-weight:600">{{ m.name }}</div>
+                                <div style="font-size:11px;color:#94A3B8;margin-top:1px">{{ m.email }}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style="padding:12px 16px">
+                            <div style="font-family:monospace;font-size:12px;font-weight:600">{{ m.studentId }}</div>
+                            <div style="font-size:11px;color:#64748B;margin-top:2px">{{ m.major }}</div>
+                          </td>
+                          <td style="padding:12px 16px"><span class="{{ m.badgeCls }}">{{ m.statusLabel }}</span></td>
+                          <td style="padding:12px 16px;font-weight:600">{{ m.hours }} ชม.</td>
+                          <td style="padding:12px 16px;color:#64748B;white-space:nowrap">{{ m.joinDate }}</td>
+                          <td style="padding:12px 16px">
+                            <div style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap">
+                              <sc-if value="{{ m.isPending }}">
+                                <button onClick="{{ m.onApprove }}" class="action-btn-ok"><i class="bi bi-check-lg me-1"></i>อนุมัติ</button>
+                                <button onClick="{{ m.onReject }}" class="action-btn-err"><i class="bi bi-x-lg me-1"></i>ปฏิเสธ</button>
+                              </sc-if>
+                              <sc-if value="{{ m.isApproved }}">
+                                <button onClick="{{ m.onSuspend }}" class="action-btn-warn"><i class="bi bi-slash-circle me-1"></i>ระงับ</button>
+                                <button class="action-btn-blue"><i class="bi bi-clock-history me-1"></i>ประวัติ</button>
+                              </sc-if>
+                              <sc-if value="{{ m.isSuspended }}">
+                                <button onClick="{{ m.onActivate }}" class="action-btn-ok"><i class="bi bi-check-circle me-1"></i>เปิดใช้</button>
+                                <button class="action-btn-err"><i class="bi bi-trash me-1"></i>ลบ</button>
+                              </sc-if>
+                            </div>
+                          </td>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                  <!-- Pagination -->
+                  <div style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--bs-border-color)">
+                    <span style="font-size:12px;color:#64748B">แสดง 1–{{ membersShown }} จาก {{ totalMembers }} รายการ</span>
+                    <div style="display:flex;gap:4px">
+                      <button class="btn btn-sm btn-outline-secondary" style="font-size:12px">ก่อนหน้า</button>
+                      <button class="btn btn-sm btn-primary" style="background:#2563EB;border:none;font-size:12px">1</button>
+                      <button class="btn btn-sm btn-outline-secondary" style="font-size:12px">ถัดไป</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ══ SLOT MANAGEMENT ══ -->
+          <sc-if value="{{ isSlotMgmt }}">
+            <div class="page-anim">
+              <h5 style="font-weight:700;margin:0 0 20px">จัดการตารางเวลา</h5>
+              <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:600px">
+                  <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:5px">ความยาวช่วงเวลา (ชั่วโมง)</label><input class="form-control" value="5" type="number" style="font-size:13px"></div>
+                  <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:5px">จำนวน Slots/วัน</label><input class="form-control" value="3" type="number" style="font-size:13px"></div>
+                  <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:5px">โควต้า/สัปดาห์/คน</label><input class="form-control" value="3" type="number" style="font-size:13px"></div>
+                  <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:5px">จองล่วงหน้าสูงสุด (วัน)</label><input class="form-control" value="14" type="number" style="font-size:13px"></div>
+                </div>
+                <button onClick="{{ onSaveSlotSettings }}" class="btn btn-primary" style="background:#2563EB;border:none;margin-top:16px;font-size:13px"><i class="bi bi-save me-1"></i>บันทึกการตั้งค่า</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ══ AI ACCOUNTS ══ -->
+          <sc-if value="{{ isAIAccounts }}">
+            <div class="page-anim">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+                <h5 style="font-weight:700;margin:0">บัญชี AI Account Pool</h5>
+                <button onClick="{{ onAddAIAccount }}" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px"><i class="bi bi-plus-lg me-1"></i>เพิ่มบัญชี AI</button>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
+                <sc-for list="{{ aiAccounts }}" as="ac" hint-placeholder-count="4">
+                  <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                    <div class="card-body" style="padding:18px">
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                        <div style="display:flex;align-items:center;gap:10px">
+                          <div class="stat-icon" style="background:#EFF6FF;width:40px;height:40px"><i class="bi bi-robot" style="color:#2563EB;font-size:17px"></i></div>
+                          <div>
+                            <div style="font-weight:700;font-size:14px">{{ ac.name }}</div>
+                            <div style="font-size:11px;color:#64748B">{{ ac.type }}</div>
+                          </div>
+                        </div>
+                        <span class="{{ ac.statusCls }}">{{ ac.statusLabel }}</span>
+                      </div>
+                      <div style="font-size:12px;color:#64748B;margin-bottom:6px">ใช้วันนี้: {{ ac.usedToday }}/{{ ac.totalSlots }} slots</div>
+                      <div style="background:var(--bs-border-color);border-radius:4px;height:6px;overflow:hidden">
+                        <div style="background:#2563EB;width:{{ ac.usagePct }};height:100%;border-radius:4px"></div>
+                      </div>
+                      <div style="display:flex;gap:6px;margin-top:12px">
+                        <button class="action-btn-blue" style="flex:1;text-align:center"><i class="bi bi-pencil me-1"></i>แก้ไข</button>
+                        <button class="action-btn-err"><i class="bi bi-trash"></i></button>
+                      </div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ══ REPORTS ══ -->
+          <sc-if value="{{ isReports }}">
+            <div class="page-anim">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+                <h5 style="font-weight:700;margin:0">รายงานสถิติ</h5>
+                <button onClick="{{ onExportReport }}" class="btn btn-outline-primary" style="font-size:13px;color:#2563EB;border-color:#2563EB"><i class="bi bi-download me-1"></i>Export CSV</button>
+              </div>
+              <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+                <div class="card-body" style="padding:20px">
+                  <div style="overflow-x:auto">
+                    <table style="width:100%;border-collapse:collapse;font-size:13px">
+                      <thead>
+                        <tr style="border-bottom:2px solid var(--bs-border-color);background:var(--bs-secondary-bg)">
+                          <th style="padding:10px 14px;text-align:left;font-weight:600;color:#64748B">สมาชิก</th>
+                          <th style="padding:10px 14px;text-align:left;font-weight:600;color:#64748B">รหัสนักศึกษา</th>
+                          <th style="padding:10px 14px;text-align:left;font-weight:600;color:#64748B">จองทั้งหมด</th>
+                          <th style="padding:10px 14px;text-align:left;font-weight:600;color:#64748B">ชม.สะสม</th>
+                          <th style="padding:10px 14px;text-align:left;font-weight:600;color:#64748B">อัตราการใช้งาน</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <sc-for list="{{ reportRows }}" as="r" hint-placeholder-count="6">
+                          <tr style="border-bottom:1px solid var(--bs-border-color)">
+                            <td style="padding:10px 14px;font-weight:500">{{ r.name }}</td>
+                            <td style="padding:10px 14px;font-family:monospace;font-size:12px">{{ r.studentId }}</td>
+                            <td style="padding:10px 14px">{{ r.totalBookings }} รอบ</td>
+                            <td style="padding:10px 14px;font-weight:600">{{ r.hours }} ชม.</td>
+                            <td style="padding:10px 14px">
+                              <div style="display:flex;align-items:center;gap:8px">
+                                <div style="flex:1;background:var(--bs-border-color);border-radius:3px;height:5px;overflow:hidden">
+                                  <div style="background:#2563EB;width:{{ r.rate }};height:100%;border-radius:3px"></div>
+                                </div>
+                                <span style="font-size:12px;font-weight:600;color:#2563EB;white-space:nowrap">{{ r.rateLabel }}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        </sc-for>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+        </main>
+      </div>
+
+      <!-- ── BOOKING MODAL ── -->
+      <sc-if value="{{ showModal }}">
+        <div class="modal-back" onClick="{{ onCloseModal }}">
+          <div class="modal-box" onClick="{{ stopProp }}">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="stat-icon" style="background:#EFF6FF;width:40px;height:40px"><i class="bi bi-calendar-check" style="color:#2563EB;font-size:18px"></i></div>
+                <h5 style="font-weight:700;margin:0;font-size:16px">ยืนยันการจองคิว</h5>
+              </div>
+              <button onClick="{{ onCloseModal }}" style="border:none;background:none;cursor:pointer;color:#94A3B8;font-size:22px;line-height:1;padding:0">×</button>
+            </div>
+            <div class="info-box" style="margin-bottom:16px">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div><div style="font-size:11px;color:#64748B;margin-bottom:3px">วันที่</div><div style="font-weight:700;font-size:14px">{{ modalDayLabel }}</div></div>
+                <div><div style="font-size:11px;color:#64748B;margin-bottom:3px">ช่วงเวลา</div><div style="font-weight:700;font-size:14px">{{ modalSlotTime }}</div></div>
+                <div><div style="font-size:11px;color:#64748B;margin-bottom:3px">ระยะเวลา</div><div style="font-weight:700;font-size:14px">5 ชั่วโมง</div></div>
+                <div><div style="font-size:11px;color:#64748B;margin-bottom:3px">AI Account</div><div style="font-weight:700;font-size:14px">{{ modalAIAccount }}</div></div>
+              </div>
+            </div>
+            <div style="background:#FFFBEB;border-radius:8px;padding:10px 13px;margin-bottom:18px;font-size:12px;color:#92400E;display:flex;gap:8px;align-items:flex-start">
+              <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0;margin-top:1px"></i>
+              <span>หลังจองนี้ โควต้าสัปดาห์คงเหลือ <strong>1/3 รอบ</strong> · ระบบจะส่งอีเมลยืนยันทันที</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <button onClick="{{ onCloseModal }}" class="btn btn-outline-secondary" style="font-size:14px;font-weight:500">ยกเลิก</button>
+              <button onClick="{{ onConfirmBooking }}" class="btn btn-primary" style="background:linear-gradient(90deg,#2563EB,#0EA5E9);border:none;font-size:14px;font-weight:600">
+                <i class="bi bi-check-lg me-1"></i>ยืนยันการจอง
+              </button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ── TOAST ── -->
+      <sc-if value="{{ showToast }}">
+        <div class="{{ toastCls }}">
+          <i class="{{ toastIconCls }}" style="font-size:16px;flex-shrink:0"></i>
+          <span>{{ toastMsg }}</span>
+        </div>
+      </sc-if>
+
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  chartInstance = null;
+
+  state = {
+    page: 'login',
+    theme: 'system',
+    role: null,
+    sidebarCollapsed: false,
+    showModal: false,
+    modalData: null,
+    toastMsg: null,
+    toastType: 'ok',
+    searchQuery: '',
+    filterStatus: 'all',
+    currentWeek: 0,
+    mbFilter: 'all',
+    membersData: [
+      { id:1, name:'สมชาย ใจดี',     studentId:'6501CS001', major:'วิทยาการคอมพิวเตอร์', email:'somchai@rvc.ac.th',   status:'approved',  hours:48, joinDate:'15 ม.ค. 68' },
+      { id:2, name:'สมหญิง รักเรียน', studentId:'6501IT002', major:'เทคโนโลยีสารสนเทศ',   email:'somying@rvc.ac.th',  status:'pending',   hours:0,  joinDate:'2 ก.ค. 69'  },
+      { id:3, name:'วิชัย เก่งมาก',   studentId:'6501CS003', major:'วิทยาการคอมพิวเตอร์', email:'wichai@rvc.ac.th',   status:'approved',  hours:35, joinDate:'10 ม.ค. 68' },
+      { id:4, name:'อมรา สวยงาม',     studentId:'6502DS004', major:'วิทยาการข้อมูล',       email:'amara@rvc.ac.th',   status:'pending',   hours:0,  joinDate:'1 ก.ค. 69'  },
+      { id:5, name:'ธนพล มีสติ',      studentId:'6501CS005', major:'วิทยาการคอมพิวเตอร์', email:'thanapol@rvc.ac.th', status:'suspended', hours:15, joinDate:'5 ก.พ. 68'  },
+      { id:6, name:'นภา แสงทอง',      studentId:'6502IT006', major:'เทคโนโลยีสารสนเทศ',   email:'napa@rvc.ac.th',    status:'approved',  hours:22, joinDate:'20 ก.พ. 68' },
+      { id:7, name:'ปิยะ วงษ์งาม',    studentId:'6502DS007', major:'วิทยาการข้อมูล',       email:'piya@rvc.ac.th',    status:'approved',  hours:41, joinDate:'1 มี.ค. 68'  },
+      { id:8, name:'กนกวรรณ สุขใจ',   studentId:'6503CS008', major:'วิทยาการคอมพิวเตอร์', email:'kanok@rvc.ac.th',   status:'pending',   hours:0,  joinDate:'3 ก.ค. 69'  },
+    ],
+    myBookings: [
+      { id:1, date:'ศ. 4 ก.ค. 69',  slot:'เช้า (08:00–13:00)',  ai:'Claude Pro #2',   status:'upcoming'  },
+      { id:2, date:'จ. 30 มิ.ย. 69', slot:'บ่าย (13:00–18:00)', ai:'ChatGPT Plus #1', status:'completed' },
+      { id:3, date:'ศ. 27 มิ.ย. 69', slot:'เย็น (18:00–23:00)', ai:'Claude Pro #1',   status:'completed' },
+      { id:4, date:'จ. 23 มิ.ย. 69', slot:'เช้า (08:00–13:00)', ai:'ChatGPT Plus #2', status:'completed' },
+      { id:5, date:'ศ. 20 มิ.ย. 69', slot:'บ่าย (13:00–18:00)', ai:'Claude Pro #2',   status:'cancelled' },
+    ],
+  };
+
+  /* ─────────────── Theme ─────────────── */
+  getBsTheme() {
+    const { theme } = this.state;
+    if (theme === 'system') return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    return theme;
+  }
+
+  setTheme(t) {
+    this.setState({ theme: t }, () => {
+      const bsTheme = this.getBsTheme();
+      document.documentElement.setAttribute('data-bs-theme', bsTheme);
+      if (this.chartInstance) { this.chartInstance.destroy(); this.chartInstance = null; }
+      setTimeout(() => this.maybeInitChart(), 80);
+    });
+  }
+
+  /* ─────────────── Toast ─────────────── */
+  showToast(msg, type = 'ok') {
+    this.setState({ toastMsg: msg, toastType: type });
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => this.setState({ toastMsg: null }), 3200);
+  }
+
+  /* ─────────────── Chart ─────────────── */
+  maybeInitChart() {
+    const canvas = document.getElementById('adminUsageChart');
+    if (!canvas || this.chartInstance) return;
+    const isDark = this.getBsTheme() === 'dark';
+    const gc = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)';
+    const tc = isDark ? '#94A3B8' : '#64748B';
+    this.chartInstance = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: ['จ','อ','พ','พฤ','ศ','ส','อา'],
+        datasets: [
+          { label:'Claude Pro',    data:[85,92,78,95,88,60,45], backgroundColor:'rgba(37,99,235,.82)',  borderRadius:5 },
+          { label:'ChatGPT Plus',  data:[70,80,85,75,90,55,40], backgroundColor:'rgba(14,165,233,.82)', borderRadius:5 },
+        ],
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ position:'top', labels:{ color:tc, font:{ size:12 } } } },
+        scales:{
+          x:{ grid:{ color:gc }, ticks:{ color:tc } },
+          y:{ grid:{ color:gc }, ticks:{ color:tc, callback: v => v+'%' }, max:100, min:0 },
+        },
+      },
+    });
+  }
+
+  /* ─────────────── Week slots ─────────────── */
+  generateWeekSlots() {
+    const thDays = ['จ','อ','พ','พฤ','ศ','ส','อา'];
+    const today = new Date(2026,6,3);
+    const dow = today.getDay() === 0 ? 7 : today.getDay();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - (dow - 1) + this.state.currentWeek * 7);
+
+    const patterns = [
+      ['available','busy','mine'],
+      ['now','available','available'],
+      ['busy','busy','available'],
+      ['available','mine','busy'],
+      ['available','available','available'],
+      ['busy','available','off'],
+      ['off','off','available'],
+    ];
+    const slotMeta = [
+      { label:'เช้า', time:'08:00–13:00', iconAvail:'bi-sun', iconBusy:'bi-person-fill', iconMine:'bi-check-circle-fill', iconNow:'bi-circle-fill', iconOff:'bi-moon' },
+      { label:'บ่าย', time:'13:00–18:00', iconAvail:'bi-sun', iconBusy:'bi-person-fill', iconMine:'bi-check-circle-fill', iconNow:'bi-circle-fill', iconOff:'bi-moon' },
+      { label:'เย็น', time:'18:00–23:00', iconAvail:'bi-moon-stars', iconBusy:'bi-person-fill', iconMine:'bi-check-circle-fill', iconNow:'bi-circle-fill', iconOff:'bi-moon' },
+    ];
+    const clsMap = { available:'slt slt-avail', busy:'slt slt-busy', mine:'slt slt-mine', now:'slt slt-now', off:'slt slt-off' };
+    const iconMap = { available:'bi bi-sun', busy:'bi bi-person-fill', mine:'bi bi-check-circle-fill', now:'bi bi-circle-fill', off:'bi bi-tools' };
+    const textMap = { available:'ว่าง', busy:'จองแล้ว', mine:'ของฉัน', now:'ใช้งานอยู่', off:'ปิด' };
+
+    return thDays.map((dayName, d) => {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + d);
+      const isToday = date.toDateString() === today.toDateString();
+      return {
+        dayName,
+        date: date.getDate(),
+        todayCls: isToday ? 'day-today' : 'day-normal',
+        slots: slotMeta.map((sm, i) => {
+          const status = patterns[d][i];
+          const dayLabel = `${['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'][d]}ที่ ${date.getDate()}`;
+          return {
+            cls: clsMap[status],
+            iconCls: 'bi ' + iconMap[status],
+            label: sm.label,
+            time: sm.time,
+            statusText: textMap[status],
+            onClick: status === 'available' ? () => this.setState({
+              showModal: true,
+              modalData: { dayLabel, slotLabel: sm.label, slotTime: sm.time, aiAccount: d % 2 === 0 ? 'Claude Pro #2' : 'ChatGPT Plus #1' }
+            }) : null,
+          };
+        }),
+      };
+    });
+  }
+
+  getWeekLabel() {
+    const today = new Date(2026,6,3);
+    const dow = today.getDay() === 0 ? 7 : today.getDay();
+    const ws = new Date(today);
+    ws.setDate(today.getDate() - (dow - 1) + this.state.currentWeek * 7);
+    const we = new Date(ws);
+    we.setDate(ws.getDate() + 6);
+    const opts = { day:'numeric', month:'short' };
+    const locale = 'th-TH';
+    return `${ws.toLocaleDateString(locale, opts)} – ${we.toLocaleDateString(locale, opts)} ${we.getFullYear() + 543}`;
+  }
+
+  /* ─────────────── Members ─────────────── */
+  getMembers() {
+    const { membersData, filterStatus, searchQuery } = this.state;
+    const q = searchQuery.toLowerCase();
+    const badgeCls = { approved:'badge-ok', pending:'badge-pend', suspended:'badge-susp' };
+    const statusLabel = { approved:'อนุมัติแล้ว', pending:'รออนุมัติ', suspended:'ระงับสิทธิ์' };
+    return membersData
+      .filter(m => filterStatus === 'all' || m.status === filterStatus)
+      .filter(m => !q || m.name.toLowerCase().includes(q) || m.studentId.toLowerCase().includes(q))
+      .map(m => ({
+        ...m,
+        initial: m.name[0] || '?',
+        badgeCls: badgeCls[m.status],
+        statusLabel: statusLabel[m.status],
+        isPending:   m.status === 'pending',
+        isApproved:  m.status === 'approved',
+        isSuspended: m.status === 'suspended',
+        onApprove:  () => this.approveMember(m.id),
+        onReject:   () => this.rejectMember(m.id),
+        onSuspend:  () => this.suspendMember(m.id),
+        onActivate: () => this.activateMember(m.id),
+      }));
+  }
+
+  approveMember(id) {
+    this.setState(s => ({ membersData: s.membersData.map(m => m.id===id ? {...m,status:'approved'} : m) }));
+    this.showToast('อนุมัติสมาชิกเรียบร้อยแล้ว ✓');
+  }
+  rejectMember(id) {
+    this.setState(s => ({ membersData: s.membersData.filter(m => m.id!==id) }));
+    this.showToast('ปฏิเสธและนำสมาชิกออกเรียบร้อยแล้ว', 'warn');
+  }
+  suspendMember(id) {
+    this.setState(s => ({ membersData: s.membersData.map(m => m.id===id ? {...m,status:'suspended'} : m) }));
+    this.showToast('ระงับสิทธิ์สมาชิกเรียบร้อยแล้ว', 'warn');
+  }
+  activateMember(id) {
+    this.setState(s => ({ membersData: s.membersData.map(m => m.id===id ? {...m,status:'approved'} : m) }));
+    this.showToast('เปิดใช้งานสมาชิกเรียบร้อยแล้ว ✓');
+  }
+
+  /* ─────────────── Lifecycle ─────────────── */
+  componentDidMount() {
+    this.setTheme(this.state.theme);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (this.state.theme === 'system') this.setTheme('system');
+    });
+  }
+
+  componentDidUpdate(pp, ps) {
+    const { page } = this.state;
+    if (page === 'admin-dashboard' && ps.page !== 'admin-dashboard') {
+      setTimeout(() => this.maybeInitChart(), 80);
+    }
+    if (page !== 'admin-dashboard' && ps.page === 'admin-dashboard' && this.chartInstance) {
+      this.chartInstance.destroy();
+      this.chartInstance = null;
+    }
+  }
+
+  /* ─────────────── renderVals ─────────────── */
+  renderVals() {
+    const { page, theme, role, sidebarCollapsed, showModal, modalData, toastMsg, toastType, searchQuery, filterStatus, currentWeek, membersData, myBookings, mbFilter } = this.state;
+    const bsTheme = this.getBsTheme();
+    const isStudent = role === 'student';
+    const isAdmin   = role === 'admin';
+
+    const pendingCount  = membersData.filter(m => m.status==='pending').length;
+    const approvedCount = membersData.filter(m => m.status==='approved').length;
+    const totalMembers  = membersData.length;
+
+    // Theme toggle active bg
+    const thSel = '#2563EB'; const thSelTxt = 'white';
+    const thIdle = 'transparent'; const thIdleTxt = 'var(--bs-secondary-color)';
+    const tlBg = (t) => theme === t ? thSel : thIdle;
+    const tlColor = (t) => theme === t ? thSelTxt : thIdleTxt;
+
+    // Sidebar active classes
+    const sb = (p) => 'sb-link' + (page === p ? ' active' : '');
+
+    // Filter button styles
+    const fActive = 'btn btn-primary btn-sm'; const fInactive = 'btn btn-outline-secondary btn-sm';
+    const fc = (s) => filterStatus === s ? fActive : fInactive;
+
+    // My bookings filter
+    const mbBadge = { upcoming:'badge-up', completed:'badge-ok', cancelled:'badge-susp' };
+    const mbLabel = { upcoming:'กำลังจะมาถึง', completed:'เสร็จสิ้น', cancelled:'ยกเลิกแล้ว' };
+    const mbFiltered = myBookings
+      .filter(b => mbFilter === 'all' || b.status === mbFilter)
+      .map(b => ({
+        ...b,
+        badgeCls: mbBadge[b.status],
+        statusLabel: mbLabel[b.status],
+        canCancel: b.status === 'upcoming',
+        onCancel: b.status === 'upcoming' ? () => { this.setState(s => ({ myBookings: s.myBookings.map(x => x.id===b.id ? {...x,status:'cancelled'} : x) })); this.showToast('ยกเลิกการจองเรียบร้อยแล้ว','warn'); } : null,
+      }));
+
+    const mbCls = (f) => 'nav-tab-' + (mbFilter === f ? 'active' : 'inactive');
+
+    // My bookings summary (for student dashboard)
+    const myBookingsSummary = myBookings.slice(0,4).map(b => ({
+      ...b, ai: b.ai,
+      badgeCls: mbBadge[b.status],
+      statusLabel: mbLabel[b.status],
+    }));
+
+    // AI accounts data
+    const aiAccounts = [
+      { name:'Claude Pro #1',    type:'Anthropic Claude Pro',    usedToday:2, totalSlots:3, usagePct:'67%', status:'active',   statusCls:'badge-ok',   statusLabel:'ใช้งานได้'  },
+      { name:'Claude Pro #2',    type:'Anthropic Claude Pro',    usedToday:1, totalSlots:3, usagePct:'33%', status:'active',   statusCls:'badge-ok',   statusLabel:'ใช้งานได้'  },
+      { name:'ChatGPT Plus #1',  type:'OpenAI ChatGPT Plus',     usedToday:3, totalSlots:3, usagePct:'100%', status:'full',   statusCls:'badge-susp', statusLabel:'เต็มแล้ว'   },
+      { name:'ChatGPT Plus #2',  type:'OpenAI ChatGPT Plus',     usedToday:0, totalSlots:3, usagePct:'0%',   status:'maint',  statusCls:'badge-pend', statusLabel:'บำรุงรักษา' },
+    ];
+
+    // Pending members for admin dashboard
+    const pendingMembers = membersData.filter(m => m.status==='pending').map(m => ({
+      ...m, initial: m.name[0],
+      onApprove: () => this.approveMember(m.id),
+      onReject:  () => this.rejectMember(m.id),
+    }));
+
+    // Reports
+    const reportRows = membersData.filter(m => m.hours > 0).map(m => {
+      const pct = Math.min(100, Math.round(m.hours / 50 * 100));
+      return { name: m.name, studentId: m.studentId, totalBookings: Math.ceil(m.hours/5), hours: m.hours, rate: pct+'%', rateLabel: pct+'%' };
+    });
+
+    // Toast styling
+    const toastClsMap = { ok:'toast-fixed toast-ok', warn:'toast-fixed toast-warn', err:'toast-fixed toast-err' };
+    const toastIconMap = { ok:'bi bi-check-circle-fill', warn:'bi bi-exclamation-triangle-fill', err:'bi bi-x-circle-fill' };
+
+    return {
+      // Auth
+      showAuth: !role,
+      isLoginPage: page === 'login',
+      isRegisterPage: page === 'register',
+
+      // App
+      isLoggedIn: !!role,
+      isStudent, isAdmin,
+      bsTheme,
+
+      // User
+      userName: isStudent ? 'สมชาย ใจดี' : 'ผู้ดูแลระบบ',
+      userInitial: isStudent ? 'ส' : 'A',
+      userRoleLabel: isStudent ? 'นักศึกษา' : 'Admin',
+
+      // Theme
+      themeLightBg: tlBg('light'), themeLightColor: tlColor('light'),
+      themeSystemBg: tlBg('system'), themeSystemColor: tlColor('system'),
+      themeDarkBg: tlBg('dark'), themeDarkColor: tlColor('dark'),
+      setLightTheme: () => this.setTheme('light'),
+      setDarkTheme:  () => this.setTheme('dark'),
+      setSystemTheme:() => this.setTheme('system'),
+
+      // Sidebar
+      sidebarCls: 'sidebar' + (sidebarCollapsed ? ' collapsed' : ''),
+      sbSDash: sb('student-dashboard'),
+      sbBooking: sb('booking'),
+      sbMyBook: sb('my-bookings'),
+      sbProfile: sb('profile'),
+      sbADash: sb('admin-dashboard'),
+      sbMember: sb('member-management'),
+      sbSlot: sb('slot-management'),
+      sbAI: sb('ai-accounts'),
+      sbReports: sb('reports'),
+      hasPending: pendingCount > 0,
+      pendingCount,
+
+      // Navigation handlers
+      onLoginStudent: () => { this.setState({role:'student', page:'student-dashboard'}); },
+      onLoginAdmin:   () => { this.setState({role:'admin',   page:'admin-dashboard'}); },
+      onShowRegister: (e) => { e.preventDefault(); this.setState({page:'register'}); },
+      onShowLogin:    (e) => { e.preventDefault(); this.setState({page:'login'}); },
+      onRegisterSubmit: () => this.showToast('สมัครสำเร็จ! รอการอนุมัติจากผู้ดูแลระบบ'),
+      onLogout: () => { if(this.chartInstance){this.chartInstance.destroy();this.chartInstance=null;} this.setState({role:null,page:'login'}); },
+      onToggleSidebar: () => this.setState(s => ({sidebarCollapsed:!s.sidebarCollapsed})),
+
+      navToStudentDash: () => this.setState({page:'student-dashboard'}),
+      navToBooking:     () => this.setState({page:'booking'}),
+      navToMyBookings:  () => this.setState({page:'my-bookings'}),
+      navToProfile:     () => this.setState({page:'profile'}),
+      navToAdminDash:   () => this.setState({page:'admin-dashboard'}),
+      navToMemberMgmt:  () => this.setState({page:'member-management'}),
+      navToSlotMgmt:    () => this.setState({page:'slot-management'}),
+      navToAIAccounts:  () => this.setState({page:'ai-accounts'}),
+      navToReports:     () => this.setState({page:'reports'}),
+
+      // Pages
+      isStudentDash:  page === 'student-dashboard',
+      isBookingPage:  page === 'booking',
+      isMyBookings:   page === 'my-bookings',
+      isProfilePage:  page === 'profile',
+      isAdminDash:    page === 'admin-dashboard',
+      isMemberMgmt:   page === 'member-management',
+      isSlotMgmt:     page === 'slot-management',
+      isAIAccounts:   page === 'ai-accounts',
+      isReports:      page === 'reports',
+
+      // Student dashboard
+      myBookingsSummary,
+      onCancelUpcoming: () => this.showToast('ยกเลิกการจองเรียบร้อยแล้ว','warn'),
+      onSaveProfile:    () => this.showToast('บันทึกข้อมูลเรียบร้อยแล้ว ✓'),
+      onChangePassword: () => this.showToast('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว ✓'),
+
+      // Booking calendar
+      weekSlots: this.generateWeekSlots(),
+      weekLabel: this.getWeekLabel(),
+      onPrevWeek: () => this.setState(s => ({currentWeek: s.currentWeek - 1})),
+      onNextWeek: () => this.setState(s => ({currentWeek: s.currentWeek + 1})),
+
+      // My bookings
+      myBookingsFiltered: mbFiltered,
+      setMBFilterAll:    () => this.setState({mbFilter:'all'}),
+      setMBFilterUp:     () => this.setState({mbFilter:'upcoming'}),
+      setMBFilterDone:   () => this.setState({mbFilter:'completed'}),
+      setMBFilterCancel: () => this.setState({mbFilter:'cancelled'}),
+      mbAllCls:    mbCls('all'),
+      mbUpCls:     mbCls('upcoming'),
+      mbDoneCls:   mbCls('completed'),
+      mbCancelCls: mbCls('cancelled'),
+
+      // Members
+      members: this.getMembers(),
+      totalMembers, pendingCount, approvedCount,
+      membersShown: Math.min(this.getMembers().length, 10),
+      searchQuery, filterStatus,
+      onSearchChange:    (e) => this.setState({searchQuery: e.target.value}),
+      setFilterAll:      () => this.setState({filterStatus:'all'}),
+      setFilterApproved: () => this.setState({filterStatus:'approved'}),
+      setFilterPending:  () => this.setState({filterStatus:'pending'}),
+      setFilterSuspended:() => this.setState({filterStatus:'suspended'}),
+      filterAllCls:  fc('all'), filterOkCls: fc('approved'),
+      filterPendCls: fc('pending'), filterSuspCls: fc('suspended'),
+
+      // Admin
+      pendingMembers,
+      aiAccounts,
+      reportRows,
+      onSaveSlotSettings: () => this.showToast('บันทึกการตั้งค่าเรียบร้อยแล้ว ✓'),
+      onAddAIAccount:     () => this.showToast('ฟีเจอร์นี้กำลังพัฒนา','warn'),
+      onExportReport:     () => this.showToast('กำลัง Export ข้อมูล...'),
+
+      // Modal
+      showModal,
+      modalDayLabel:   modalData ? modalData.dayLabel  : '',
+      modalSlotTime:   modalData ? modalData.slotTime   : '',
+      modalAIAccount:  modalData ? modalData.aiAccount  : '',
+      onCloseModal:    () => this.setState({showModal:false, modalData:null}),
+      onConfirmBooking:() => { this.setState({showModal:false, modalData:null}); this.showToast('จองคิวสำเร็จ! ระบบส่งอีเมลยืนยันแล้ว ✓'); },
+      stopProp: (e) => e.stopPropagation(),
+
+      // Toast
+      showToast: !!toastMsg,
+      toastMsg: toastMsg || '',
+      toastCls: toastClsMap[toastType] || toastClsMap.ok,
+      toastIconCls: toastIconMap[toastType] || toastIconMap.ok,
+    };
+  }
+}
+</script>
+</body>
+</html>
