@@ -31,7 +31,7 @@ function nav_cls(string $key, ?string $active): string
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body class="bg-body">
-<div id="appRoot" data-bs-theme="light" style="min-height:100vh;display:flex;flex-direction:column">
+<div id="appRoot" data-bs-theme="light" style="min-height:100vh;display:flex;flex-direction:column;color:var(--bs-body-color);background:var(--bs-body-bg)">
 
   <nav class="navbar navbar-expand bg-body" style="height:56px;padding:0 16px;position:sticky;top:0;z-index:200;border-bottom:1px solid var(--bs-border-color)">
     <div style="display:flex;align-items:center;gap:10px;flex:1">
