@@ -82,11 +82,13 @@ function nav_cls(string $key, ?string $active): string
       </div>
 
       <div style="display:flex;align-items:center;gap:8px;margin-left:4px">
-        <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#0EA5E9);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:13px"><?= e($__initial) ?></div>
-        <div style="line-height:1.2">
-          <div style="font-size:13px;font-weight:600"><?= e($__user['name']) ?></div>
-          <div style="font-size:11px;color:#64748B"><?= e($__roleLabel) ?></div>
-        </div>
+        <a href="<?= url($__isAdmin ? 'admin/profile.php' : 'student/profile.php') ?>" title="โปรไฟล์ของฉัน" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit">
+          <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#0EA5E9);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:13px"><?= e($__initial) ?></div>
+          <div style="line-height:1.2">
+            <div style="font-size:13px;font-weight:600"><?= e($__user['name']) ?></div>
+            <div style="font-size:11px;color:#64748B"><?= e($__roleLabel) ?></div>
+          </div>
+        </a>
         <a href="<?= url('logout.php') ?>" class="btn btn-sm" style="background:transparent;border:1px solid var(--bs-border-color);color:var(--bs-secondary-color);font-size:12px;padding:4px 10px;margin-left:4px"><i class="bi bi-box-arrow-right"></i></a>
       </div>
     </div>
@@ -126,6 +128,9 @@ function nav_cls(string $key, ?string $active): string
           </a>
           <a class="<?= nav_cls('reports', $activeNav ?? null) ?>" href="<?= url('admin/reports.php') ?>">
             <i class="bi bi-file-earmark-bar-graph" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">รายงานสถิติ</span>
+          </a>
+          <a class="<?= nav_cls('admin-profile', $activeNav ?? null) ?>" href="<?= url('admin/profile.php') ?>">
+            <i class="bi bi-person-circle" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">โปรไฟล์</span>
           </a>
         <?php endif; ?>
       </div>
