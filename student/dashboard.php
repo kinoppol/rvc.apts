@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../bootstrap.php';
 $user = require_role('student');
 
-$settings = SlotSettings::get();
+$settings = Booking::limitsFor($user['id']);
 $next = Booking::nextUpcomingForUser($user['id']);
 $hoursUsed = Booking::weeklyHoursUsed($user['id']);
 $weeklyMaxHours = $settings['weekly_quota'] * $settings['slot_hours'];

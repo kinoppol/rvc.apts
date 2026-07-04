@@ -4,7 +4,10 @@ final class Auth
 {
     public static function findById(int $id): ?array
     {
-        $stmt = Database::pdo()->prepare('SELECT * FROM users WHERE id = ?');
+        $stmt = Database::pdo()->prepare(
+            'SELECT u.*, g.name AS group_name FROM users u
+             LEFT JOIN user_groups g ON g.id = u.group_id WHERE u.id = ?'
+        );
         $stmt->execute([$id]);
         $user = $stmt->fetch();
         return $user ?: null;
@@ -12,7 +15,10 @@ final class Auth
 
     public static function findByEmail(string $email): ?array
     {
-        $stmt = Database::pdo()->prepare('SELECT * FROM users WHERE email = ?');
+        $stmt = Database::pdo()->prepare(
+            'SELECT u.*, g.name AS group_name FROM users u
+             LEFT JOIN user_groups g ON g.id = u.group_id WHERE u.email = ?'
+        );
         $stmt->execute([$email]);
         $user = $stmt->fetch();
         return $user ?: null;

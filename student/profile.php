@@ -34,7 +34,10 @@ require __DIR__ . '/../includes/header.php';
       <div>
         <div style="font-size:20px;font-weight:700"><?= e($user['name']) ?></div>
         <div style="color:var(--bs-secondary-color);font-size:13px"><?= e($user['student_id'] ?? '—') ?> · <?= e($user['major'] ?? '—') ?></div>
-        <span class="<?= $statusBadge ?>" style="margin-top:6px;display:inline-block"><?= e($statusLabel) ?></span>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+          <span class="<?= $statusBadge ?>"><?= e($statusLabel) ?></span>
+          <span class="badge-up"><i class="bi bi-diagram-3 me-1"></i>กลุ่ม: <?= e($user['group_name'] ?? 'ทั่วไป (ค่าเริ่มต้น)') ?></span>
+        </div>
       </div>
     </div>
   </div>
