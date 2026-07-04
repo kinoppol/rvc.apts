@@ -34,7 +34,7 @@ require __DIR__ . '/../includes/header.php';
     </div>
     <div style="background:#FFF7ED;border-radius:8px;padding:10px 14px;margin-top:16px;font-size:12px;color:#92400E;display:flex;gap:8px;align-items:flex-start;max-width:600px">
       <i class="bi bi-info-circle-fill" style="margin-top:1px;flex-shrink:0"></i>
-      <span>เวลาเริ่มต้นของวัน + (ความยาวช่วงเวลา × จำนวน Slots/วัน) ต้องไม่เกิน 24:00 น. · ช่วงเวลาแต่ละ slot จะถูกคำนวณจากเวลาเริ่มต้นนี้ · การเปลี่ยนแปลงมีผลกับการจองใหม่เท่านั้น</span>
+      <span>รองรับ<strong>ระบบเวลา 30 ชั่วโมง</strong>แบบญี่ปุ่น — ช่วงเวลาที่เลยเที่ยงคืนจะแสดงเป็น 24:00–30:00 (เช่น 25:00 = ตี 1 ของวันถัดไป) เพื่อให้ยังนับเป็นวันเดียวกัน · เวลาเริ่มต้นของวัน + (ความยาวช่วงเวลา × จำนวน Slots/วัน) ต้องไม่เกิน 30:00 น. · การเปลี่ยนแปลงมีผลกับการจองใหม่เท่านั้น</span>
     </div>
     <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;margin-top:16px;font-size:13px"><i class="bi bi-save me-1"></i>บันทึกการตั้งค่า</button>
   </form>

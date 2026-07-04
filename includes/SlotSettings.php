@@ -18,10 +18,11 @@ final class SlotSettings
         if (!preg_match('/^([01]\d|2[0-3]):([0-5]\d)$/', trim($dayStartTime), $m)) {
             return ['ok' => false, 'error' => 'รูปแบบเวลาเริ่มต้นของวันไม่ถูกต้อง (HH:MM)'];
         }
-        // Start time + total slot span must fit within the same day (slots don't wrap past midnight).
+        // Slots may run past midnight (shown on a 30-hour "business day" clock: 24:00–30:00),
+        // but the last slot must end by 30:00 so late-night slots still belong to the start day.
         $startMinutes = (int) $m[1] * 60 + (int) $m[2];
-        if ($startMinutes + $slotHours * $slotsPerDay * 60 > 24 * 60) {
-            return ['ok' => false, 'error' => 'เวลาเริ่มต้น + (ความยาวช่วงเวลา × จำนวน slots/วัน) ต้องไม่เกิน 24:00 น. ของวัน'];
+        if ($startMinutes + $slotHours * $slotsPerDay * 60 > 30 * 60) {
+            return ['ok' => false, 'error' => 'เวลาเริ่มต้น + (ความยาวช่วงเวลา × จำนวน slots/วัน) ต้องไม่เกิน 30:00 น. (ระบบเวลา 30 ชั่วโมง)'];
         }
 
         $stmt = Database::pdo()->prepare(
@@ -39,17 +40,30 @@ final class SlotSettings
         return $labels[$index] ?? ('ช่วงที่ ' . ($index + 1));
     }
 
+    /**
+     * Slot boundary as a 30-hour "business day" clock string (e.g. 25:00 = 1 AM the next calendar day).
+     * Times that cross midnight keep counting up (24:00, 25:00, ...) so a late-night slot stays on its
+     * start day instead of showing a confusing next-day date. Passing the returned "HH:MM" to
+     * DateTimeImmutable::setTime() still resolves to the correct absolute timestamp (setTime rolls over).
+     */
     public static function slotStart(array $settings, int $index): string
     {
-        $minutes = $index * $settings['slot_hours'] * 60;
-        $start = strtotime($settings['day_start_time']) + $minutes * 60;
-        return date('H:i', $start);
+        return self::fmtMinutes(self::dayStartMinutes($settings) + $index * $settings['slot_hours'] * 60);
     }
 
     public static function slotEnd(array $settings, int $index): string
     {
-        $minutes = ($index + 1) * $settings['slot_hours'] * 60;
-        $end = strtotime($settings['day_start_time']) + $minutes * 60;
-        return date('H:i', $end);
+        return self::fmtMinutes(self::dayStartMinutes($settings) + ($index + 1) * $settings['slot_hours'] * 60);
+    }
+
+    private static function dayStartMinutes(array $settings): int
+    {
+        [$h, $m] = array_map('intval', explode(':', $settings['day_start_time']));
+        return $h * 60 + $m;
+    }
+
+    private static function fmtMinutes(int $totalMinutes): string
+    {
+        return sprintf('%02d:%02d', intdiv($totalMinutes, 60), $totalMinutes % 60);
     }
 }

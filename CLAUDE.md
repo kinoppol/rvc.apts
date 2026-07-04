@@ -91,7 +91,14 @@ toast UI.
 - Keep new user-facing strings in **Thai**, matching existing terminology (จองคิว = book, ระงับสิทธิ์ =
   suspend, อนุมัติ = approve, บำรุงรักษา = maintenance).
 - Slot count/labels/times are computed in PHP from `slot_settings` (`SlotSettings::slotLabel/slotStart/
-  slotEnd`) — admin-editable, not a fixed table.
+  slotEnd`, incl. the admin-editable `day_start_time`) — not a fixed table.
+- **Slots use a 30-hour "business-day" clock.** A slot may run past midnight; `SlotSettings::slotStart/
+  slotEnd` emit `24:00`–`30:00` (e.g. `25:00` = 1 AM the next calendar day) rather than wrapping, and
+  `update()` caps `day_start + slot_hours×slots_per_day` at 30:00. `bookings.booking_date` stays the
+  start ("business") day while `start/end_datetime` hold the true absolute timestamps (passing an
+  "HH:MM" ≥ 24:00 to `DateTimeImmutable::setTime()` rolls over correctly). For display, `Booking`
+  derives the date from `booking_date` and the time via `thirtyHour()` (minutes from that day's
+  midnight) so a post-midnight slot shows on its start day, not a confusing next-day date.
 - **Per-user booking limits go through `Booking::limitsFor($userId)`**, not `SlotSettings::get()`
   directly: it returns the global settings with the user's group (`user_groups`, admin-managed on
   `admin/groups.php`) overriding `weekly_quota` / `max_advance_days` when those group columns aren't

@@ -19,6 +19,14 @@ final class Booking
         return $d->format('j') . ' ' . self::THAI_MONTHS_SHORT[(int) $d->format('n')] . ' ' . ((int) $d->format('Y') + 543);
     }
 
+    /** Wall-clock time of $dt expressed on $bookingDate's 30-hour clock (25:00 = 1 AM next calendar day). */
+    private static function thirtyHour(string $bookingDate, string $dt): string
+    {
+        $base = new DateTimeImmutable($bookingDate . ' 00:00:00');
+        $minutes = intdiv((new DateTimeImmutable($dt))->getTimestamp() - $base->getTimestamp(), 60);
+        return sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+    }
+
     private static function weekStart(int $weekOffset): DateTimeImmutable
     {
         $today = new DateTimeImmutable('today');
@@ -274,8 +282,13 @@ final class Booking
             $row['displayStatus'] = $status;
             $row['badgeCls'] = $badgeMap[$status];
             $row['statusLabel'] = $labelMap[$status];
-            $row['dateLabel'] = self::THAI_WEEKDAYS_SHORT[$start->format('N') - 1] . '. ' . self::thaiDate($start);
-            $row['slotLabel'] = SlotSettings::slotLabel((int) $row['slot_index']) . ' (' . substr($row['start_datetime'], 11, 5) . '–' . substr($row['end_datetime'], 11, 5) . ')';
+            // Date/time shown on the booking's "business day" using the 30-hour clock, so a slot that
+            // runs past midnight (e.g. 25:00–30:00) stays on its start day instead of a next-day date.
+            $bookingDate = new DateTimeImmutable($row['booking_date']);
+            $row['dateLabel'] = self::THAI_WEEKDAYS_SHORT[$bookingDate->format('N') - 1] . '. ' . self::thaiDate($bookingDate);
+            $row['slotLabel'] = SlotSettings::slotLabel((int) $row['slot_index'])
+                . ' (' . self::thirtyHour($row['booking_date'], $row['start_datetime'])
+                . '–' . self::thirtyHour($row['booking_date'], $row['end_datetime']) . ')';
             $row['canCancel'] = $status === 'upcoming';
 
             // Post-use report state (only completed, non-cancelled bookings need one)
