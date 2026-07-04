@@ -26,6 +26,9 @@ final class Member
         $row['hours'] = self::hoursFor((int) $row['id']);
         $created = new DateTimeImmutable($row['created_at']);
         $row['joinDate'] = Booking::thaiDate($created);
+        $row['groupName'] = $row['group_name'] ?? null;
+        $row['overdueReports'] = Booking::overdueCountForUser((int) $row['id']);
+        $row['restricted'] = $row['overdueReports'] > 0;
         return $row;
     }
 
@@ -41,26 +44,28 @@ final class Member
         }
         $totalMembers = array_sum($countMap);
 
-        $where = ["role = 'student'"];
+        $where = ["u.role = 'student'"];
         $params = [];
         if ($status !== 'all') {
-            $where[] = 'status = ?';
+            $where[] = 'u.status = ?';
             $params[] = $status;
         }
         if ($search !== '') {
-            $where[] = '(name LIKE ? OR student_id LIKE ?)';
+            $where[] = '(u.name LIKE ? OR u.student_id LIKE ?)';
             $params[] = "%{$search}%";
             $params[] = "%{$search}%";
         }
         $whereSql = implode(' AND ', $where);
 
-        $totalStmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE {$whereSql}");
+        $totalStmt = $pdo->prepare("SELECT COUNT(*) FROM users u WHERE {$whereSql}");
         $totalStmt->execute($params);
         $total = (int) $totalStmt->fetchColumn();
 
         $offset = max(0, ($page - 1) * $perPage);
         $stmt = $pdo->prepare(
-            "SELECT * FROM users WHERE {$whereSql} ORDER BY created_at DESC LIMIT {$perPage} OFFSET {$offset}"
+            "SELECT u.*, g.name AS group_name FROM users u
+             LEFT JOIN user_groups g ON g.id = u.group_id
+             WHERE {$whereSql} ORDER BY u.created_at DESC LIMIT {$perPage} OFFSET {$offset}"
         );
         $stmt->execute($params);
         $rows = array_map([self::class, 'decorate'], $stmt->fetchAll());
@@ -82,7 +87,11 @@ final class Member
 
     public static function pending(int $limit = 5): array
     {
-        $stmt = Database::pdo()->prepare("SELECT * FROM users WHERE role = 'student' AND status = 'pending' ORDER BY created_at ASC LIMIT ?");
+        $stmt = Database::pdo()->prepare(
+            "SELECT u.*, g.name AS group_name FROM users u
+             LEFT JOIN user_groups g ON g.id = u.group_id
+             WHERE u.role = 'student' AND u.status = 'pending' ORDER BY u.created_at ASC LIMIT ?"
+        );
         $stmt->bindValue(1, $limit, PDO::PARAM_INT);
         $stmt->execute();
         return array_map([self::class, 'decorate'], $stmt->fetchAll());
@@ -90,10 +99,36 @@ final class Member
 
     public static function find(int $id): ?array
     {
-        $stmt = Database::pdo()->prepare("SELECT * FROM users WHERE id = ? AND role = 'student'");
+        $stmt = Database::pdo()->prepare(
+            "SELECT u.*, g.name AS group_name FROM users u
+             LEFT JOIN user_groups g ON g.id = u.group_id
+             WHERE u.id = ? AND u.role = 'student'"
+        );
         $stmt->execute([$id]);
         $row = $stmt->fetch();
         return $row ? self::decorate($row) : null;
+    }
+
+    /** @return array{ok:bool,error?:string} Admin sets a new password for a member. */
+    public static function resetPassword(int $id, string $newPassword): array
+    {
+        if (strlen($newPassword) < 8) {
+            return ['ok' => false, 'error' => 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'];
+        }
+        $stmt = Database::pdo()->prepare("UPDATE users SET password_hash = ? WHERE id = ? AND role = 'student'");
+        $stmt->execute([password_hash($newPassword, PASSWORD_DEFAULT), $id]);
+        return ['ok' => true];
+    }
+
+    /** Assigns a member to a group (or clears it when $groupId is null). @return array{ok:bool,error?:string} */
+    public static function assignGroup(int $id, ?int $groupId): array
+    {
+        if ($groupId !== null && !UserGroup::find($groupId)) {
+            return ['ok' => false, 'error' => 'ไม่พบกลุ่มที่เลือก'];
+        }
+        $stmt = Database::pdo()->prepare("UPDATE users SET group_id = ? WHERE id = ? AND role = 'student'");
+        $stmt->execute([$groupId, $id]);
+        return ['ok' => true];
     }
 
     public static function approve(int $id): void

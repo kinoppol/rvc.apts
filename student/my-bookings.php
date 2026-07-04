@@ -4,15 +4,15 @@ $user = require_role('student');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
-    if (($_POST['action'] ?? '') === 'cancel') {
+    $action = $_POST['action'] ?? '';
+    if ($action === 'cancel') {
         $result = Booking::cancel($user['id'], (int) ($_POST['id'] ?? 0));
-        if ($result['ok']) {
-            flash_set('warn', 'ยกเลิกการจองเรียบร้อยแล้ว');
-        } else {
-            flash_set('err', $result['error'] ?? 'ไม่สามารถยกเลิกได้');
-        }
+        flash_set($result['ok'] ? 'warn' : 'err', $result['ok'] ? 'ยกเลิกการจองเรียบร้อยแล้ว' : ($result['error'] ?? 'ไม่สามารถยกเลิกได้'));
+    } elseif ($action === 'report') {
+        $result = Booking::submitReport($user['id'], (int) ($_POST['id'] ?? 0), $_POST['report_text'] ?? '', $_FILES['report_file'] ?? null);
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'ส่งรายงานการใช้งานเรียบร้อยแล้ว' : ($result['error'] ?? 'ส่งรายงานไม่สำเร็จ'));
     }
-    header('Location: ' . url('student/my-bookings.php'));
+    header('Location: ' . url('student/my-bookings.php') . (($_GET['filter'] ?? '') !== '' ? '?filter=' . urlencode($_GET['filter']) : ''));
     exit;
 }
 
@@ -22,11 +22,24 @@ if (!isset($filters[$filter])) {
     $filter = 'all';
 }
 $bookings = Booking::listForUser($user['id'], $filter);
+$restricted = Booking::isRestricted($user['id']);
+$pendingReports = Booking::pendingReportsForUser($user['id']);
 
 $activeNav = 'my-bookings';
 require __DIR__ . '/../includes/header.php';
 ?>
 <h5 style="font-weight:700;margin:0 0 20px">การจองของฉัน</h5>
+<?php if ($restricted): ?>
+  <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:#991B1B;display:flex;gap:8px;align-items:flex-start">
+    <i class="bi bi-slash-circle-fill" style="flex-shrink:0;margin-top:1px"></i>
+    <span><strong>ถูกระงับการจองชั่วคราว</strong> — มีรายงานค้างเกินกำหนด <?= Booking::REPORT_DEADLINE_DAYS ?> วัน กรุณากดปุ่ม "รายงาน" ในรายการด้านล่างให้ครบ ระบบจะปลดล็อกให้จองได้อีกครั้งทันที</span>
+  </div>
+<?php elseif ($pendingReports): ?>
+  <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400E;display:flex;gap:8px;align-items:center">
+    <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0"></i>
+    <span>มีการใช้งานที่ยังไม่ได้รายงาน <strong><?= count($pendingReports) ?></strong> รายการ กรุณารายงานภายใน <?= Booking::REPORT_DEADLINE_DAYS ?> วันหลังใช้งาน ไม่เช่นนั้นจะถูกระงับการจอง</span>
+  </div>
+<?php endif; ?>
 <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
   <div class="card-body" style="padding:20px">
     <div style="display:flex;gap:0;border-bottom:2px solid var(--bs-border-color);margin-bottom:20px;flex-wrap:wrap">
@@ -43,16 +56,25 @@ require __DIR__ . '/../includes/header.php';
           <div style="flex:1;min-width:0">
             <div style="font-weight:600;font-size:14px"><?= e($bk['slotLabel']) ?></div>
             <div style="font-size:12px;color:var(--bs-secondary-color);margin-top:2px"><?= e($bk['dateLabel']) ?> · <?= e($bk['ai_name']) ?></div>
+            <?php if (!empty($bk['purpose'])): ?><div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:2px"><i class="bi bi-bullseye me-1"></i><?= e($bk['purpose']) ?></div><?php endif; ?>
           </div>
-          <span class="<?= $bk['badgeCls'] ?>"><?= e($bk['statusLabel']) ?></span>
-          <?php if ($bk['canCancel']): ?>
-            <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0" onsubmit="return confirm('ยืนยันการยกเลิกการจองนี้?')">
-              <?= Csrf::field() ?>
-              <input type="hidden" name="action" value="cancel">
-              <input type="hidden" name="id" value="<?= (int) $bk['id'] ?>">
-              <button type="submit" class="action-btn-err"><i class="bi bi-x-circle me-1"></i>ยกเลิก</button>
-            </form>
-          <?php endif; ?>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+            <span class="<?= $bk['badgeCls'] ?>"><?= e($bk['statusLabel']) ?></span>
+            <?php if ($bk['needsReport']): ?>
+              <span class="<?= $bk['reportOverdue'] ? 'badge-susp' : 'badge-pend' ?>" style="font-size:11px"><?= e($bk['reportStatusText']) ?></span>
+              <button type="button" class="action-btn-blue" data-report-booking data-id="<?= (int) $bk['id'] ?>" data-meta="<?= e($bk['dateLabel'] . ' · ' . $bk['slotLabel']) ?>"><i class="bi bi-journal-text me-1"></i>รายงาน</button>
+            <?php elseif ($bk['reported'] && $bk['displayStatus'] === 'completed'): ?>
+              <span class="badge-ok" style="font-size:11px"><i class="bi bi-check-circle me-1"></i>รายงานแล้ว</span>
+            <?php endif; ?>
+            <?php if ($bk['canCancel']): ?>
+              <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0" onsubmit="return confirm('ยืนยันการยกเลิกการจองนี้?')">
+                <?= Csrf::field() ?>
+                <input type="hidden" name="action" value="cancel">
+                <input type="hidden" name="id" value="<?= (int) $bk['id'] ?>">
+                <button type="submit" class="action-btn-err"><i class="bi bi-x-circle me-1"></i>ยกเลิก</button>
+              </form>
+            <?php endif; ?>
+          </div>
         </div>
       <?php endforeach; ?>
       <?php if (!$bookings): ?>
@@ -62,6 +84,40 @@ require __DIR__ . '/../includes/header.php';
           <a href="<?= url('student/booking.php') ?>" style="font-size:13px;color:#2563EB;text-decoration:none;font-weight:600;display:inline-block;margin-top:10px">จองคิวตอนนี้ <i class="bi bi-arrow-right"></i></a>
         </div>
       <?php endif; ?>
+    </div>
+  </div>
+</div>
+
+<!-- Usage report modal (populated by app.js) -->
+<div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post" enctype="multipart/form-data" action="<?= url('student/my-bookings.php') ?>?filter=<?= e($filter) ?>">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="report">
+        <input type="hidden" name="id">
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-journal-text me-2" style="color:#2563EB"></i>รายงานการใช้งาน</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+        </div>
+        <div class="modal-body" style="padding:20px">
+          <p style="font-size:12px;color:var(--bs-secondary-color);margin:0 0 4px" id="reportModalMeta">—</p>
+          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">กรอกรายละเอียดการใช้งาน และ/หรือ แนบไฟล์หลักฐาน (รูปภาพหรือ PDF) อย่างน้อยหนึ่งอย่าง</p>
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">รายละเอียดการใช้งาน</label>
+            <textarea name="report_text" rows="4" maxlength="2000" class="form-control" placeholder="อธิบายสิ่งที่ได้ทำ/ผลลัพธ์จากการใช้ AI ในรอบนี้..." style="font-size:13px"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">แนบไฟล์ (ไม่บังคับ)</label>
+            <input type="file" name="report_file" accept="image/*,application/pdf" class="form-control" style="font-size:13px">
+            <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">รองรับรูปภาพ (JPG/PNG/GIF/WEBP) หรือ PDF ขนาดไม่เกิน 5 MB</div>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none"><i class="bi bi-send me-1"></i>ส่งรายงาน</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

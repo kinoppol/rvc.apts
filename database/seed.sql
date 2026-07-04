@@ -2,6 +2,12 @@
 -- All seeded accounts use the password: Passw0rd!
 USE rvc_apts;
 
+-- User groups (per-group limits; NULL = use the global slot_settings default)
+INSERT INTO user_groups (id, name, description, weekly_quota, max_advance_days) VALUES
+(1, 'นักศึกษาทั่วไป', 'สิทธิ์มาตรฐานตามค่าเริ่มต้นของระบบ', NULL, NULL),
+(2, 'นักวิจัย',       'โควต้าสูงและจองล่วงหน้าได้นานกว่า',   5,    30),
+(3, 'ทดลองใช้',       'สิทธิ์จำกัดสำหรับผู้ใช้ทดลอง',         1,    7);
+
 -- id 1: admin
 INSERT INTO users (role, name, student_id, major, email, phone, password_hash, status) VALUES
 ('admin', 'ผู้ดูแลระบบ', NULL, NULL, 'admin@rvc.ac.th', NULL,
@@ -17,6 +23,11 @@ INSERT INTO users (role, name, student_id, major, email, phone, password_hash, s
 ('student', 'นภา แสงทอง',      '6502IT006', 'เทคโนโลยีสารสนเทศ',   'napa@rvc.ac.th',     NULL,           '$2y$10$yujc9TCzkQ7ei7G6XCxEA.lzrdc/AxkxBck5vZNef4PIkenNwA2ce', 'approved'),
 ('student', 'ปิยะ วงษ์งาม',    '6502DS007', 'วิทยาการข้อมูล',      'piya@rvc.ac.th',     NULL,           '$2y$10$yujc9TCzkQ7ei7G6XCxEA.lzrdc/AxkxBck5vZNef4PIkenNwA2ce', 'approved'),
 ('student', 'กนกวรรณ สุขใจ',   '6503CS008', 'วิทยาการคอมพิวเตอร์', 'kanok@rvc.ac.th',    NULL,           '$2y$10$yujc9TCzkQ7ei7G6XCxEA.lzrdc/AxkxBck5vZNef4PIkenNwA2ce', 'pending');
+
+-- Assign a few students to groups (the rest inherit the global default)
+UPDATE users SET group_id = 2 WHERE email = 'somchai@rvc.ac.th';  -- นักวิจัย (quota 5)
+UPDATE users SET group_id = 3 WHERE email = 'wichai@rvc.ac.th';   -- ทดลองใช้ (quota 1)
+UPDATE users SET group_id = 1 WHERE email = 'napa@rvc.ac.th';     -- นักศึกษาทั่วไป
 
 -- AI account types (admin-managed)
 INSERT INTO ai_providers (id, name) VALUES
@@ -38,10 +49,13 @@ INSERT INTO ai_accounts (name, provider_id, provider, email, account_password, s
 ('ChatGPT Plus #2', 2, 'OpenAI ChatGPT Plus',  'gpt.plus2@rvc.ac.th',   'Gpt+Pool#2',   'maintenance',
     TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 1 DAY), '23:59:00'),   TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 40 DAY), '09:00:00'), 'monthly');
 
--- 5 bookings for สมชาย (user id 2), dates relative to import time so "upcoming" stays upcoming
-INSERT INTO bookings (user_id, ai_account_id, booking_date, slot_index, start_datetime, end_datetime, status, cancelled_at) VALUES
-(2, 2, DATE_ADD(CURDATE(), INTERVAL 1 DAY),  0, TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 1 DAY), '08:00:00'),  TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 1 DAY), '13:00:00'),  'upcoming',  NULL),
-(2, 3, DATE_SUB(CURDATE(), INTERVAL 3 DAY),  1, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 3 DAY), '13:00:00'),  TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 3 DAY), '18:00:00'),  'upcoming',  NULL),
-(2, 1, DATE_SUB(CURDATE(), INTERVAL 6 DAY),  2, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 6 DAY), '18:00:00'),  TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 6 DAY), '23:00:00'),  'upcoming',  NULL),
-(2, 4, DATE_SUB(CURDATE(), INTERVAL 10 DAY), 0, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 10 DAY), '08:00:00'), TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 10 DAY), '13:00:00'), 'upcoming',  NULL),
-(2, 2, DATE_SUB(CURDATE(), INTERVAL 13 DAY), 1, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 13 DAY), '13:00:00'), TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 13 DAY), '18:00:00'), 'cancelled', TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 13 DAY), '12:00:00'));
+-- Bookings for สมชาย (user id 2), dates relative to import time so "upcoming" stays upcoming.
+-- Completed ones carry a usage report so สมชาย is NOT blocked; นภา (user 7) has one overdue
+-- unreported booking to demo the "report within 7 days or get blocked" rule.
+INSERT INTO bookings (user_id, ai_account_id, booking_date, slot_index, start_datetime, end_datetime, status, purpose, report_text, reported_at, cancelled_at) VALUES
+(2, 2, DATE_ADD(CURDATE(), INTERVAL 1 DAY),  0, TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 1 DAY), '08:00:00'),  TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 1 DAY), '13:00:00'),  'upcoming',  'ทำโปรเจกต์รายวิชา AI',            NULL, NULL, NULL),
+(2, 3, DATE_SUB(CURDATE(), INTERVAL 3 DAY),  1, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 3 DAY), '13:00:00'),  TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 3 DAY), '18:00:00'),  'upcoming',  'ค้นคว้าข้อมูลวิทยานิพนธ์',        'ใช้ค้นคว้าและสรุป references ได้ 12 แหล่ง', TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 2 DAY), '10:00:00'), NULL),
+(2, 1, DATE_SUB(CURDATE(), INTERVAL 6 DAY),  2, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 6 DAY), '18:00:00'),  TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 6 DAY), '23:00:00'),  'upcoming',  'เขียนและดีบักโค้ดโปรเจกต์',      'ดีบักโมดูล backend เสร็จเรียบร้อย',        TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 5 DAY), '09:00:00'), NULL),
+(2, 4, DATE_SUB(CURDATE(), INTERVAL 10 DAY), 0, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 10 DAY), '08:00:00'), TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 10 DAY), '13:00:00'), 'upcoming',  'ทดสอบโมเดลและปรับ prompt',        'ทดสอบ prompt engineering 30 รูปแบบ',        TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 8 DAY), '14:00:00'), NULL),
+(2, 2, DATE_SUB(CURDATE(), INTERVAL 13 DAY), 1, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 13 DAY), '13:00:00'), TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 13 DAY), '18:00:00'), 'cancelled', 'อ่านและสรุปงานวิจัย',            NULL, NULL, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 13 DAY), '12:00:00')),
+(7, 1, DATE_SUB(CURDATE(), INTERVAL 10 DAY), 2, TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 10 DAY), '18:00:00'), TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 10 DAY), '23:00:00'), 'upcoming',  'สรุปรายงานกลุ่มวิชาสัมมนา',      NULL, NULL, NULL);

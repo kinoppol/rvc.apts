@@ -2,6 +2,17 @@
 CREATE DATABASE IF NOT EXISTS rvc_apts CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE rvc_apts;
 
+-- Admin-managed user groups; per-group usage limits override the global slot_settings
+-- (NULL on a limit column means "fall back to the global default").
+CREATE TABLE user_groups (
+    id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name             VARCHAR(100) NOT NULL UNIQUE,
+    description      VARCHAR(255) NULL,
+    weekly_quota     TINYINT UNSIGNED NULL,
+    max_advance_days SMALLINT UNSIGNED NULL,
+    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE users (
     id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     role          ENUM('student','admin') NOT NULL DEFAULT 'student',
@@ -10,9 +21,11 @@ CREATE TABLE users (
     major         VARCHAR(100) NULL,
     email         VARCHAR(150) NOT NULL UNIQUE,
     phone         VARCHAR(20) NULL,
+    group_id      INT UNSIGNED NULL,
     password_hash VARCHAR(255) NOT NULL,
     status        ENUM('pending','approved','suspended') NOT NULL DEFAULT 'pending',
-    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_users_group FOREIGN KEY (group_id) REFERENCES user_groups(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Admin-managed list of AI account types (Claude Pro, ChatGPT Plus, ...).
@@ -60,6 +73,10 @@ CREATE TABLE bookings (
     start_datetime DATETIME NOT NULL,
     end_datetime   DATETIME NOT NULL,
     status         ENUM('upcoming','cancelled') NOT NULL DEFAULT 'upcoming',
+    purpose        VARCHAR(500) NOT NULL DEFAULT '',   -- why the student booked the slot (required at booking time)
+    report_text    TEXT NULL,                          -- post-use report body
+    report_file    VARCHAR(255) NULL,                  -- optional uploaded evidence (image/PDF) filename
+    reported_at    DATETIME NULL,                      -- when the usage report was submitted (NULL = not yet reported)
     created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     cancelled_at   DATETIME NULL,
     CONSTRAINT fk_bookings_user FOREIGN KEY (user_id) REFERENCES users(id),

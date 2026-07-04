@@ -14,10 +14,23 @@ $cancelledCount = count(array_filter($allBookings, fn ($b) => $b['displayStatus'
 $totalHours = array_sum(array_map(fn ($b) => $b['displayStatus'] === 'completed' ? $settings['slot_hours'] : 0, $allBookings));
 $utilization = count($allBookings) > 0 ? round($totalCount / count($allBookings) * 100, 1) : 0;
 $recent = array_slice($allBookings, 0, 5);
+$restricted = Booking::isRestricted($user['id']);
+$pendingReports = Booking::pendingReportsForUser($user['id']);
 
 $activeNav = 'student-dashboard';
 require __DIR__ . '/../includes/header.php';
 ?>
+<?php if ($restricted): ?>
+  <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px 16px;margin-bottom:18px;font-size:13px;color:#991B1B;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <i class="bi bi-slash-circle-fill" style="flex-shrink:0"></i>
+    <span><strong>ถูกระงับการจองชั่วคราว</strong> — มีรายงานการใช้งานค้างเกินกำหนด กรุณา<a href="<?= url('student/my-bookings.php') ?>" style="color:#991B1B;font-weight:700">รายงานการใช้งาน</a>ให้ครบก่อน</span>
+  </div>
+<?php elseif ($pendingReports): ?>
+  <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:13px;color:#92400E;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0"></i>
+    <span>คุณมีการใช้งานที่ยังไม่ได้รายงาน <strong><?= count($pendingReports) ?></strong> รายการ — <a href="<?= url('student/my-bookings.php') ?>" style="color:#92400E;font-weight:700">รายงานตอนนี้</a></span>
+  </div>
+<?php endif; ?>
 <div style="margin-bottom:22px">
   <h5 style="font-weight:700;margin:0">สวัสดี, <?= e(explode(' ', $user['name'])[0]) ?> 👋</h5>
   <p style="color:var(--bs-secondary-color);font-size:14px;margin:4px 0 0"><?= e(Booking::thaiDate(new DateTimeImmutable('today'))) ?></p>

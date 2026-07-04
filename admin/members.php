@@ -51,6 +51,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'delete') {
         Member::delete($id);
         flash_set('warn', 'ลบสมาชิกเรียบร้อยแล้ว');
+    } elseif ($action === 'reset_password') {
+        $result = Member::resetPassword($id, $_POST['new_password'] ?? '');
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'รีเซตรหัสผ่านเรียบร้อยแล้ว' : ($result['error'] ?? 'รีเซตไม่สำเร็จ'));
+    } elseif ($action === 'assign_group') {
+        $gid = ($_POST['group_id'] ?? '') !== '' ? (int) $_POST['group_id'] : null;
+        $result = Member::assignGroup($id, $gid);
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'อัปเดตกลุ่มของสมาชิกเรียบร้อยแล้ว' : ($result['error'] ?? 'อัปเดตกลุ่มไม่สำเร็จ'));
+    } elseif ($action === 'waive') {
+        $n = Booking::waiveOverdueForUser($id);
+        flash_set('ok', 'ปลดการระงับเรียบร้อยแล้ว (ยกเว้นรายงานค้าง ' . $n . ' รายการ)');
     }
     header('Location: ' . members_return_url());
     exit;
@@ -64,6 +74,7 @@ if (!in_array($status, ['all', 'approved', 'pending', 'suspended'], true)) {
 $page = max(1, (int) ($_GET['page'] ?? 1));
 
 $data = Member::list($search, $status, $page, $perPage);
+$allGroups = UserGroup::all();
 $totalPages = max(1, (int) ceil($data['total'] / $perPage));
 $page = min($page, $totalPages);
 $shownFrom = $data['total'] > 0 ? ($page - 1) * $perPage + 1 : 0;
@@ -128,6 +139,7 @@ require __DIR__ . '/../includes/header.php';
           <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">สมาชิก</th>
           <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">รหัส / สาขา</th>
           <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">สถานะ</th>
+          <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">กลุ่ม</th>
           <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">ชม.สะสม</th>
           <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">วันสมัคร</th>
           <th style="padding:12px 16px;text-align:center;font-weight:600;color:var(--bs-secondary-color)">การดำเนินการ</th>
@@ -149,7 +161,26 @@ require __DIR__ . '/../includes/header.php';
               <div style="font-family:monospace;font-size:12px;font-weight:600"><?= e($m['student_id'] ?? '—') ?></div>
               <div style="font-size:11px;color:var(--bs-secondary-color);margin-top:2px"><?= e($m['major'] ?? '—') ?></div>
             </td>
-            <td style="padding:12px 16px"><span class="<?= $m['badgeCls'] ?>"><?= e($m['statusLabel']) ?></span></td>
+            <td style="padding:12px 16px">
+              <span class="<?= $m['badgeCls'] ?>"><?= e($m['statusLabel']) ?></span>
+              <?php if ($m['restricted']): ?><div><span class="badge-susp" style="margin-top:4px;display:inline-block;font-size:11px" title="มีรายงานการใช้งานค้างเกิน 7 วัน"><i class="bi bi-slash-circle me-1"></i>ระงับการจอง</span></div><?php endif; ?>
+            </td>
+            <td style="padding:12px 16px">
+              <form method="post" style="margin:0">
+                <?= Csrf::field() ?>
+                <input type="hidden" name="action" value="assign_group">
+                <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">
+                <input type="hidden" name="search" value="<?= e($search) ?>">
+                <input type="hidden" name="status" value="<?= e($status) ?>">
+                <input type="hidden" name="page" value="<?= (int) $page ?>">
+                <select name="group_id" onchange="this.form.submit()" class="form-select form-select-sm" style="font-size:12px;min-width:130px">
+                  <option value="">— ไม่มีกลุ่ม —</option>
+                  <?php foreach ($allGroups as $g): ?>
+                    <option value="<?= (int) $g['id'] ?>" <?= (int) ($m['group_id'] ?? 0) === (int) $g['id'] ? 'selected' : '' ?>><?= e($g['name']) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </form>
+            </td>
             <td style="padding:12px 16px;font-weight:600"><?= (int) $m['hours'] ?> ชม.</td>
             <td style="padding:12px 16px;color:var(--bs-secondary-color);white-space:nowrap"><?= e($m['joinDate']) ?></td>
             <td style="padding:12px 16px">
@@ -158,10 +189,13 @@ require __DIR__ . '/../includes/header.php';
                   <?= member_action_form($m['id'], 'approve', 'action-btn-ok', 'bi-check-lg', 'อนุมัติ') ?>
                   <?= member_action_form($m['id'], 'reject', 'action-btn-err', 'bi-x-lg', 'ปฏิเสธ', 'ปฏิเสธและลบคำขอนี้?') ?>
                 <?php elseif ($m['isApproved']): ?>
+                  <?php if ($m['restricted']): ?><?= member_action_form($m['id'], 'waive', 'action-btn-warn', 'bi-unlock', 'ปลดระงับ', 'ปลดการระงับการจองของสมาชิกนี้ (ยกเว้นรายงานค้าง)?') ?><?php endif; ?>
                   <?= member_action_form($m['id'], 'suspend', 'action-btn-warn', 'bi-slash-circle', 'ระงับ', 'ระงับสิทธิ์สมาชิกนี้?') ?>
+                  <button type="button" class="action-btn-blue" data-reset-pw data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>"><i class="bi bi-key me-1"></i>รีเซตรหัส</button>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
                 <?php elseif ($m['isSuspended']): ?>
                   <?= member_action_form($m['id'], 'activate', 'action-btn-ok', 'bi-check-circle', 'เปิดใช้') ?>
+                  <button type="button" class="action-btn-blue" data-reset-pw data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>"><i class="bi bi-key me-1"></i>รีเซตรหัส</button>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
                   <?= member_action_form($m['id'], 'delete', 'action-btn-err', 'bi-trash', 'ลบ', 'ลบสมาชิกนี้อย่างถาวร?') ?>
                 <?php endif; ?>
@@ -170,7 +204,7 @@ require __DIR__ . '/../includes/header.php';
           </tr>
         <?php endforeach; ?>
         <?php if (!$data['rows']): ?>
-          <tr><td colspan="6" style="padding:32px;text-align:center;color:var(--bs-tertiary-color)">ไม่พบสมาชิกที่ตรงกับเงื่อนไข</td></tr>
+          <tr><td colspan="7" style="padding:32px;text-align:center;color:var(--bs-tertiary-color)">ไม่พบสมาชิกที่ตรงกับเงื่อนไข</td></tr>
         <?php endif; ?>
       </tbody>
     </table>
@@ -222,6 +256,35 @@ require __DIR__ . '/../includes/header.php';
   </div>
 </div>
 
+<!-- Reset password modal (populated by app.js) -->
+<div class="modal fade" id="resetPwModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="reset_password">
+        <input type="hidden" name="id">
+        <input type="hidden" name="search" value="<?= e($search) ?>">
+        <input type="hidden" name="status" value="<?= e($status) ?>">
+        <input type="hidden" name="page" value="<?= (int) $page ?>">
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-key me-2" style="color:#2563EB"></i>รีเซตรหัสผ่าน</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+        </div>
+        <div class="modal-body" style="padding:20px">
+          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">ตั้งรหัสผ่านใหม่ให้ <strong id="resetPwName">สมาชิก</strong> แล้วแจ้งรหัสนี้ให้ผู้ใช้</p>
+          <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">รหัสผ่านใหม่ *</label>
+          <input name="new_password" required minlength="8" class="form-control" placeholder="อย่างน้อย 8 ตัวอักษร" style="font-size:13px">
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none">ตั้งรหัสผ่านใหม่</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <?php if ($historyMember): ?>
 <!-- History modal (auto-opened) -->
 <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
@@ -237,16 +300,24 @@ require __DIR__ . '/../includes/header.php';
             <thead><tr style="border-bottom:2px solid var(--bs-border-color)">
               <th style="padding:8px 10px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">วันที่</th>
               <th style="padding:8px 10px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">ช่วงเวลา</th>
-              <th style="padding:8px 10px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">AI Account</th>
+              <th style="padding:8px 10px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">วัตถุประสงค์ / รายงาน</th>
               <th style="padding:8px 10px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">สถานะ</th>
             </tr></thead>
             <tbody>
               <?php foreach ($historyBookings as $b): ?>
-                <tr style="border-bottom:1px solid var(--bs-border-color)">
-                  <td style="padding:10px"><?= e($b['dateLabel']) ?></td>
-                  <td style="padding:10px"><?= e($b['slotLabel']) ?></td>
-                  <td style="padding:10px;color:var(--bs-secondary-color)"><?= e($b['ai_name']) ?></td>
-                  <td style="padding:10px"><span class="<?= $b['badgeCls'] ?>"><?= e($b['statusLabel']) ?></span></td>
+                <tr style="border-bottom:1px solid var(--bs-border-color);vertical-align:top">
+                  <td style="padding:10px;white-space:nowrap"><?= e($b['dateLabel']) ?></td>
+                  <td style="padding:10px;white-space:nowrap"><?= e($b['slotLabel']) ?><div style="font-size:11px;color:var(--bs-tertiary-color)"><?= e($b['ai_name']) ?></div></td>
+                  <td style="padding:10px">
+                    <div><?= e($b['purpose'] ?: '—') ?></div>
+                    <?php if (!empty($b['report_text'])): ?><div style="font-size:11px;color:var(--bs-secondary-color);margin-top:3px"><i class="bi bi-journal-text me-1"></i><?= e($b['report_text']) ?></div><?php endif; ?>
+                    <?php if (!empty($b['report_file'])): ?><div style="font-size:11px;margin-top:3px"><a href="<?= url('uploads/reports/' . $b['report_file']) ?>" target="_blank" style="color:#2563EB;text-decoration:none"><i class="bi bi-paperclip me-1"></i>ไฟล์แนบ</a></div><?php endif; ?>
+                  </td>
+                  <td style="padding:10px">
+                    <span class="<?= $b['badgeCls'] ?>"><?= e($b['statusLabel']) ?></span>
+                    <?php if ($b['needsReport']): ?><div><span class="<?= $b['reportOverdue'] ? 'badge-susp' : 'badge-pend' ?>" style="margin-top:4px;display:inline-block;font-size:11px"><?= e($b['reportStatusText']) ?></span></div>
+                    <?php elseif ($b['reported']): ?><div style="font-size:11px;color:#059669;margin-top:4px"><i class="bi bi-check-circle me-1"></i>รายงานแล้ว</div><?php endif; ?>
+                  </td>
                 </tr>
               <?php endforeach; ?>
             </tbody>

@@ -18,10 +18,13 @@ reinstalling:
 
 ```sh
 "$MYSQL" -u root -h 127.0.0.1 --port=3307 < migrate_ai_account_details.sql
+"$MYSQL" -u root -h 127.0.0.1 --port=3307 < migrate_groups_and_reports.sql
 ```
 
-It adds the `ai_providers` table and the new `ai_accounts` columns idempotently (safe to re-run; the
-one non-idempotent step is the foreign key — a "Duplicate key name" error on re-run is harmless).
+`migrate_ai_account_details.sql` adds the `ai_providers` table and the new `ai_accounts` columns;
+`migrate_groups_and_reports.sql` adds the `user_groups` table, `users.group_id`, and the booking
+`purpose` / report columns. Both are idempotent (safe to re-run; the one non-idempotent step is each
+foreign key — a "Duplicate key name" error on re-run is harmless).
 
 ## Or import from the CLI
 

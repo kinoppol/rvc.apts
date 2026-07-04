@@ -1,2 +1,6 @@
 config.local.php
 .claude/launch.json
+
+# Uploaded usage-report files (keep the folder, ignore its contents)
+uploads/reports/*
+!uploads/reports/.gitkeep

@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
     $date = trim($_POST['booking_date'] ?? '');
     $slotIndex = (int) ($_POST['slot_index'] ?? -1);
-    $result = Booking::create($user['id'], $date, $slotIndex);
+    $result = Booking::create($user['id'], $date, $slotIndex, $_POST['purpose'] ?? '');
     if ($result['ok']) {
         flash_set('ok', 'จองคิวสำเร็จ! ระบบได้จัดสรร AI Account ให้เรียบร้อยแล้ว');
     } else {
@@ -19,7 +19,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$settings = SlotSettings::get();
+$settings = Booking::limitsFor($user['id']);
+$restricted = Booking::isRestricted($user['id']);
+$pendingReports = Booking::pendingReportsForUser($user['id']);
 $grid = Booking::getWeekGrid($user['id'], $week);
 $weekLabel = Booking::getWeekLabel($week);
 $quotaRemaining = Booking::weeklyQuotaRemaining($user['id']);
@@ -27,6 +29,23 @@ $quotaRemaining = Booking::weeklyQuotaRemaining($user['id']);
 $activeNav = 'booking';
 require __DIR__ . '/../includes/header.php';
 ?>
+<?php if ($restricted): ?>
+  <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:20px;display:flex;gap:14px;align-items:flex-start;max-width:640px">
+    <i class="bi bi-slash-circle-fill" style="color:#DC2626;font-size:22px;flex-shrink:0;margin-top:2px"></i>
+    <div>
+      <div style="font-weight:700;color:#991B1B;font-size:15px;margin-bottom:4px">บัญชีถูกระงับการจองชั่วคราว</div>
+      <p style="color:#991B1B;font-size:13px;margin:0 0 12px">คุณมีรายงานการใช้งานค้างเกินกำหนด <?= Booking::REPORT_DEADLINE_DAYS ?> วัน จำนวน <?= (int) Booking::overdueCountForUser($user['id']) ?> รายการ กรุณารายงานการใช้งานที่ค้างให้ครบก่อน หรือแจ้งผู้ดูแลระบบ จึงจะจองได้อีกครั้ง</p>
+      <a href="<?= url('student/my-bookings.php') ?>" class="btn btn-primary btn-sm" style="background:#DC2626;border:none"><i class="bi bi-journal-text me-1"></i>ไปรายงานการใช้งาน</a>
+    </div>
+  </div>
+<?php require __DIR__ . '/../includes/footer.php'; exit; ?>
+<?php endif; ?>
+<?php if ($pendingReports): ?>
+  <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400E;display:flex;gap:8px;align-items:center">
+    <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0"></i>
+    <span>คุณมีการใช้งานที่ยังไม่ได้รายงาน <strong><?= count($pendingReports) ?></strong> รายการ — <a href="<?= url('student/my-bookings.php') ?>" style="color:#92400E;font-weight:700">รายงานตอนนี้</a> ก่อนครบกำหนด <?= Booking::REPORT_DEADLINE_DAYS ?> วัน ไม่เช่นนั้นจะถูกระงับการจอง</span>
+  </div>
+<?php endif; ?>
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
   <div>
     <h5 style="font-weight:700;margin:0">จองคิว AI Pro</h5>
@@ -102,6 +121,10 @@ require __DIR__ . '/../includes/header.php';
           <div class="info-box">
             <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--bs-secondary-color)">วันที่</span><span style="font-weight:600;font-size:13px" id="bookModalDayLabel">—</span></div>
             <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--bs-secondary-color)">ช่วงเวลา</span><span style="font-weight:600;font-size:13px" id="bookModalSlotTime">—</span></div>
+          </div>
+          <div style="margin-top:14px">
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">วัตถุประสงค์การใช้งาน <span style="color:#DC2626">*</span></label>
+            <textarea name="purpose" required rows="3" maxlength="500" class="form-control" placeholder="ระบุว่าจะใช้ AI ทำอะไร เช่น ทำโปรเจกต์รายวิชา, ค้นคว้าข้อมูลวิทยานิพนธ์, เขียนโค้ด..." style="font-size:13px"></textarea>
           </div>
         </div>
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">

@@ -30,6 +30,21 @@ final class Notification
             ];
         }
 
+        $restrictedCount = (int) Database::pdo()->query(
+            "SELECT COUNT(DISTINCT user_id) FROM bookings
+             WHERE status = 'upcoming' AND reported_at IS NULL
+               AND end_datetime < DATE_SUB(NOW(), INTERVAL " . Booking::REPORT_DEADLINE_DAYS . " DAY)"
+        )->fetchColumn();
+        if ($restrictedCount > 0) {
+            $items[] = [
+                'level' => 'err',
+                'icon' => 'bi-slash-circle',
+                'title' => "สมาชิกถูกระงับการจอง {$restrictedCount} คน",
+                'detail' => 'มีรายงานการใช้งานค้างเกินกำหนด',
+                'url' => url('admin/members.php'),
+            ];
+        }
+
         $aiUrl = url('admin/ai-accounts.php');
         foreach (AiAccount::listWithUsage() as $ac) {
             if ($ac['isExpired']) {
@@ -80,6 +95,16 @@ final class Notification
                 'icon' => 'bi-calendar-check',
                 'title' => $hours <= 24 ? 'การจองใกล้ถึงแล้ว' : 'การจองที่กำลังจะมาถึง',
                 'detail' => $b['dateLabel'] . ' · ' . $b['slotLabel'] . ' · ' . $b['ai_name'],
+                'url' => url('student/my-bookings.php'),
+            ];
+        }
+
+        foreach (Booking::pendingReportsForUser($userId) as $b) {
+            $items[] = [
+                'level' => $b['reportOverdue'] ? 'err' : 'warn',
+                'icon' => 'bi-journal-text',
+                'title' => $b['reportOverdue'] ? 'เกินกำหนดรายงานการใช้งาน' : 'ต้องรายงานการใช้งาน',
+                'detail' => $b['dateLabel'] . ' · ' . $b['reportStatusText'],
                 'url' => url('student/my-bookings.php'),
             ];
         }

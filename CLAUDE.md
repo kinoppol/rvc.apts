@@ -51,13 +51,15 @@ toast UI.
   deleted after setup.
 - `student/{dashboard,booking,my-bookings,profile}.php`, `admin/{dashboard,members,slots,ai-accounts,reports}.php`.
 - `includes/` — domain classes (all `static`-method, PDO-backed): `Database` (PDO singleton),
-  `Auth`, `Booking`, `Member`, `AiProvider`, `AiAccount`, `SlotSettings`, `Report`, `Csrf`; plus the
-  shared view partials `header.php` / `footer.php` (authenticated shell) and `guest-header.php` /
-  `guest-footer.php` (login/register shell).
+  `Auth`, `Booking`, `Member`, `UserGroup`, `AiProvider`, `AiAccount`, `SlotSettings`, `Report`,
+  `Notification`, `Csrf`; plus the shared view partials `header.php` / `footer.php` (authenticated
+  shell) and `guest-header.php` / `guest-footer.php` (login/register shell).
+- `uploads/reports/` — student-uploaded usage-report files (image/PDF). Git-ignored except `.gitkeep`.
 - `assets/app.css` (ported verbatim from the prototype's `<style>`), `assets/app.js` (sidebar collapse,
   theme toggle, booking modal population, AI-account edit modal, `initUsageChart` for Chart.js).
-- `database/schema.sql`, `database/seed.sql`, and `database/migrate_ai_account_details.sql` (an
-  idempotent ALTER migration for existing DBs — fresh installs get everything from `schema.sql`).
+- `database/schema.sql`, `database/seed.sql`, and idempotent ALTER migrations for existing DBs
+  (`database/migrate_ai_account_details.sql`, `database/migrate_groups_and_reports.sql`) — fresh
+  installs get everything from `schema.sql`.
 
 ### Architecture rules to respect when editing
 
@@ -90,6 +92,18 @@ toast UI.
   suspend, อนุมัติ = approve, บำรุงรักษา = maintenance).
 - Slot count/labels/times are computed in PHP from `slot_settings` (`SlotSettings::slotLabel/slotStart/
   slotEnd`) — admin-editable, not a fixed table.
+- **Per-user booking limits go through `Booking::limitsFor($userId)`**, not `SlotSettings::get()`
+  directly: it returns the global settings with the user's group (`user_groups`, admin-managed on
+  `admin/groups.php`) overriding `weekly_quota` / `max_advance_days` when those group columns aren't
+  NULL. Any new quota/advance logic must resolve limits through `limitsFor`, not the raw global row.
+- **Every booking must carry a `purpose`** (required by `Booking::create()`), and after a slot ends the
+  student must file a usage report (free text and/or an image/PDF upload) within
+  `Booking::REPORT_DEADLINE_DAYS` (7). This is enforced with the same derive-at-read-time pattern as
+  booking status: `Booking::isRestricted($userId)` (any completed booking unreported past the deadline)
+  blocks new bookings — no cron, no stored "suspended" flag. Student pages gate on it and show the
+  report UI; `Member::assignGroup/resetPassword` and `Booking::waiveOverdueForUser` (admin "ปลดระงับ")
+  are the admin-side counterparts. Uploaded files are validated (extension + finfo mime, ≤5 MB) and
+  moved into `uploads/reports/` by `Booking::submitReport()`.
 
 ### Running / setup (PHP app)
 

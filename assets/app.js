@@ -105,6 +105,51 @@
     });
   });
 
+  // ── User-group add/edit modal (admin/groups.php) ──
+  var groupModal = document.getElementById("groupModal");
+  if (groupModal) {
+    var fillGroup = function (data, isEdit) {
+      groupModal.querySelector("[name=id]").value = data.id || "";
+      groupModal.querySelector("[name=name]").value = data.name || "";
+      groupModal.querySelector("[name=description]").value = data.description || "";
+      groupModal.querySelector("[name=weekly_quota]").value = data.weekly_quota || "";
+      groupModal.querySelector("[name=max_advance_days]").value = data.max_advance_days || "";
+      var title = document.getElementById("groupModalTitle");
+      if (title) title.textContent = isEdit ? "แก้ไขกลุ่ม" : "เพิ่มกลุ่ม";
+    };
+    document.querySelectorAll("[data-edit-group]").forEach(function (btn) {
+      btn.addEventListener("click", function () { fillGroup(btn.dataset, true); });
+    });
+    document.querySelectorAll("[data-add-group]").forEach(function (btn) {
+      btn.addEventListener("click", function () { fillGroup({}, false); });
+    });
+  }
+
+  // ── Reset-password modal (admin/members.php) ──
+  document.querySelectorAll("[data-reset-pw]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var modalEl = document.getElementById("resetPwModal");
+      if (!modalEl) return;
+      modalEl.querySelector("[name=id]").value = btn.dataset.id;
+      modalEl.querySelector("[name=new_password]").value = "";
+      var nameEl = document.getElementById("resetPwName");
+      if (nameEl) nameEl.textContent = btn.dataset.name || "สมาชิก";
+      new bootstrap.Modal(modalEl).show();
+    });
+  });
+
+  // ── Report submission modal (student/my-bookings.php) ──
+  document.querySelectorAll("[data-report-booking]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var modalEl = document.getElementById("reportModal");
+      if (!modalEl) return;
+      modalEl.querySelector("[name=id]").value = btn.dataset.id;
+      var meta = document.getElementById("reportModalMeta");
+      if (meta) meta.textContent = btn.dataset.meta || "";
+      new bootstrap.Modal(modalEl).show();
+    });
+  });
+
   // ── Chart.js init hook for admin/dashboard.php ──
   window.initUsageChart = function (canvasId, labels, datasets) {
     var canvas = document.getElementById(canvasId);

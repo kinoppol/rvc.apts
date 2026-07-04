@@ -10,6 +10,10 @@ final class Booking
     private const ICON_MAP = ['available' => 'bi bi-sun', 'busy' => 'bi bi-person-fill', 'mine' => 'bi bi-check-circle-fill', 'now' => 'bi bi-circle-fill', 'off' => 'bi bi-tools'];
     private const TEXT_MAP = ['available' => 'ว่าง', 'busy' => 'จองแล้ว', 'mine' => 'ของฉัน', 'now' => 'ใช้งานอยู่', 'off' => 'ปิด'];
 
+    /** Days a student has, after a slot ends, to file the usage report before booking is blocked. */
+    public const REPORT_DEADLINE_DAYS = 7;
+    private const REPORT_ALLOWED = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', 'pdf' => 'application/pdf'];
+
     public static function thaiDate(DateTimeInterface $d): string
     {
         return $d->format('j') . ' ' . self::THAI_MONTHS_SHORT[(int) $d->format('n')] . ' ' . ((int) $d->format('Y') + 543);
@@ -46,7 +50,7 @@ final class Booking
      */
     public static function getWeekGrid(int $userId, int $weekOffset): array
     {
-        $settings = SlotSettings::get();
+        $settings = self::limitsFor($userId);
         $start = self::weekStart($weekOffset);
         $today = new DateTimeImmutable('today');
         $now = new DateTimeImmutable();
@@ -140,9 +144,19 @@ final class Booking
     }
 
     /** @return array{ok:bool,error?:string} */
-    public static function create(int $userId, string $dateStr, int $slotIndex): array
+    public static function create(int $userId, string $dateStr, int $slotIndex, string $purpose = ''): array
     {
-        $settings = SlotSettings::get();
+        if (self::isRestricted($userId)) {
+            return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับการจองชั่วคราว เนื่องจากมีรายงานการใช้งานค้างเกิน ' . self::REPORT_DEADLINE_DAYS . ' วัน กรุณารายงานการใช้งานที่ค้างให้ครบก่อน'];
+        }
+
+        $purpose = trim($purpose);
+        if ($purpose === '') {
+            return ['ok' => false, 'error' => 'กรุณาระบุวัตถุประสงค์การใช้งาน'];
+        }
+        $purpose = mb_substr($purpose, 0, 500);
+
+        $settings = self::limitsFor($userId);
         try {
             $date = new DateTimeImmutable($dateStr);
         } catch (Exception) {
@@ -199,10 +213,10 @@ final class Booking
             }
 
             $insert = $pdo->prepare(
-                'INSERT INTO bookings (user_id, ai_account_id, booking_date, slot_index, start_datetime, end_datetime, status)
-                 VALUES (?, ?, ?, ?, ?, ?, \'upcoming\')'
+                'INSERT INTO bookings (user_id, ai_account_id, booking_date, slot_index, start_datetime, end_datetime, status, purpose)
+                 VALUES (?, ?, ?, ?, ?, ?, \'upcoming\', ?)'
             );
-            $insert->execute([$userId, $accountId, $dateStr, $slotIndex, $slotStart->format('Y-m-d H:i:s'), $slotEnd->format('Y-m-d H:i:s')]);
+            $insert->execute([$userId, $accountId, $dateStr, $slotIndex, $slotStart->format('Y-m-d H:i:s'), $slotEnd->format('Y-m-d H:i:s'), $purpose]);
 
             $pdo->commit();
             return ['ok' => true];
@@ -252,15 +266,34 @@ final class Booking
     {
         $badgeMap = ['upcoming' => 'badge-up', 'now' => 'badge-up', 'completed' => 'badge-ok', 'cancelled' => 'badge-susp'];
         $labelMap = ['upcoming' => 'กำลังจะมาถึง', 'now' => 'กำลังใช้งาน', 'completed' => 'เสร็จสิ้น', 'cancelled' => 'ยกเลิกแล้ว'];
+        $now = new DateTimeImmutable();
         foreach ($rows as &$row) {
             $status = self::displayStatus($row);
             $start = new DateTimeImmutable($row['start_datetime']);
+            $end = new DateTimeImmutable($row['end_datetime']);
             $row['displayStatus'] = $status;
             $row['badgeCls'] = $badgeMap[$status];
             $row['statusLabel'] = $labelMap[$status];
             $row['dateLabel'] = self::THAI_WEEKDAYS_SHORT[$start->format('N') - 1] . '. ' . self::thaiDate($start);
             $row['slotLabel'] = SlotSettings::slotLabel((int) $row['slot_index']) . ' (' . substr($row['start_datetime'], 11, 5) . '–' . substr($row['end_datetime'], 11, 5) . ')';
             $row['canCancel'] = $status === 'upcoming';
+
+            // Post-use report state (only completed, non-cancelled bookings need one)
+            $reported = !empty($row['reported_at']);
+            $deadline = $end->modify('+' . self::REPORT_DEADLINE_DAYS . ' days');
+            $row['reported'] = $reported;
+            $row['needsReport'] = $status === 'completed' && !$reported;
+            $row['reportOverdue'] = $row['needsReport'] && $now > $deadline;
+            $row['reportDeadlineLabel'] = self::thaiDate($deadline);
+            $daysLeft = (int) (new DateTimeImmutable($now->format('Y-m-d')))->diff(new DateTimeImmutable($deadline->format('Y-m-d')))->format('%r%a');
+            $row['reportDaysLeft'] = $daysLeft;
+            if ($reported) {
+                $row['reportStatusText'] = 'รายงานแล้ว';
+            } elseif ($row['needsReport']) {
+                $row['reportStatusText'] = $row['reportOverdue'] ? 'เกินกำหนดรายงาน ' . abs($daysLeft) . ' วัน' : 'ต้องรายงานภายใน ' . $daysLeft . ' วัน';
+            } else {
+                $row['reportStatusText'] = '';
+            }
         }
         return $rows;
     }
@@ -305,7 +338,135 @@ final class Booking
 
     public static function weeklyQuotaRemaining(int $userId): int
     {
-        $settings = SlotSettings::get();
+        $settings = self::limitsFor($userId);
         return max(0, $settings['weekly_quota'] - self::quotaUsed($userId, new DateTimeImmutable('today')));
+    }
+
+    /**
+     * Effective booking limits for a user: the global slot_settings, with the user's group
+     * overriding weekly_quota / max_advance_days when those group columns are not NULL.
+     */
+    public static function limitsFor(int $userId): array
+    {
+        $settings = SlotSettings::get();
+        $stmt = Database::pdo()->prepare(
+            'SELECT g.weekly_quota, g.max_advance_days FROM users u
+             JOIN user_groups g ON g.id = u.group_id WHERE u.id = ?'
+        );
+        $stmt->execute([$userId]);
+        $group = $stmt->fetch();
+        if ($group) {
+            if ($group['weekly_quota'] !== null) {
+                $settings['weekly_quota'] = (int) $group['weekly_quota'];
+            }
+            if ($group['max_advance_days'] !== null) {
+                $settings['max_advance_days'] = (int) $group['max_advance_days'];
+            }
+        }
+        return $settings;
+    }
+
+    /** @return array<int,array> Completed bookings the user still has to report on. */
+    public static function pendingReportsForUser(int $userId): array
+    {
+        return array_values(array_filter(self::listForUser($userId), fn ($r) => $r['needsReport']));
+    }
+
+    /** Count of completed bookings whose report is past the 7-day deadline and still missing. */
+    public static function overdueCountForUser(int $userId): int
+    {
+        $stmt = Database::pdo()->prepare(
+            "SELECT COUNT(*) FROM bookings
+             WHERE user_id = ? AND status = 'upcoming' AND reported_at IS NULL
+               AND end_datetime < DATE_SUB(NOW(), INTERVAL ? DAY)"
+        );
+        $stmt->execute([$userId, self::REPORT_DEADLINE_DAYS]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /** A user with any overdue unreported booking is temporarily blocked from making new bookings. */
+    public static function isRestricted(int $userId): bool
+    {
+        return self::overdueCountForUser($userId) > 0;
+    }
+
+    /**
+     * Student submits the post-use report (free text and/or an image/PDF file).
+     * @param array|null $file A single $_FILES entry, or null when no file was attached.
+     * @return array{ok:bool,error?:string}
+     */
+    public static function submitReport(int $userId, int $bookingId, string $text, ?array $file): array
+    {
+        $stmt = Database::pdo()->prepare('SELECT * FROM bookings WHERE id = ? AND user_id = ?');
+        $stmt->execute([$bookingId, $userId]);
+        $b = $stmt->fetch();
+        if (!$b) {
+            return ['ok' => false, 'error' => 'ไม่พบรายการจอง'];
+        }
+        if ($b['status'] === 'cancelled') {
+            return ['ok' => false, 'error' => 'รายการนี้ถูกยกเลิกแล้ว ไม่ต้องรายงาน'];
+        }
+        if (new DateTimeImmutable() < new DateTimeImmutable($b['end_datetime'])) {
+            return ['ok' => false, 'error' => 'ยังใช้งานไม่เสร็จ ยังไม่ต้องรายงาน'];
+        }
+        if (!empty($b['reported_at'])) {
+            return ['ok' => false, 'error' => 'รายการนี้รายงานไปแล้ว'];
+        }
+
+        $text = trim($text);
+        $hasFile = $file && isset($file['error']) && $file['error'] === UPLOAD_ERR_OK;
+        if ($text === '' && !$hasFile) {
+            return ['ok' => false, 'error' => 'กรุณากรอกรายละเอียดการใช้งาน หรือแนบไฟล์อย่างน้อยหนึ่งอย่าง'];
+        }
+
+        $storedFile = null;
+        if ($hasFile) {
+            $res = self::storeReportFile($file, $bookingId);
+            if (!$res['ok']) {
+                return $res;
+            }
+            $storedFile = $res['file'];
+        }
+
+        $upd = Database::pdo()->prepare('UPDATE bookings SET report_text = ?, report_file = ?, reported_at = NOW() WHERE id = ?');
+        $upd->execute([$text !== '' ? mb_substr($text, 0, 2000) : null, $storedFile, $bookingId]);
+        return ['ok' => true];
+    }
+
+    /** Validates and moves an uploaded report file into uploads/reports/. @return array{ok:bool,error?:string,file?:string} */
+    private static function storeReportFile(array $file, int $bookingId): array
+    {
+        if (($file['size'] ?? 0) > 5 * 1024 * 1024) {
+            return ['ok' => false, 'error' => 'ไฟล์มีขนาดใหญ่เกิน 5 MB'];
+        }
+        $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        if (!isset(self::REPORT_ALLOWED[$ext])) {
+            return ['ok' => false, 'error' => 'รองรับเฉพาะไฟล์รูปภาพ (JPG/PNG/GIF/WEBP) หรือ PDF'];
+        }
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+        if ($mime !== self::REPORT_ALLOWED[$ext]) {
+            return ['ok' => false, 'error' => 'ชนิดไฟล์ไม่ตรงกับนามสกุลไฟล์'];
+        }
+        $dir = __DIR__ . '/../uploads/reports';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        $name = 'report_' . $bookingId . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+        $dest = $dir . '/' . $name;
+        if (!move_uploaded_file($file['tmp_name'], $dest)) {
+            return ['ok' => false, 'error' => 'อัปโหลดไฟล์ไม่สำเร็จ'];
+        }
+        return ['ok' => true, 'file' => $name];
+    }
+
+    /** Admin clears a user's pending reports (lifts the temporary block). @return int rows waived */
+    public static function waiveOverdueForUser(int $userId): int
+    {
+        $stmt = Database::pdo()->prepare(
+            "UPDATE bookings SET reported_at = NOW(), report_text = COALESCE(report_text, 'ยกเว้นโดยผู้ดูแลระบบ')
+             WHERE user_id = ? AND status = 'upcoming' AND reported_at IS NULL AND end_datetime < NOW()"
+        );
+        $stmt->execute([$userId]);
+        return $stmt->rowCount();
     }
 }
