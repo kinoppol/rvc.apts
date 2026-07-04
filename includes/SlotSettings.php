@@ -10,19 +10,24 @@ final class SlotSettings
     }
 
     /** @return array{ok:bool,error?:string} */
-    public static function update(int $slotHours, int $slotsPerDay, int $weeklyQuota, int $maxAdvanceDays): array
+    public static function update(int $slotHours, int $slotsPerDay, int $weeklyQuota, int $maxAdvanceDays, string $dayStartTime): array
     {
         if ($slotHours < 1 || $slotsPerDay < 1 || $weeklyQuota < 1 || $maxAdvanceDays < 1) {
             return ['ok' => false, 'error' => 'ค่าที่กรอกต้องเป็นจำนวนเต็มบวก'];
         }
-        if ($slotHours * $slotsPerDay > 24) {
-            return ['ok' => false, 'error' => 'ความยาวช่วงเวลา x จำนวน slots/วัน ต้องไม่เกิน 24 ชั่วโมง'];
+        if (!preg_match('/^([01]\d|2[0-3]):([0-5]\d)$/', trim($dayStartTime), $m)) {
+            return ['ok' => false, 'error' => 'รูปแบบเวลาเริ่มต้นของวันไม่ถูกต้อง (HH:MM)'];
+        }
+        // Start time + total slot span must fit within the same day (slots don't wrap past midnight).
+        $startMinutes = (int) $m[1] * 60 + (int) $m[2];
+        if ($startMinutes + $slotHours * $slotsPerDay * 60 > 24 * 60) {
+            return ['ok' => false, 'error' => 'เวลาเริ่มต้น + (ความยาวช่วงเวลา × จำนวน slots/วัน) ต้องไม่เกิน 24:00 น. ของวัน'];
         }
 
         $stmt = Database::pdo()->prepare(
-            'UPDATE slot_settings SET slot_hours = ?, slots_per_day = ?, weekly_quota = ?, max_advance_days = ? WHERE id = 1'
+            'UPDATE slot_settings SET slot_hours = ?, slots_per_day = ?, weekly_quota = ?, max_advance_days = ?, day_start_time = ? WHERE id = 1'
         );
-        $stmt->execute([$slotHours, $slotsPerDay, $weeklyQuota, $maxAdvanceDays]);
+        $stmt->execute([$slotHours, $slotsPerDay, $weeklyQuota, $maxAdvanceDays, $m[1] . ':' . $m[2] . ':00']);
 
         return ['ok' => true];
     }
