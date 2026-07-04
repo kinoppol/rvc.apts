@@ -19,6 +19,9 @@ final class Database
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
             ]);
+            // Align MySQL NOW() with the app's Asia/Bangkok timezone (Thailand is a fixed +07:00, no DST),
+            // so SQL time comparisons match PHP's DateTimeImmutable comparisons.
+            self::$pdo->exec("SET time_zone = '+07:00'");
         }
         return self::$pdo;
     }
