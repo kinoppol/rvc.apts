@@ -161,9 +161,18 @@ final class Booking
         return (int) $stmt->fetchColumn();
     }
 
-    /** @return array{ok:bool,error?:string} Books a specific AI pool the user's group is allowed to use. */
-    public static function create(int $userId, string $dateStr, int $slotIndex, int $accountId, string $purpose = ''): array
+    /**
+     * Books one or more AI pools (checkboxes in the UI) for the same slot in a single all-or-nothing
+     * transaction, capped at the user's group max_concurrent. @param int[] $accountIds
+     * @return array{ok:bool,error?:string}
+     */
+    public static function create(int $userId, string $dateStr, int $slotIndex, array $accountIds, string $purpose = ''): array
     {
+        $accountIds = array_values(array_unique(array_map('intval', $accountIds)));
+        if (!$accountIds) {
+            return ['ok' => false, 'error' => 'กรุณาเลือกอย่างน้อย 1 Pool'];
+        }
+
         if (self::isRestricted($userId)) {
             return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับการจองชั่วคราว เนื่องจากมีรายงานการใช้งานค้างเกิน ' . self::REPORT_DEADLINE_DAYS . ' วัน กรุณารายงานการใช้งานที่ค้างให้ครบก่อน'];
         }
@@ -189,6 +198,9 @@ final class Booking
         if ($slotIndex < 0 || $slotIndex >= $settings['slots_per_day']) {
             return ['ok' => false, 'error' => 'ช่วงเวลาไม่ถูกต้อง'];
         }
+        if (count($accountIds) > (int) $settings['max_concurrent']) {
+            return ['ok' => false, 'error' => 'เลือกได้ไม่เกิน ' . (int) $settings['max_concurrent'] . ' Pool ต่อช่วงเวลา'];
+        }
 
         $slotStart = $date->setTime(...array_map('intval', explode(':', SlotSettings::slotStart($settings, $slotIndex))));
         $slotEnd = $date->setTime(...array_map('intval', explode(':', SlotSettings::slotEnd($settings, $slotIndex))));
@@ -196,24 +208,28 @@ final class Booking
             return ['ok' => false, 'error' => 'ไม่สามารถจองช่วงเวลาที่ผ่านไปแล้วหรือกำลังเริ่มได้'];
         }
 
-        // The chosen pool must be one this user's group is allowed to book, and be usable.
+        // Every chosen pool must be one this user's group is allowed to book, and be usable.
+        $placeholders = implode(',', array_fill(0, count($accountIds), '?'));
         $accStmt = Database::pdo()->prepare(
-            'SELECT a.status, a.expires_at FROM users u
-             JOIN group_ai_accounts ga ON ga.group_id = u.group_id AND ga.ai_account_id = ?
+            "SELECT a.id, a.status, a.expires_at FROM users u
+             JOIN group_ai_accounts ga ON ga.group_id = u.group_id AND ga.ai_account_id IN ($placeholders)
              JOIN ai_accounts a ON a.id = ga.ai_account_id
-             WHERE u.id = ?'
+             WHERE u.id = ?"
         );
-        $accStmt->execute([$accountId, $userId]);
-        $acc = $accStmt->fetch();
-        if (!$acc) {
-            return ['ok' => false, 'error' => 'คุณไม่มีสิทธิ์จอง Pool นี้'];
+        $accStmt->execute([...$accountIds, $userId]);
+        $accounts = $accStmt->fetchAll();
+        if (count($accounts) !== count($accountIds)) {
+            return ['ok' => false, 'error' => 'คุณไม่มีสิทธิ์จอง Pool บางรายการที่เลือก'];
         }
-        if ($acc['status'] !== 'active' || (!empty($acc['expires_at']) && new DateTimeImmutable($acc['expires_at']) <= new DateTimeImmutable())) {
-            return ['ok' => false, 'error' => 'Pool นี้ไม่พร้อมใช้งาน (ปิดปรับปรุงหรือหมดอายุ)'];
+        $now = new DateTimeImmutable();
+        foreach ($accounts as $acc) {
+            if ($acc['status'] !== 'active' || (!empty($acc['expires_at']) && new DateTimeImmutable($acc['expires_at']) <= $now)) {
+                return ['ok' => false, 'error' => 'มี Pool ที่เลือกไม่พร้อมใช้งาน (ปิดปรับปรุงหรือหมดอายุ)'];
+            }
         }
 
-        if (self::quotaUsed($userId, $date) >= $settings['weekly_quota']) {
-            return ['ok' => false, 'error' => 'คุณใช้โควต้าการจองของสัปดาห์นี้ครบแล้ว'];
+        if (self::quotaUsed($userId, $date) + count($accountIds) > $settings['weekly_quota']) {
+            return ['ok' => false, 'error' => 'จำนวน Pool ที่เลือกเกินโควต้าคงเหลือของสัปดาห์นี้'];
         }
 
         $pdo = Database::pdo();
@@ -224,26 +240,30 @@ final class Booking
                 "SELECT COUNT(*) FROM bookings WHERE user_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming' FOR UPDATE"
             );
             $mineStmt->execute([$userId, $dateStr, $slotIndex]);
-            if ((int) $mineStmt->fetchColumn() >= (int) $settings['max_concurrent']) {
+            if ((int) $mineStmt->fetchColumn() + count($accountIds) > (int) $settings['max_concurrent']) {
                 $pdo->rollBack();
                 return ['ok' => false, 'error' => 'คุณจองครบจำนวน Pool สูงสุดต่อช่วงเวลาแล้ว (' . (int) $settings['max_concurrent'] . ' Pool)'];
             }
 
-            // Is this specific pool still free for this slot?
+            // Every chosen pool must still be free for this slot.
             $takenStmt = $pdo->prepare(
                 "SELECT COUNT(*) FROM bookings WHERE ai_account_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming' FOR UPDATE"
             );
-            $takenStmt->execute([$accountId, $dateStr, $slotIndex]);
-            if ((int) $takenStmt->fetchColumn() > 0) {
-                $pdo->rollBack();
-                return ['ok' => false, 'error' => 'Pool นี้ถูกจองในช่วงเวลานี้แล้ว กรุณาเลือก Pool อื่น'];
+            foreach ($accountIds as $accountId) {
+                $takenStmt->execute([$accountId, $dateStr, $slotIndex]);
+                if ((int) $takenStmt->fetchColumn() > 0) {
+                    $pdo->rollBack();
+                    return ['ok' => false, 'error' => 'มี Pool ที่เลือกถูกจองในช่วงเวลานี้ไปแล้ว กรุณาเลือกใหม่'];
+                }
             }
 
             $insert = $pdo->prepare(
                 'INSERT INTO bookings (user_id, ai_account_id, booking_date, slot_index, start_datetime, end_datetime, status, purpose)
                  VALUES (?, ?, ?, ?, ?, ?, \'upcoming\', ?)'
             );
-            $insert->execute([$userId, $accountId, $dateStr, $slotIndex, $slotStart->format('Y-m-d H:i:s'), $slotEnd->format('Y-m-d H:i:s'), $purpose]);
+            foreach ($accountIds as $accountId) {
+                $insert->execute([$userId, $accountId, $dateStr, $slotIndex, $slotStart->format('Y-m-d H:i:s'), $slotEnd->format('Y-m-d H:i:s'), $purpose]);
+            }
 
             $pdo->commit();
             return ['ok' => true];

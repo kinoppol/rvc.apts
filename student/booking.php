@@ -9,8 +9,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
     $date = trim($_POST['booking_date'] ?? '');
     $slotIndex = (int) ($_POST['slot_index'] ?? -1);
-    $accountId = (int) ($_POST['ai_account_id'] ?? 0);
-    $result = Booking::create($user['id'], $date, $slotIndex, $accountId, $_POST['purpose'] ?? '');
+    $accountIds = array_map('intval', (array) ($_POST['ai_account_id'] ?? []));
+    $result = Booking::create($user['id'], $date, $slotIndex, $accountIds, $_POST['purpose'] ?? '');
     flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'จองคิวสำเร็จ!' : ($result['error'] ?? 'ไม่สามารถจองได้'));
     header('Location: ' . url('student/booking.php') . '?week=' . $week);
     exit;
@@ -133,12 +133,14 @@ $cellMeta = [
                 }
                 $meta = $cellMeta[$cellStatus];
                 $preview = $avail ? pool_names_preview($avail) : ($mine ? pool_names_preview($mine) : '');
+                $remaining = max(0, $maxConcurrent - count($mine));
             ?>
               <td style="vertical-align:top;padding:0;border:1px solid var(--bs-border-color)">
                 <?php if ($cellStatus === 'available'): ?>
                   <button type="button" class="slot-cell" style="all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;padding:8px;background:<?= $meta['bg'] ?>;border-left:3px solid <?= $meta['border'] ?>"
                     data-date="<?= e($slot['date']) ?>" data-slot-index="<?= (int) $slot['slotIndex'] ?>"
                     data-day-label="<?= e($slot['dateLabel']) ?>" data-slot-label="<?= e($slot['label']) ?>" data-slot-time="<?= e($slot['time']) ?>"
+                    data-max-select="<?= (int) $remaining ?>"
                     data-pools='<?= e(json_encode(array_map(fn ($p) => ['id' => $p['accountId'], 'name' => $p['name']], $avail), JSON_UNESCAPED_UNICODE)) ?>'>
                     <div style="font-size:10px;font-weight:700;color:<?= $meta['fg'] ?>"><i class="bi <?= $meta['icon'] ?>"></i> <?= $meta['label'] ?></div>
                     <div style="font-size:9px;color:<?= $meta['fg'] ?>;opacity:.85;margin-top:2px;word-break:break-word"><?= e($preview) ?></div>
@@ -178,8 +180,11 @@ $cellMeta = [
             <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--bs-secondary-color)">ช่วงเวลา</span><span style="font-weight:600;font-size:13px" id="bookModalSlotTime">—</span></div>
           </div>
           <div style="margin-top:14px">
-            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">เลือก AI Pool <span style="color:#DC2626">*</span></label>
-            <select name="ai_account_id" id="bookModalPoolSelect" required class="form-select" style="font-size:13px"></select>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
+              <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);margin:0">เลือก AI Pool <span style="color:#DC2626">*</span></label>
+              <span style="font-size:11px;color:var(--bs-tertiary-color)" id="bookModalMaxHint"></span>
+            </div>
+            <div id="bookModalPoolChecks" style="display:flex;flex-direction:column;gap:6px;border:1px solid var(--bs-border-color);border-radius:8px;padding:10px;max-height:180px;overflow-y:auto"></div>
           </div>
           <div style="margin-top:14px">
             <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">วัตถุประสงค์การใช้งาน <span style="color:#DC2626">*</span></label>

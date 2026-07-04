@@ -59,9 +59,17 @@
     }, 3200);
   }
 
-  // ── Booking confirmation modal (student/booking.php) — click the whole slot cell, then pick a Pool ──
+  // ── Booking confirmation modal (student/booking.php) — click the whole slot cell, then check off Pools ──
   var bookModal = document.getElementById("bookSlotModal");
   if (bookModal) {
+    var applySelectLimit = function (container, maxSelect) {
+      var boxes = container.querySelectorAll("input[type=checkbox]");
+      var checkedCount = Array.prototype.filter.call(boxes, function (b) { return b.checked; }).length;
+      boxes.forEach(function (b) {
+        b.disabled = !b.checked && checkedCount >= maxSelect;
+      });
+    };
+
     document.querySelectorAll(".slot-cell").forEach(function (cell) {
       cell.addEventListener("click", function () {
         document.getElementById("bookModalDate").value = cell.dataset.date;
@@ -69,17 +77,28 @@
         document.getElementById("bookModalDayLabel").textContent = cell.dataset.dayLabel;
         document.getElementById("bookModalSlotTime").textContent = cell.dataset.slotLabel + " (" + cell.dataset.slotTime + ")";
 
-        var select = document.getElementById("bookModalPoolSelect");
-        if (select) {
-          select.innerHTML = "";
+        var maxSelect = parseInt(cell.dataset.maxSelect, 10) || 1;
+        var hint = document.getElementById("bookModalMaxHint");
+        if (hint) hint.textContent = "เลือกได้สูงสุด " + maxSelect + " Pool";
+
+        var container = document.getElementById("bookModalPoolChecks");
+        if (container) {
+          container.innerHTML = "";
           var pools = [];
           try { pools = JSON.parse(cell.dataset.pools || "[]"); } catch (e) { pools = []; }
           pools.forEach(function (p) {
-            var opt = document.createElement("option");
-            opt.value = p.id;
-            opt.textContent = p.name;
-            select.appendChild(opt);
+            var label = document.createElement("label");
+            label.style.cssText = "display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer";
+            var box = document.createElement("input");
+            box.type = "checkbox";
+            box.name = "ai_account_id[]";
+            box.value = p.id;
+            box.addEventListener("change", function () { applySelectLimit(container, maxSelect); });
+            label.appendChild(box);
+            label.appendChild(document.createTextNode(p.name));
+            container.appendChild(label);
           });
+          applySelectLimit(container, maxSelect);
         }
         new bootstrap.Modal(bookModal).show();
       });

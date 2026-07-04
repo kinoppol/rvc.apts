@@ -75,12 +75,16 @@ toast UI.
   cron flips statuses. Don't add a stored "completed" state.
 - **Booking is per-pool, gated by group access.** A group's members may only book the AI accounts
   listed in `group_ai_accounts` (admin-managed on `admin/groups.php`); no group / no rows = cannot book
-  (`Booking::allowedAccountsFor` returns `[]` and the booking page shows an empty state). Students pick a
-  **specific** pool per slot — `Booking::create($userId, $date, $slot, $accountId, $purpose)` validates
-  the pool is granted + active + non-expired, enforces the group's `max_concurrent` pools-per-slot cap,
-  and books it inside a `SELECT ... FOR UPDATE` transaction (unique `(ai_account_id, booking_date,
-  slot_index)` prevents double-booking). No auto-assign. `Booking::getWeekGrid` returns, per slot, the
-  per-pool status (`available`/`busy`/`mine`/`now`/`off`) the booking grid renders as one chip per pool.
+  (`Booking::allowedAccountsFor` returns `[]` and the booking page shows an empty state). Students pick
+  one or more **specific** pools per slot via checkboxes (capped client-side at the group's
+  `max_concurrent`) — `Booking::create($userId, $date, $slot, array $accountIds, $purpose)` validates
+  every id is granted + active + non-expired, re-checks the `max_concurrent` cap server-side, and books
+  them **atomically** in one `SELECT ... FOR UPDATE` transaction (any one pool already taken/ungranted
+  rolls back the whole batch — unique `(ai_account_id, booking_date, slot_index)` prevents double-
+  booking). No auto-assign. `Booking::getWeekGrid` returns, per slot, each pool's status
+  (`available`/`busy`/`mine`/`now`/`off`); the booking page collapses this into a single bordered cell
+  per slot (aggregate status + truncated list of available pool names), and clicking a bookable cell
+  opens the confirm modal where the actual per-pool checkboxes live.
 - **AI-account expiry is derived, not stored.** An account with `expires_at <= NOW()` is treated as
   disabled at read time — `AiAccount::listWithUsage()` shows a "ปิดใช้งาน (หมดอายุ)" badge, and every
   booking-availability query (`Booking::activeAccountCount/getWeekGrid/create`, plus the admin dashboard
