@@ -76,6 +76,14 @@ function url(string $path): string
     return APP_BASE . '/' . ltrim($path, '/');
 }
 
+/** Versioned asset URL (?v=filemtime) so browsers re-fetch CSS/JS after every change instead of caching stale copies. */
+function asset(string $path): string
+{
+    $full = __DIR__ . '/' . ltrim($path, '/');
+    $url = url($path);
+    return is_file($full) ? $url . '?v=' . filemtime($full) : $url;
+}
+
 function e(?string $value): string
 {
     return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');

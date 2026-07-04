@@ -10,8 +10,8 @@ html,body{margin:0;padding:0}
 .sb-link:hover{background:#EFF6FF;color:#2563EB}
 .sb-link.active{background:#EFF6FF;color:#2563EB;font-weight:600}
 .sb-link.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:18px;background:#2563EB;border-radius:0 2px 2px 0}
-[data-bs-theme="dark"] .sb-link:hover{background:#172554;color:#93C5FD}
-[data-bs-theme="dark"] .sb-link.active{background:#172554;color:#93C5FD}
+[data-bs-theme="dark"] .sb-link:hover{background:#1e3a8a;color:#DBEAFE}
+[data-bs-theme="dark"] .sb-link.active{background:#1e3a8a;color:#DBEAFE}
 [data-bs-theme="dark"] .sb-link.active::before{background:#60A5FA}
 /* ── Auth ── */
 .auth-bg{min-height:100vh;background:linear-gradient(140deg,#1D4ED8 0%,#2563EB 50%,#0EA5E9 100%);display:flex;align-items:center;justify-content:center;padding:24px}

@@ -15,6 +15,6 @@
   <?php endif; ?>
 
 </div>
-<script src="<?= url('assets/app.js') ?>"></script>
+<script src="<?= asset('assets/app.js') ?>"></script>
 </body>
 </html>
