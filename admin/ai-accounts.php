@@ -162,7 +162,14 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
         </select>
       </div>
       <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">อีเมลบัญชี</label><input type="email" name="email" class="form-control" placeholder="account@example.com" style="font-size:13px"></div>
-      <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">รหัสผ่านบัญชี</label><input name="account_password" class="form-control" placeholder="<?= $prefix === 'edit' ? 'เว้นว่างไว้หากไม่เปลี่ยน' : 'รหัสผ่านสำหรับใช้ร่วมกัน' ?>" style="font-size:13px;font-family:monospace"></div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">รหัสผ่านบัญชี</label>
+        <div style="display:flex;gap:6px">
+          <input name="account_password" id="<?= e($prefix) ?>_account_password" class="form-control" placeholder="<?= $prefix === 'edit' ? 'เว้นว่างไว้หากไม่เปลี่ยน' : 'รหัสผ่านสำหรับใช้ร่วมกัน' ?>" style="font-size:13px;font-family:monospace">
+          <button type="button" class="btn btn-outline-secondary" data-pw-generate="#<?= e($prefix) ?>_account_password" title="สุ่มรหัสผ่าน"><i class="bi bi-shuffle"></i></button>
+          <button type="button" class="btn btn-outline-secondary" data-pw-copy="#<?= e($prefix) ?>_account_password" title="คัดลอก"><i class="bi bi-clipboard"></i></button>
+        </div>
+      </div>
       <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">วันเวลาหมดอายุ</label><input type="datetime-local" name="expires_at" class="form-control" style="font-size:13px"></div>
       <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">สถานะ</label>
         <select name="status" class="form-select" style="font-size:13px"><option value="active">ใช้งานได้</option><option value="maintenance">บำรุงรักษา</option></select>

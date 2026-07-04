@@ -163,6 +163,29 @@
     }
   }
 
+  // ── Generate/copy buttons on the "รหัสผ่านบัญชี" field (add & edit AI-account modals) ──
+  // Delegated so it works regardless of when the add/edit modal markup is in the DOM.
+  document.addEventListener("click", function (e) {
+    var genBtn = e.target.closest("[data-pw-generate]");
+    if (genBtn) {
+      var genInput = document.querySelector(genBtn.dataset.pwGenerate);
+      if (genInput) genInput.value = generateSecurePassword(12);
+      return;
+    }
+    var copyBtn = e.target.closest("[data-pw-copy]");
+    if (copyBtn) {
+      var copyInput = document.querySelector(copyBtn.dataset.pwCopy);
+      if (copyInput && copyInput.value) {
+        copyInput.select();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(copyInput.value);
+        } else {
+          document.execCommand("copy");
+        }
+      }
+    }
+  });
+
   // ── AI account edit modal (admin/ai-accounts.php) ──
   document.querySelectorAll("[data-edit-account]").forEach(function (btn) {
     btn.addEventListener("click", function () {
