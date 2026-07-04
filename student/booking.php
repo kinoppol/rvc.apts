@@ -57,7 +57,7 @@ require __DIR__ . '/../includes/header.php';
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
   <div>
     <h5 style="font-weight:700;margin:0">จองคิว AI Pro</h5>
-    <p style="color:var(--bs-secondary-color);font-size:14px;margin:4px 0 0">คลิก Pool สีฟ้าเพื่อจอง · โควต้าคงเหลือ <?= (int) $quotaRemaining ?>/<?= (int) $settings['weekly_quota'] ?> รอบ/สัปดาห์ · จองพร้อมกันได้ <?= $maxConcurrent ?> Pool/ช่วงเวลา</p>
+    <p style="color:var(--bs-secondary-color);font-size:14px;margin:4px 0 0">คลิกช่วงเวลาที่ต้องการจอง แล้วเลือก AI Pool จากแบบฟอร์ม · โควต้าคงเหลือ <?= (int) $quotaRemaining ?>/<?= (int) $settings['weekly_quota'] ?> รอบ/สัปดาห์ · จองพร้อมกันได้ <?= $maxConcurrent ?> Pool/ช่วงเวลา</p>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <a href="<?= url('student/booking.php') ?>?week=<?= max(0, $week - 1) ?>" class="btn btn-outline-secondary btn-sm<?= $week <= 0 ? ' disabled' : '' ?>"><i class="bi bi-chevron-left"></i></a>
@@ -66,22 +66,39 @@ require __DIR__ . '/../includes/header.php';
   </div>
 </div>
 
+<?php
+/** Joins pool names, truncated to $max items with a trailing "…" if more remain. */
+function pool_names_preview(array $pools, int $max = 2): string
+{
+    $names = array_map(fn ($p) => $p['name'], $pools);
+    if (count($names) <= $max) {
+        return implode(', ', $names);
+    }
+    return implode(', ', array_slice($names, 0, $max)) . ', …';
+}
+
+$cellMeta = [
+    'now'       => ['bg' => '#DCFCE7', 'fg' => '#059669', 'border' => '#059669', 'label' => 'กำลังใช้งาน', 'icon' => 'bi-broadcast'],
+    'available' => ['bg' => '#EFF6FF', 'fg' => '#2563EB', 'border' => '#2563EB', 'label' => 'ว่าง',        'icon' => 'bi-plus-circle'],
+    'mine'      => ['bg' => '#DBEAFE', 'fg' => '#1D4ED8', 'border' => '#1D4ED8', 'label' => 'ของฉัน',      'icon' => 'bi-check-circle-fill'],
+    'off'       => ['bg' => 'transparent', 'fg' => '#94A3B8', 'border' => '#CBD5E1', 'label' => 'ปิด',    'icon' => 'bi-dash-circle'],
+    'busy'      => ['bg' => '#F1F5F9', 'fg' => '#64748B', 'border' => '#94A3B8', 'label' => 'จองแล้ว',     'icon' => 'bi-person-fill'],
+];
+?>
 <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;font-size:12px">
-  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#EFF6FF;border:1.5px solid #2563EB"></div>ว่าง (จองได้)</div>
-  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#DBEAFE;border:1.5px solid #1D4ED8"></div>ของฉัน</div>
-  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#DCFCE7;border:1.5px solid #059669"></div>กำลังใช้งาน</div>
-  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#F1F5F9;border:1.5px solid #94A3B8"></div>จองแล้ว</div>
-  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;border:1.5px dashed #CBD5E1"></div>ปิด</div>
+  <?php foreach (['available' => 'ว่าง (จองได้)', 'mine' => 'ของฉัน', 'now' => 'กำลังใช้งาน', 'busy' => 'จองแล้ว', 'off' => 'ปิด'] as $k => $lbl): $m = $cellMeta[$k]; ?>
+    <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:<?= $m['bg'] ?>;border:1.5px <?= $k === 'off' ? 'dashed' : 'solid' ?> <?= $m['border'] ?>"></div><?= e($lbl) ?></div>
+  <?php endforeach; ?>
 </div>
 
 <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
   <div class="card-body" style="padding:16px;overflow-x:auto">
-    <table style="border-collapse:separate;border-spacing:5px;min-width:100%">
+    <table style="border-collapse:collapse;min-width:100%">
       <thead>
         <tr>
-          <th style="width:56px"></th>
+          <th style="width:56px;border:1px solid var(--bs-border-color)"></th>
           <?php foreach ($grid as $day): ?>
-            <th style="text-align:center;padding:2px;min-width:118px">
+            <th style="text-align:center;padding:4px;min-width:118px;border:1px solid var(--bs-border-color)">
               <div style="font-size:10px;font-weight:600;color:var(--bs-tertiary-color);letter-spacing:.05em"><?= e($day['dayName']) ?></div>
               <span class="<?= $day['todayCls'] ?>"><?= (int) $day['date'] ?></span>
             </th>
@@ -91,35 +108,48 @@ require __DIR__ . '/../includes/header.php';
       <tbody>
         <?php for ($i = 0; $i < $settings['slots_per_day']; $i++): ?>
           <tr>
-            <td style="vertical-align:top;text-align:right;padding:6px 6px 0 0;white-space:nowrap">
+            <td style="vertical-align:top;text-align:right;padding:6px 8px;white-space:nowrap;border:1px solid var(--bs-border-color)">
               <div style="font-size:11px;font-weight:600;color:var(--bs-secondary-color)"><?= e(SlotSettings::slotLabel($i)) ?></div>
               <div style="font-size:9px;color:var(--bs-tertiary-color)"><?= e(SlotSettings::slotStart($settings, $i)) ?></div>
               <div style="font-size:9px;color:var(--bs-tertiary-color)"><?= e(SlotSettings::slotEnd($settings, $i)) ?></div>
             </td>
-            <?php foreach ($grid as $day): $slot = $day['slots'][$i]; ?>
-              <td style="vertical-align:top">
-                <div style="display:flex;flex-direction:column;gap:4px">
-                  <?php foreach ($slot['pools'] as $p): ?>
-                    <?php
-                      $border = $p['status'] === 'off' ? '1px dashed var(--bs-border-color)' : '1px solid ' . $p['fg'] . '66';
-                      $chip = 'display:block;width:100%;border:' . $border . ';background:' . $p['bg'] . ';color:' . $p['fg'] . ';border-radius:6px;padding:4px 6px;text-align:left;font-size:9px;line-height:1.2';
-                    ?>
-                    <?php if ($p['bookable']): ?>
-                      <button type="button" class="pool-book" style="<?= $chip ?>;cursor:pointer"
-                        data-date="<?= e($slot['date']) ?>" data-slot-index="<?= (int) $slot['slotIndex'] ?>"
-                        data-account-id="<?= (int) $p['accountId'] ?>" data-account-name="<?= e($p['name']) ?>"
-                        data-day-label="<?= e($slot['dateLabel']) ?>" data-slot-label="<?= e($slot['label']) ?>" data-slot-time="<?= e($slot['time']) ?>">
-                        <span style="display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><i class="bi <?= e($p['icon']) ?>"></i> <?= e($p['name']) ?></span>
-                        <span style="opacity:.85"><?= e($p['statusText']) ?></span>
-                      </button>
-                    <?php else: ?>
-                      <div style="<?= $chip ?><?= $p['status'] === 'off' ? ';opacity:.6' : '' ?>">
-                        <span style="display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><i class="bi <?= e($p['icon']) ?>"></i> <?= e($p['name']) ?></span>
-                        <span style="opacity:.85"><?= e($p['statusText']) ?></span>
-                      </div>
-                    <?php endif; ?>
-                  <?php endforeach; ?>
-                </div>
+            <?php foreach ($grid as $day):
+                $slot = $day['slots'][$i];
+                $avail = array_values(array_filter($slot['pools'], fn ($p) => $p['bookable']));
+                $mine = array_values(array_filter($slot['pools'], fn ($p) => in_array($p['status'], ['mine', 'now'], true)));
+                $isNow = (bool) array_filter($mine, fn ($p) => $p['status'] === 'now');
+                $allOff = count(array_filter($slot['pools'], fn ($p) => $p['status'] !== 'off')) === 0;
+
+                if ($isNow) {
+                    $cellStatus = 'now';
+                } elseif ($avail) {
+                    $cellStatus = 'available';
+                } elseif ($mine) {
+                    $cellStatus = 'mine';
+                } elseif ($allOff) {
+                    $cellStatus = 'off';
+                } else {
+                    $cellStatus = 'busy';
+                }
+                $meta = $cellMeta[$cellStatus];
+                $preview = $avail ? pool_names_preview($avail) : ($mine ? pool_names_preview($mine) : '');
+            ?>
+              <td style="vertical-align:top;padding:0;border:1px solid var(--bs-border-color)">
+                <?php if ($cellStatus === 'available'): ?>
+                  <button type="button" class="slot-cell" style="all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;padding:8px;background:<?= $meta['bg'] ?>;border-left:3px solid <?= $meta['border'] ?>"
+                    data-date="<?= e($slot['date']) ?>" data-slot-index="<?= (int) $slot['slotIndex'] ?>"
+                    data-day-label="<?= e($slot['dateLabel']) ?>" data-slot-label="<?= e($slot['label']) ?>" data-slot-time="<?= e($slot['time']) ?>"
+                    data-pools='<?= e(json_encode(array_map(fn ($p) => ['id' => $p['accountId'], 'name' => $p['name']], $avail), JSON_UNESCAPED_UNICODE)) ?>'>
+                    <div style="font-size:10px;font-weight:700;color:<?= $meta['fg'] ?>"><i class="bi <?= $meta['icon'] ?>"></i> <?= $meta['label'] ?></div>
+                    <div style="font-size:9px;color:<?= $meta['fg'] ?>;opacity:.85;margin-top:2px;word-break:break-word"><?= e($preview) ?></div>
+                    <?php if ($mine): ?><div style="font-size:9px;color:#1D4ED8;margin-top:2px">ของฉัน: <?= e(pool_names_preview($mine)) ?></div><?php endif; ?>
+                  </button>
+                <?php else: ?>
+                  <div style="padding:8px;background:<?= $meta['bg'] ?>;<?= $cellStatus === 'off' ? 'border-left:3px dashed ' . $meta['border'] . ';opacity:.6' : 'border-left:3px solid ' . $meta['border'] ?>">
+                    <div style="font-size:10px;font-weight:700;color:<?= $meta['fg'] ?>"><i class="bi <?= $meta['icon'] ?>"></i> <?= $meta['label'] ?></div>
+                    <?php if ($preview): ?><div style="font-size:9px;color:<?= $meta['fg'] ?>;opacity:.85;margin-top:2px;word-break:break-word"><?= e($preview) ?></div><?php endif; ?>
+                  </div>
+                <?php endif; ?>
               </td>
             <?php endforeach; ?>
           </tr>
@@ -141,13 +171,15 @@ require __DIR__ . '/../includes/header.php';
         <?= Csrf::field() ?>
         <input type="hidden" name="booking_date" id="bookModalDate">
         <input type="hidden" name="slot_index" id="bookModalSlotIndex">
-        <input type="hidden" name="ai_account_id" id="bookModalAccountId">
         <div class="modal-body" style="padding:20px">
-          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">โปรดตรวจสอบรายละเอียดก่อนยืนยันการจอง Pool ที่เลือก</p>
+          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">โปรดเลือก AI Pool ที่ต้องการจองสำหรับช่วงเวลานี้</p>
           <div class="info-box">
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--bs-secondary-color)">Pool</span><span style="font-weight:700;font-size:13px;color:#2563EB" id="bookModalAccountName">—</span></div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--bs-secondary-color)">วันที่</span><span style="font-weight:600;font-size:13px" id="bookModalDayLabel">—</span></div>
             <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--bs-secondary-color)">ช่วงเวลา</span><span style="font-weight:600;font-size:13px" id="bookModalSlotTime">—</span></div>
+          </div>
+          <div style="margin-top:14px">
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">เลือก AI Pool <span style="color:#DC2626">*</span></label>
+            <select name="ai_account_id" id="bookModalPoolSelect" required class="form-select" style="font-size:13px"></select>
           </div>
           <div style="margin-top:14px">
             <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">วัตถุประสงค์การใช้งาน <span style="color:#DC2626">*</span></label>

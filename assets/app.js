@@ -59,17 +59,28 @@
     }, 3200);
   }
 
-  // ── Booking confirmation modal (student/booking.php) — one clickable chip per allowed pool ──
+  // ── Booking confirmation modal (student/booking.php) — click the whole slot cell, then pick a Pool ──
   var bookModal = document.getElementById("bookSlotModal");
   if (bookModal) {
-    document.querySelectorAll(".pool-book").forEach(function (cell) {
+    document.querySelectorAll(".slot-cell").forEach(function (cell) {
       cell.addEventListener("click", function () {
         document.getElementById("bookModalDate").value = cell.dataset.date;
         document.getElementById("bookModalSlotIndex").value = cell.dataset.slotIndex;
-        document.getElementById("bookModalAccountId").value = cell.dataset.accountId;
-        document.getElementById("bookModalAccountName").textContent = cell.dataset.accountName;
         document.getElementById("bookModalDayLabel").textContent = cell.dataset.dayLabel;
         document.getElementById("bookModalSlotTime").textContent = cell.dataset.slotLabel + " (" + cell.dataset.slotTime + ")";
+
+        var select = document.getElementById("bookModalPoolSelect");
+        if (select) {
+          select.innerHTML = "";
+          var pools = [];
+          try { pools = JSON.parse(cell.dataset.pools || "[]"); } catch (e) { pools = []; }
+          pools.forEach(function (p) {
+            var opt = document.createElement("option");
+            opt.value = p.id;
+            opt.textContent = p.name;
+            select.appendChild(opt);
+          });
+        }
         new bootstrap.Modal(bookModal).show();
       });
     });
