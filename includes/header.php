@@ -7,7 +7,7 @@ $__user = current_user();
 $__isAdmin = $__user['role'] === 'admin';
 $__pendingCount = $__isAdmin ? Member::pendingCount() : 0;
 $__initial = mb_substr($__user['name'], 0, 1);
-$__roleLabel = $__isAdmin ? 'Admin' : ('นักศึกษา' . (!empty($__user['group_name']) ? ' · ' . $__user['group_name'] : ''));
+$__roleLabel = $__isAdmin ? 'Admin' : ('นักศึกษา' . (!empty($__user['group_name']) ? ' (กลุ่ม: ' . $__user['group_name'] . ')' : ''));
 $__notifications = Notification::forUser($__user);
 $__notifLevelColor = ['err' => '#DC2626', 'warn' => '#D97706', 'info' => '#2563EB'];
 
