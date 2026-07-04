@@ -22,7 +22,9 @@ $settings = SlotSettings::get();
 
 $totalMembers = (int) $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'student'")->fetchColumn();
 $pendingCount = Member::pendingCount();
-$activeAccounts = (int) $pdo->query("SELECT COUNT(*) FROM ai_accounts WHERE status = 'active'")->fetchColumn();
+$activeAccounts = (int) $pdo->query(
+    "SELECT COUNT(*) FROM ai_accounts WHERE status = 'active' AND (expires_at IS NULL OR expires_at > NOW())"
+)->fetchColumn();
 
 $capacityToday = $activeAccounts * $settings['slots_per_day'];
 $bookedToday = (int) $pdo->query("SELECT COUNT(*) FROM bookings WHERE booking_date = CURDATE() AND status = 'upcoming'")->fetchColumn();
@@ -40,13 +42,19 @@ $accounts = AiAccount::listWithUsage();
 $pendingMembers = Member::pending(5);
 
 // Chart data: daily utilization % per provider across the current week
-$providers = $pdo->query("SELECT provider, COUNT(*) c FROM ai_accounts WHERE status = 'active' GROUP BY provider")->fetchAll();
+$providers = $pdo->query(
+    "SELECT COALESCE(p.name, a.provider) AS provider, COUNT(*) c
+     FROM ai_accounts a LEFT JOIN ai_providers p ON p.id = a.provider_id
+     WHERE a.status = 'active' AND (a.expires_at IS NULL OR a.expires_at > NOW())
+     GROUP BY COALESCE(p.name, a.provider)"
+)->fetchAll();
 $dayLabels = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
 $palette = ['rgba(37,99,235,.82)', 'rgba(14,165,233,.82)', 'rgba(124,58,237,.82)', 'rgba(5,150,105,.82)'];
 $datasets = [];
 $dayCountStmt = $pdo->prepare(
     "SELECT COUNT(*) FROM bookings b JOIN ai_accounts a ON a.id = b.ai_account_id
-     WHERE b.booking_date = ? AND b.status = 'upcoming' AND a.provider = ?"
+     LEFT JOIN ai_providers p ON p.id = a.provider_id
+     WHERE b.booking_date = ? AND b.status = 'upcoming' AND COALESCE(p.name, a.provider) = ?"
 );
 foreach ($providers as $pi => $prov) {
     $capacity = (int) $prov['c'] * $settings['slots_per_day'];

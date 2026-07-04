@@ -51,12 +51,13 @@ toast UI.
   deleted after setup.
 - `student/{dashboard,booking,my-bookings,profile}.php`, `admin/{dashboard,members,slots,ai-accounts,reports}.php`.
 - `includes/` — domain classes (all `static`-method, PDO-backed): `Database` (PDO singleton),
-  `Auth`, `Booking`, `Member`, `AiAccount`, `SlotSettings`, `Report`, `Csrf`; plus the shared view
-  partials `header.php` / `footer.php` (authenticated shell) and `guest-header.php` / `guest-footer.php`
-  (login/register shell).
+  `Auth`, `Booking`, `Member`, `AiProvider`, `AiAccount`, `SlotSettings`, `Report`, `Csrf`; plus the
+  shared view partials `header.php` / `footer.php` (authenticated shell) and `guest-header.php` /
+  `guest-footer.php` (login/register shell).
 - `assets/app.css` (ported verbatim from the prototype's `<style>`), `assets/app.js` (sidebar collapse,
   theme toggle, booking modal population, AI-account edit modal, `initUsageChart` for Chart.js).
-- `database/schema.sql`, `database/seed.sql`.
+- `database/schema.sql`, `database/seed.sql`, and `database/migrate_ai_account_details.sql` (an
+  idempotent ALTER migration for existing DBs — fresh installs get everything from `schema.sql`).
 
 ### Architecture rules to respect when editing
 
@@ -71,8 +72,17 @@ toast UI.
   are *derived at read time* by `Booking::displayStatus()` comparing `start/end_datetime` to `NOW()` — no
   cron flips statuses. Don't add a stored "completed" state.
 - **Booking a slot auto-assigns an AI account** via `SELECT ... FOR UPDATE` inside a transaction in
-  `Booking::create()` (picks the lowest-id `active` account not already booked for that date+slot) to
-  avoid a race on the last free account. Weekly quota is enforced there too.
+  `Booking::create()` (picks the lowest-id `active`, non-expired account not already booked for that
+  date+slot) to avoid a race on the last free account. Weekly quota is enforced there too.
+- **AI-account expiry is derived, not stored.** An account with `expires_at <= NOW()` is treated as
+  disabled at read time — `AiAccount::listWithUsage()` shows a "ปิดใช้งาน (หมดอายุ)" badge, and every
+  booking-availability query (`Booking::activeAccountCount/getWeekGrid/create`, plus the admin dashboard
+  chart) filters `(expires_at IS NULL OR expires_at > NOW())`. No cron flips a status. `AiAccount` also
+  derives the days-remaining and password-update-reminder due dates the same way.
+- **AI-account type is an FK to `ai_providers`** (admin-managed via the "จัดการประเภท" modal on
+  `ai-accounts.php`). `ai_accounts.provider` is a denormalized copy of the type name kept in sync by
+  `AiProvider::rename()`; reads prefer `COALESCE(p.name, a.provider)`. The shared login password
+  (`account_password`) is stored readable on purpose (admins hand it out) — never hash it.
 - **Portable URLs:** never hardcode paths. `url('student/booking.php')` prefixes the computed `APP_BASE`
   (derived in bootstrap.php from `DOCUMENT_ROOT` vs `__DIR__`), so the app works under any WAMP vhost
   subdirectory. Sibling pages still link via `url()`, not relative paths.

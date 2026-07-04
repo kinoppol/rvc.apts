@@ -5,37 +5,62 @@ $user = require_role('admin');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
     $action = $_POST['action'] ?? '';
-    $name = $_POST['name'] ?? '';
-    $provider = $_POST['provider'] ?? '';
-    $status = $_POST['status'] ?? 'active';
 
     if ($action === 'add') {
-        $result = AiAccount::add($name, $provider, $status);
-        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'เพิ่มบัญชี AI เรียบร้อยแล้ว' : ($result['error'] ?? 'เพิ่มไม่สำเร็จ'));
+        $r = AiAccount::add($_POST);
+        flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? 'เพิ่มบัญชี AI เรียบร้อยแล้ว' : ($r['error'] ?? 'เพิ่มไม่สำเร็จ'));
     } elseif ($action === 'update') {
-        $result = AiAccount::update((int) ($_POST['id'] ?? 0), $name, $provider, $status);
-        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'แก้ไขบัญชี AI เรียบร้อยแล้ว' : ($result['error'] ?? 'แก้ไขไม่สำเร็จ'));
+        $r = AiAccount::update((int) ($_POST['id'] ?? 0), $_POST);
+        flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? 'แก้ไขบัญชี AI เรียบร้อยแล้ว' : ($r['error'] ?? 'แก้ไขไม่สำเร็จ'));
     } elseif ($action === 'delete') {
-        $result = AiAccount::delete((int) ($_POST['id'] ?? 0));
-        flash_set($result['ok'] ? 'warn' : 'err', $result['ok'] ? 'ลบบัญชี AI เรียบร้อยแล้ว' : ($result['error'] ?? 'ลบไม่สำเร็จ'));
+        $r = AiAccount::delete((int) ($_POST['id'] ?? 0));
+        flash_set($r['ok'] ? 'warn' : 'err', $r['ok'] ? 'ลบบัญชี AI เรียบร้อยแล้ว' : ($r['error'] ?? 'ลบไม่สำเร็จ'));
+    } elseif ($action === 'type_add') {
+        $r = AiProvider::add($_POST['type_name'] ?? '');
+        flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? 'เพิ่มประเภทเรียบร้อยแล้ว' : ($r['error'] ?? 'เพิ่มประเภทไม่สำเร็จ'));
+    } elseif ($action === 'type_rename') {
+        $r = AiProvider::rename((int) ($_POST['type_id'] ?? 0), $_POST['type_name'] ?? '');
+        flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? 'แก้ไขประเภทเรียบร้อยแล้ว' : ($r['error'] ?? 'แก้ไขไม่สำเร็จ'));
+    } elseif ($action === 'type_delete') {
+        $r = AiProvider::delete((int) ($_POST['type_id'] ?? 0));
+        flash_set($r['ok'] ? 'warn' : 'err', $r['ok'] ? 'ลบประเภทเรียบร้อยแล้ว' : ($r['error'] ?? 'ลบไม่สำเร็จ'));
     }
     header('Location: ' . url('admin/ai-accounts.php'));
     exit;
 }
 
 $accounts = AiAccount::listWithUsage();
-$providers = ['Claude Pro', 'ChatGPT Plus', 'Gemini Advanced'];
+$providers = AiProvider::all();
+$typeRows = AiProvider::listWithUsage();
+
+/** Options for the type <select>, marking $selectedId as selected. */
+function provider_options(array $providers, int $selectedId = 0): string
+{
+    $out = '';
+    foreach ($providers as $p) {
+        $sel = (int) $p['id'] === $selectedId ? ' selected' : '';
+        $out .= '<option value="' . (int) $p['id'] . '"' . $sel . '>' . e($p['name']) . '</option>';
+    }
+    return $out;
+}
+
+$reminderOpts = ['none' => 'ปิดการแจ้งเตือน', 'daily' => 'ทุกวัน', 'weekly' => 'ทุกสัปดาห์', 'monthly' => 'ทุกเดือน'];
 
 $activeNav = 'ai-accounts';
 require __DIR__ . '/../includes/header.php';
 ?>
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
   <h5 style="font-weight:700;margin:0">บัญชี AI Account Pool</h5>
-  <button type="button" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px" data-bs-toggle="modal" data-bs-target="#addAccountModal"><i class="bi bi-plus-lg me-1"></i>เพิ่มบัญชี AI</button>
+  <div style="display:flex;gap:8px">
+    <button type="button" class="btn btn-outline-secondary" style="font-size:13px" data-bs-toggle="modal" data-bs-target="#manageTypesModal"><i class="bi bi-tags me-1"></i>จัดการประเภท</button>
+    <button type="button" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px" data-bs-toggle="modal" data-bs-target="#addAccountModal"><i class="bi bi-plus-lg me-1"></i>เพิ่มบัญชี AI</button>
+  </div>
 </div>
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">
   <?php foreach ($accounts as $ac): ?>
-    <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+    <?php $expiresInput = !empty($ac['expires_at']) ? date('Y-m-d\TH:i', strtotime($ac['expires_at'])) : ''; ?>
+    <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)<?= $ac['isExpired'] ? ';opacity:.85' : '' ?>">
       <div class="card-body" style="padding:18px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div style="display:flex;align-items:center;gap:10px">
@@ -47,13 +72,58 @@ require __DIR__ . '/../includes/header.php';
           </div>
           <span class="<?= $ac['statusCls'] ?>"><?= e($ac['statusLabel']) ?></span>
         </div>
+
+        <!-- Credentials -->
+        <div style="background:var(--bs-secondary-bg);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;color:#64748B">
+            <i class="bi bi-envelope" style="width:14px"></i>
+            <span style="color:var(--bs-body-color);word-break:break-all"><?= e($ac['email'] ?: '—') ?></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;color:#64748B">
+            <i class="bi bi-key" style="width:14px"></i>
+            <?php if (!empty($ac['account_password'])): ?>
+              <input type="password" class="pw-field" value="<?= e($ac['account_password']) ?>" readonly
+                     style="border:none;background:transparent;padding:0;font-size:12px;color:var(--bs-body-color);flex:1;min-width:0;font-family:monospace">
+              <button type="button" class="pw-toggle" title="แสดง/ซ่อนรหัสผ่าน" style="border:none;background:none;cursor:pointer;color:#64748B;padding:0"><i class="bi bi-eye"></i></button>
+            <?php else: ?>
+              <span>—</span>
+            <?php endif; ?>
+          </div>
+        </div>
+
+        <!-- Usage today -->
         <div style="font-size:12px;color:#64748B;margin-bottom:6px">ใช้วันนี้: <?= (int) $ac['usedToday'] ?>/<?= (int) $ac['totalSlots'] ?> slots</div>
-        <div style="background:var(--bs-border-color);border-radius:4px;height:6px;overflow:hidden">
+        <div style="background:var(--bs-border-color);border-radius:4px;height:6px;overflow:hidden;margin-bottom:12px">
           <div style="background:#2563EB;width:<?= e($ac['usagePct']) ?>;height:100%;border-radius:4px"></div>
         </div>
-        <div style="display:flex;gap:6px;margin-top:12px">
+
+        <!-- Expiry + password reminder -->
+        <div style="display:flex;flex-direction:column;gap:7px;font-size:12px;margin-bottom:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span style="color:#64748B"><i class="bi bi-calendar-x me-1"></i>หมดอายุ</span>
+            <span style="text-align:right;<?= $ac['expiryWarn'] ? 'color:#DC2626;font-weight:600' : 'color:var(--bs-body-color)' ?>">
+              <?= e($ac['expiresLabel']) ?><?php if (!empty($ac['expires_at'])): ?> · <?= e($ac['expiryText']) ?><?php endif; ?>
+            </span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span style="color:#64748B"><i class="bi bi-shield-lock me-1"></i>เตือนเปลี่ยนรหัส</span>
+            <span style="text-align:right;<?= $ac['pwdWarn'] ? 'color:#D97706;font-weight:600' : 'color:var(--bs-body-color)' ?>">
+              <?php if ($ac['pwdReminderOn']): ?><?= e($ac['reminderLabel']) ?> · <?= e($ac['pwdText']) ?><?php else: ?>ไม่แจ้งเตือน<?php endif; ?>
+            </span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:6px">
           <button type="button" class="action-btn-blue" style="flex:1;text-align:center"
-                  data-edit-account data-id="<?= (int) $ac['id'] ?>" data-name="<?= e($ac['name']) ?>" data-provider="<?= e($ac['provider']) ?>" data-status="<?= e($ac['status']) ?>"><i class="bi bi-pencil me-1"></i>แก้ไข</button>
+                  data-edit-account
+                  data-id="<?= (int) $ac['id'] ?>"
+                  data-name="<?= e($ac['name']) ?>"
+                  data-provider-id="<?= (int) ($ac['provider_id'] ?? 0) ?>"
+                  data-email="<?= e($ac['email'] ?? '') ?>"
+                  data-password="<?= e($ac['account_password'] ?? '') ?>"
+                  data-status="<?= e($ac['status']) ?>"
+                  data-expires="<?= e($expiresInput) ?>"
+                  data-reminder="<?= e($ac['password_reminder']) ?>"><i class="bi bi-pencil me-1"></i>แก้ไข</button>
           <form method="post" style="margin:0" onsubmit="return confirm('ลบบัญชี AI นี้?')">
             <?= Csrf::field() ?>
             <input type="hidden" name="action" value="delete">
@@ -69,6 +139,35 @@ require __DIR__ . '/../includes/header.php';
   <?php endif; ?>
 </div>
 
+<?php
+/** Shared account form body (add & edit). $prefix keeps element ids unique between the two modals. */
+function account_form_fields(array $providers, array $reminderOpts, string $prefix): void
+{
+    ?>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">ชื่อบัญชี *</label><input name="name" required class="form-control" placeholder="เช่น Claude Pro #3" style="font-size:13px"></div>
+      <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">ประเภท *</label>
+        <select name="provider_id" required class="form-select" style="font-size:13px">
+          <?php if (!$providers): ?><option value="">— ยังไม่มีประเภท กรุณาเพิ่มก่อน —</option><?php endif; ?>
+          <?= provider_options($providers) ?>
+        </select>
+      </div>
+      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">อีเมลบัญชี</label><input type="email" name="email" class="form-control" placeholder="account@example.com" style="font-size:13px"></div>
+      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">รหัสผ่านบัญชี</label><input name="account_password" class="form-control" placeholder="<?= $prefix === 'edit' ? 'เว้นว่างไว้หากไม่เปลี่ยน' : 'รหัสผ่านสำหรับใช้ร่วมกัน' ?>" style="font-size:13px;font-family:monospace"></div>
+      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">วันเวลาหมดอายุ</label><input type="datetime-local" name="expires_at" class="form-control" style="font-size:13px"></div>
+      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">สถานะ</label>
+        <select name="status" class="form-select" style="font-size:13px"><option value="active">ใช้งานได้</option><option value="maintenance">บำรุงรักษา</option></select>
+      </div>
+      <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">แจ้งเตือนให้เปลี่ยนรหัสผ่าน</label>
+        <select name="password_reminder" class="form-select" style="font-size:13px">
+          <?php foreach ($reminderOpts as $val => $lbl): ?><option value="<?= e($val) ?>"><?= e($lbl) ?></option><?php endforeach; ?>
+        </select>
+      </div>
+    </div>
+    <?php
+}
+?>
+
 <!-- Add account modal -->
 <div class="modal fade" id="addAccountModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -80,16 +179,7 @@ require __DIR__ . '/../includes/header.php';
           <h6 class="modal-title" style="font-weight:700"><i class="bi bi-plus-lg me-2" style="color:#2563EB"></i>เพิ่มบัญชี AI</h6>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
         </div>
-        <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:12px">
-          <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">ชื่อบัญชี *</label><input name="name" required class="form-control" placeholder="เช่น Claude Pro #3" style="font-size:13px"></div>
-          <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">ประเภท *</label>
-            <input name="provider" required list="providerList" class="form-control" placeholder="Claude Pro" style="font-size:13px">
-            <datalist id="providerList"><?php foreach ($providers as $p): ?><option value="<?= e($p) ?>"><?php endforeach; ?></datalist>
-          </div>
-          <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">สถานะ</label>
-            <select name="status" class="form-select" style="font-size:13px"><option value="active">ใช้งานได้</option><option value="maintenance">บำรุงรักษา</option></select>
-          </div>
-        </div>
+        <div class="modal-body" style="padding:20px"><?php account_form_fields($providers, $reminderOpts, 'add'); ?></div>
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
           <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
           <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none">เพิ่มบัญชี</button>
@@ -111,20 +201,55 @@ require __DIR__ . '/../includes/header.php';
           <h6 class="modal-title" style="font-weight:700"><i class="bi bi-pencil me-2" style="color:#2563EB"></i>แก้ไขบัญชี AI</h6>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
         </div>
-        <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:12px">
-          <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">ชื่อบัญชี *</label><input name="name" required class="form-control" style="font-size:13px"></div>
-          <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">ประเภท *</label>
-            <input name="provider" required list="providerList" class="form-control" style="font-size:13px">
-          </div>
-          <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">สถานะ</label>
-            <select name="status" class="form-select" style="font-size:13px"><option value="active">ใช้งานได้</option><option value="maintenance">บำรุงรักษา</option></select>
-          </div>
-        </div>
+        <div class="modal-body" style="padding:20px"><?php account_form_fields($providers, $reminderOpts, 'edit'); ?></div>
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
           <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
           <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none">บันทึกการแก้ไข</button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- Manage AI types modal -->
+<div class="modal fade" id="manageTypesModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+        <h6 class="modal-title" style="font-weight:700"><i class="bi bi-tags me-2" style="color:#2563EB"></i>จัดการประเภท AI</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+      </div>
+      <div class="modal-body" style="padding:20px">
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+          <?php foreach ($typeRows as $t): ?>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--bs-border-color);border-radius:8px">
+              <form method="post" style="display:flex;gap:6px;flex:1;margin:0">
+                <?= Csrf::field() ?>
+                <input type="hidden" name="action" value="type_rename">
+                <input type="hidden" name="type_id" value="<?= (int) $t['id'] ?>">
+                <input name="type_name" value="<?= e($t['name']) ?>" class="form-control form-control-sm" style="font-size:13px">
+                <button type="submit" class="btn btn-sm btn-outline-primary" style="font-size:12px;white-space:nowrap" title="บันทึกชื่อ"><i class="bi bi-check-lg"></i></button>
+              </form>
+              <span style="font-size:11px;color:#94A3B8;white-space:nowrap"><?= (int) $t['usage'] ?> บัญชี</span>
+              <form method="post" style="margin:0" onsubmit="return confirm('ลบประเภทนี้?')">
+                <?= Csrf::field() ?>
+                <input type="hidden" name="action" value="type_delete">
+                <input type="hidden" name="type_id" value="<?= (int) $t['id'] ?>">
+                <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:12px" <?= $t['usage'] > 0 ? 'disabled title="มีบัญชีใช้อยู่ ลบไม่ได้"' : '' ?>><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+          <?php endforeach; ?>
+          <?php if (!$typeRows): ?>
+            <div style="text-align:center;color:#94A3B8;font-size:13px;padding:12px">ยังไม่มีประเภท</div>
+          <?php endif; ?>
+        </div>
+        <form method="post" style="display:flex;gap:8px;border-top:1px solid var(--bs-border-color);padding-top:16px">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="action" value="type_add">
+          <input name="type_name" required class="form-control" placeholder="เพิ่มประเภทใหม่ เช่น Google Gemini Advanced" style="font-size:13px">
+          <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px;white-space:nowrap"><i class="bi bi-plus-lg me-1"></i>เพิ่ม</button>
+        </form>
+      </div>
     </div>
   </div>
 </div>

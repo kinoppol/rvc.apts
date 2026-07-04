@@ -15,12 +15,27 @@ CREATE TABLE users (
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE ai_accounts (
+-- Admin-managed list of AI account types (Claude Pro, ChatGPT Plus, ...).
+CREATE TABLE ai_providers (
     id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name       VARCHAR(100) NOT NULL,
-    provider   VARCHAR(100) NOT NULL,
-    status     ENUM('active','maintenance') NOT NULL DEFAULT 'active',
+    name       VARCHAR(100) NOT NULL UNIQUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE ai_accounts (
+    id                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name                 VARCHAR(100) NOT NULL,
+    provider_id          INT UNSIGNED NULL,
+    provider             VARCHAR(100) NOT NULL,               -- denormalized type name (kept in sync with ai_providers)
+    email                VARCHAR(190) NULL,                   -- shared login email for the AI account
+    account_password     VARCHAR(255) NULL,                   -- shared login password, stored readable so admins can share it
+    status               ENUM('active','maintenance') NOT NULL DEFAULT 'active',
+    expires_at           DATETIME NULL,                       -- when reached, the account is treated as disabled (derived at read time)
+    password_updated_at  DATETIME NULL,                       -- last time the shared password was changed
+    password_reminder    ENUM('none','daily','weekly','monthly') NOT NULL DEFAULT 'none',
+    created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_ai_accounts_provider FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE SET NULL,
+    KEY idx_ai_accounts_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE slot_settings (

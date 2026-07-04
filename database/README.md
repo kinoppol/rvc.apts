@@ -10,6 +10,19 @@ With WAMP's MariaDB running, browse to **`../install.php`** (e.g.
 connection), and can drop & reinstall if the database already exists. **Delete
 `install.php` afterwards** — it can wipe the database.
 
+## Upgrading an existing database
+
+If you already imported an older schema and just need the new AI-account fields (type list,
+credentials, expiry, password reminder) **without losing data**, run the migration instead of
+reinstalling:
+
+```sh
+"$MYSQL" -u root -h 127.0.0.1 --port=3307 < migrate_ai_account_details.sql
+```
+
+It adds the `ai_providers` table and the new `ai_accounts` columns idempotently (safe to re-run; the
+one non-idempotent step is the foreign key — a "Duplicate key name" error on re-run is harmless).
+
 ## Or import from the CLI
 
 Import it once:

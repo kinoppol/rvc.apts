@@ -18,12 +18,25 @@ INSERT INTO users (role, name, student_id, major, email, phone, password_hash, s
 ('student', 'ปิยะ วงษ์งาม',    '6502DS007', 'วิทยาการข้อมูล',      'piya@rvc.ac.th',     NULL,           '$2y$10$yujc9TCzkQ7ei7G6XCxEA.lzrdc/AxkxBck5vZNef4PIkenNwA2ce', 'approved'),
 ('student', 'กนกวรรณ สุขใจ',   '6503CS008', 'วิทยาการคอมพิวเตอร์', 'kanok@rvc.ac.th',    NULL,           '$2y$10$yujc9TCzkQ7ei7G6XCxEA.lzrdc/AxkxBck5vZNef4PIkenNwA2ce', 'pending');
 
--- id 1-4: AI account pool
-INSERT INTO ai_accounts (name, provider, status) VALUES
-('Claude Pro #1',   'Anthropic Claude Pro', 'active'),
-('Claude Pro #2',   'Anthropic Claude Pro', 'active'),
-('ChatGPT Plus #1', 'OpenAI ChatGPT Plus',  'active'),
-('ChatGPT Plus #2', 'OpenAI ChatGPT Plus',  'maintenance');
+-- AI account types (admin-managed)
+INSERT INTO ai_providers (id, name) VALUES
+(1, 'Anthropic Claude Pro'),
+(2, 'OpenAI ChatGPT Plus'),
+(3, 'Google Gemini Advanced');
+
+-- id 1-4: AI account pool (email/password are the shared login credentials admins hand out)
+-- expires_at / password_updated_at are relative to import day so demo states stay meaningful:
+--   #1 far from expiry, monthly reminder     #2 expiring in a month, weekly reminder due soon
+--   #3 expiring in a week, daily reminder overdue    #4 already expired (auto-disabled) + maintenance
+INSERT INTO ai_accounts (name, provider_id, provider, email, account_password, status, expires_at, password_updated_at, password_reminder) VALUES
+('Claude Pro #1',   1, 'Anthropic Claude Pro', 'claude.pro1@rvc.ac.th', 'Cl@ude#Pool1', 'active',
+    TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 120 DAY), '23:59:00'), TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 25 DAY), '09:00:00'), 'monthly'),
+('Claude Pro #2',   1, 'Anthropic Claude Pro', 'claude.pro2@rvc.ac.th', 'Cl@ude#Pool2', 'active',
+    TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 30 DAY), '23:59:00'),  TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 5 DAY), '09:00:00'),  'weekly'),
+('ChatGPT Plus #1', 2, 'OpenAI ChatGPT Plus',  'gpt.plus1@rvc.ac.th',   'Gpt+Pool#1',   'active',
+    TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 7 DAY), '23:59:00'),   TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 2 DAY), '09:00:00'),  'daily'),
+('ChatGPT Plus #2', 2, 'OpenAI ChatGPT Plus',  'gpt.plus2@rvc.ac.th',   'Gpt+Pool#2',   'maintenance',
+    TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 1 DAY), '23:59:00'),   TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 40 DAY), '09:00:00'), 'monthly');
 
 -- 5 bookings for สมชาย (user id 2), dates relative to import time so "upcoming" stays upcoming
 INSERT INTO bookings (user_id, ai_account_id, booking_date, slot_index, start_datetime, end_datetime, status, cancelled_at) VALUES

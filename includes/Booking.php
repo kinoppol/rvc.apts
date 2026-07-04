@@ -33,7 +33,9 @@ final class Booking
     {
         static $count = null;
         if ($count === null) {
-            $count = (int) Database::pdo()->query("SELECT COUNT(*) FROM ai_accounts WHERE status = 'active'")->fetchColumn();
+            $count = (int) Database::pdo()->query(
+                "SELECT COUNT(*) FROM ai_accounts WHERE status = 'active' AND (expires_at IS NULL OR expires_at > NOW())"
+            )->fetchColumn();
         }
         return $count;
     }
@@ -54,7 +56,8 @@ final class Booking
         $pdo = Database::pdo();
         $bookedStmt = $pdo->prepare(
             "SELECT COUNT(*) FROM bookings b JOIN ai_accounts a ON a.id = b.ai_account_id
-             WHERE b.booking_date = ? AND b.slot_index = ? AND b.status = 'upcoming' AND a.status = 'active'"
+             WHERE b.booking_date = ? AND b.slot_index = ? AND b.status = 'upcoming' AND a.status = 'active'
+               AND (a.expires_at IS NULL OR a.expires_at > NOW())"
         );
         $mineStmt = $pdo->prepare(
             "SELECT COUNT(*) FROM bookings WHERE user_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming'"
@@ -180,6 +183,7 @@ final class Booking
             $accountStmt = $pdo->prepare(
                 "SELECT a.id FROM ai_accounts a
                  WHERE a.status = 'active'
+                   AND (a.expires_at IS NULL OR a.expires_at > NOW())
                    AND a.id NOT IN (
                        SELECT ai_account_id FROM bookings
                        WHERE booking_date = ? AND slot_index = ? AND status = 'upcoming'

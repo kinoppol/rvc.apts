@@ -77,11 +77,31 @@
   document.querySelectorAll("[data-edit-account]").forEach(function (btn) {
     btn.addEventListener("click", function () {
       var modalEl = document.getElementById("editAccountModal");
-      modalEl.querySelector("[name=id]").value = btn.dataset.id;
-      modalEl.querySelector("[name=name]").value = btn.dataset.name;
-      modalEl.querySelector("[name=provider]").value = btn.dataset.provider;
-      modalEl.querySelector("[name=status]").value = btn.dataset.status;
+      var set = function (name, val) {
+        var f = modalEl.querySelector("[name=" + name + "]");
+        if (f) f.value = val == null ? "" : val;
+      };
+      set("id", btn.dataset.id);
+      set("name", btn.dataset.name);
+      set("provider_id", btn.dataset.providerId);
+      set("email", btn.dataset.email);
+      set("account_password", btn.dataset.password);
+      set("status", btn.dataset.status);
+      set("expires_at", btn.dataset.expires);
+      set("password_reminder", btn.dataset.reminder);
       new bootstrap.Modal(modalEl).show();
+    });
+  });
+
+  // ── Shared-password reveal toggles (admin/ai-accounts.php) ──
+  document.querySelectorAll(".pw-toggle").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var field = btn.parentElement.querySelector(".pw-field");
+      if (!field) return;
+      var show = field.type === "password";
+      field.type = show ? "text" : "password";
+      var icon = btn.querySelector("i");
+      if (icon) icon.className = show ? "bi bi-eye-slash" : "bi bi-eye";
     });
   });
 
