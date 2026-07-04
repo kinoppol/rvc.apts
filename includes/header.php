@@ -8,6 +8,8 @@ $__isAdmin = $__user['role'] === 'admin';
 $__pendingCount = $__isAdmin ? Member::pendingCount() : 0;
 $__initial = mb_substr($__user['name'], 0, 1);
 $__roleLabel = $__isAdmin ? 'Admin' : 'นักศึกษา';
+$__notifications = Notification::forUser($__user);
+$__notifLevelColor = ['err' => '#DC2626', 'warn' => '#D97706', 'info' => '#2563EB'];
 
 function nav_cls(string $key, ?string $active): string
 {
@@ -45,6 +47,40 @@ function nav_cls(string $key, ?string $active): string
         <button type="button" class="theme-btn" data-theme="system" title="System" style="border:none;cursor:pointer;width:30px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px"><i class="bi bi-display"></i></button>
         <button type="button" class="theme-btn" data-theme="dark" title="Dark" style="border:none;cursor:pointer;width:30px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px"><i class="bi bi-moon-fill"></i></button>
       </div>
+
+      <?php $__notifCount = count($__notifications); ?>
+      <div class="dropdown">
+        <button type="button" id="notifBell" class="btn" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="การแจ้งเตือน"
+                style="position:relative;border:1px solid var(--bs-border-color);background:transparent;color:var(--bs-secondary-color);width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;padding:0">
+          <i class="bi bi-bell<?= $__notifCount > 0 ? '-fill' : '' ?>"></i>
+          <?php if ($__notifCount > 0): ?>
+            <span style="position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;background:#EF4444;color:#fff;border-radius:9px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1"><?= $__notifCount > 9 ? '9+' : $__notifCount ?></span>
+          <?php endif; ?>
+        </button>
+        <div class="dropdown-menu dropdown-menu-end shadow" style="width:340px;max-height:400px;overflow-y:auto;padding:0;border:1px solid var(--bs-border-color)">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--bs-border-color);display:flex;align-items:center;justify-content:space-between">
+            <span style="font-weight:700;font-size:14px">การแจ้งเตือน</span>
+            <?php if ($__notifCount > 0): ?><span style="font-size:11px;color:#64748B"><?= (int) $__notifCount ?> รายการ</span><?php endif; ?>
+          </div>
+          <?php if (!$__notifications): ?>
+            <div style="padding:28px 16px;text-align:center;color:#94A3B8;font-size:13px">
+              <i class="bi bi-check2-circle" style="font-size:24px;display:block;margin-bottom:8px"></i>
+              ไม่มีการแจ้งเตือน
+            </div>
+          <?php else: ?>
+            <?php foreach ($__notifications as $n): $__c = $__notifLevelColor[$n['level']] ?? '#2563EB'; ?>
+              <a href="<?= e($n['url']) ?>" style="display:flex;gap:10px;padding:11px 16px;text-decoration:none;color:inherit;border-bottom:1px solid var(--bs-border-color);align-items:flex-start">
+                <span style="flex-shrink:0;width:30px;height:30px;border-radius:8px;background:<?= $__c ?>1a;display:flex;align-items:center;justify-content:center"><i class="bi <?= e($n['icon']) ?>" style="color:<?= $__c ?>;font-size:15px"></i></span>
+                <span style="min-width:0">
+                  <span style="display:block;font-size:13px;font-weight:600;line-height:1.35"><?= e($n['title']) ?></span>
+                  <span style="display:block;font-size:11px;color:#64748B;margin-top:2px"><?= e($n['detail']) ?></span>
+                </span>
+              </a>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </div>
+      </div>
+
       <div style="display:flex;align-items:center;gap:8px;margin-left:4px">
         <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#0EA5E9);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:13px"><?= e($__initial) ?></div>
         <div style="line-height:1.2">

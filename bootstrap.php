@@ -13,6 +13,7 @@ require_once __DIR__ . '/includes/Member.php';
 require_once __DIR__ . '/includes/AiProvider.php';
 require_once __DIR__ . '/includes/AiAccount.php';
 require_once __DIR__ . '/includes/Report.php';
+require_once __DIR__ . '/includes/Notification.php';
 
 // URL prefix of the project root, so links work regardless of the WAMP vhost name.
 $docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? '');
