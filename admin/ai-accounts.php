@@ -15,6 +15,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'delete') {
         $r = AiAccount::delete((int) ($_POST['id'] ?? 0));
         flash_set($r['ok'] ? 'warn' : 'err', $r['ok'] ? 'ลบบัญชี AI เรียบร้อยแล้ว' : ($r['error'] ?? 'ลบไม่สำเร็จ'));
+    } elseif ($action === 'change_password') {
+        $r = AiAccount::updatePassword((int) ($_POST['id'] ?? 0), $_POST['new_password'] ?? '');
+        flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? 'เปลี่ยนรหัสผ่านบัญชี AI เรียบร้อยแล้ว' : ($r['error'] ?? 'เปลี่ยนรหัสผ่านไม่สำเร็จ'));
     } elseif ($action === 'type_add') {
         $r = AiProvider::add($_POST['type_name'] ?? '');
         flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? 'เพิ่มประเภทเรียบร้อยแล้ว' : ($r['error'] ?? 'เพิ่มประเภทไม่สำเร็จ'));
@@ -113,6 +116,12 @@ require __DIR__ . '/../includes/header.php';
           </div>
         </div>
 
+        <?php if (!empty($ac['pwdWarn'])): ?>
+          <button type="button" style="width:100%;margin-bottom:8px;background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;border-radius:8px;padding:7px;font-size:12px;font-weight:600;cursor:pointer"
+                  data-change-pw data-id="<?= (int) $ac['id'] ?>" data-name="<?= e($ac['name']) ?>">
+            <i class="bi bi-shield-lock me-1"></i>เปลี่ยนรหัสผ่านตอนนี้ (<?= e($ac['pwdText']) ?>)
+          </button>
+        <?php endif; ?>
         <div style="display:flex;gap:6px">
           <button type="button" class="action-btn-blue" style="flex:1;text-align:center"
                   data-edit-account
@@ -250,6 +259,37 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
           <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px;white-space:nowrap"><i class="bi bi-plus-lg me-1"></i>เพิ่ม</button>
         </form>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Change AI-account password modal: JS auto-generates a random password (populated by app.js) -->
+<div class="modal fade" id="changePwModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="change_password">
+        <input type="hidden" name="id" id="changePwId">
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-shield-lock me-2" style="color:#2563EB"></i>เปลี่ยนรหัสผ่าน — <span id="changePwAccountName"></span></h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+        </div>
+        <div class="modal-body" style="padding:20px">
+          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">ระบบสร้างรหัสผ่านใหม่แบบสุ่มให้ — คัดลอกไปแจ้งผู้ใช้งานบัญชีนี้ แล้วกด "บันทึกรหัสผ่านนี้" เพื่อยืนยัน</p>
+          <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">รหัสผ่านใหม่</label>
+          <div style="display:flex;gap:6px">
+            <input type="text" name="new_password" id="changePwValue" readonly class="form-control" style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:.5px">
+            <button type="button" id="changePwCopyBtn" class="btn btn-outline-secondary" title="คัดลอก"><i class="bi bi-clipboard"></i></button>
+            <button type="button" id="changePwRegenBtn" class="btn btn-outline-secondary" title="สุ่มใหม่"><i class="bi bi-arrow-clockwise"></i></button>
+          </div>
+          <div id="changePwCopiedHint" style="font-size:11px;color:#059669;margin-top:6px;display:none"><i class="bi bi-check-circle me-1"></i>คัดลอกไปยังคลิปบอร์ดแล้ว</div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none"><i class="bi bi-save me-1"></i>บันทึกรหัสผ่านนี้</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

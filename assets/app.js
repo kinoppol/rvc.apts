@@ -105,6 +105,64 @@
     });
   }
 
+  // ── Change AI-account password modal (admin/ai-accounts.php) — auto-generate, copy, save ──
+  function generateSecurePassword(length) {
+    length = length || 12;
+    // Avoid visually ambiguous characters (0/O, 1/l/I); one guaranteed char from each set keeps it
+    // secure without needing extra length, then the rest is filled from the combined pool and shuffled.
+    var sets = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnpqrstuvwxyz", "23456789", "!@#$%^&*-_="];
+    var pick = function (str) {
+      var arr = new Uint32Array(1);
+      crypto.getRandomValues(arr);
+      return str[arr[0] % str.length];
+    };
+    var all = sets.join("");
+    var chars = sets.map(function (s) { return pick(s); });
+    while (chars.length < length) chars.push(pick(all));
+    for (var i = chars.length - 1; i > 0; i--) {
+      var arr = new Uint32Array(1);
+      crypto.getRandomValues(arr);
+      var j = arr[0] % (i + 1);
+      var tmp = chars[i]; chars[i] = chars[j]; chars[j] = tmp;
+    }
+    return chars.join("");
+  }
+
+  var changePwModal = document.getElementById("changePwModal");
+  if (changePwModal) {
+    var pwValue = document.getElementById("changePwValue");
+    var pwHint = document.getElementById("changePwCopiedHint");
+    var regenerate = function () {
+      pwValue.value = generateSecurePassword(12);
+      if (pwHint) pwHint.style.display = "none";
+    };
+
+    document.querySelectorAll("[data-change-pw]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.getElementById("changePwId").value = btn.dataset.id;
+        document.getElementById("changePwAccountName").textContent = btn.dataset.name;
+        regenerate();
+        new bootstrap.Modal(changePwModal).show();
+      });
+    });
+
+    var regenBtn = document.getElementById("changePwRegenBtn");
+    if (regenBtn) regenBtn.addEventListener("click", regenerate);
+
+    var copyBtn = document.getElementById("changePwCopyBtn");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", function () {
+        pwValue.select();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(pwValue.value);
+        } else {
+          document.execCommand("copy");
+        }
+        if (pwHint) pwHint.style.display = "block";
+      });
+    }
+  }
+
   // ── AI account edit modal (admin/ai-accounts.php) ──
   document.querySelectorAll("[data-edit-account]").forEach(function (btn) {
     btn.addEventListener("click", function () {

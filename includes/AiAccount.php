@@ -174,6 +174,21 @@ final class AiAccount
         return ['ok' => true];
     }
 
+    /** Sets a new shared login password and resets the password-reminder clock. @return array{ok:bool,error?:string} */
+    public static function updatePassword(int $id, string $password): array
+    {
+        if (!self::find($id)) {
+            return ['ok' => false, 'error' => 'ไม่พบบัญชี AI ที่ต้องการเปลี่ยนรหัสผ่าน'];
+        }
+        $password = trim($password);
+        if ($password === '') {
+            return ['ok' => false, 'error' => 'กรุณาระบุรหัสผ่านใหม่'];
+        }
+        $stmt = Database::pdo()->prepare('UPDATE ai_accounts SET account_password = ?, password_updated_at = NOW() WHERE id = ?');
+        $stmt->execute([$password, $id]);
+        return ['ok' => true];
+    }
+
     /** @return array{ok:bool,error?:string} */
     public static function delete(int $id): array
     {

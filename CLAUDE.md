@@ -89,7 +89,12 @@ toast UI.
   disabled at read time — `AiAccount::listWithUsage()` shows a "ปิดใช้งาน (หมดอายุ)" badge, and every
   booking-availability query (`Booking::activeAccountCount/getWeekGrid/create`, plus the admin dashboard
   chart) filters `(expires_at IS NULL OR expires_at > NOW())`. No cron flips a status. `AiAccount` also
-  derives the days-remaining and password-update-reminder due dates the same way.
+  derives the days-remaining and password-update-reminder due dates the same way. When `pwdWarn` is
+  true, `admin/ai-accounts.php` shows a "เปลี่ยนรหัสผ่านตอนนี้" button opening a modal that generates a
+  random 12-char password client-side (`generateSecurePassword()` in `assets/app.js`, one guaranteed
+  char per class — upper/lower/digit/symbol — avoiding ambiguous glyphs like `0/O`, `1/l/I`) with
+  copy/regenerate buttons; saving posts to `AiAccount::updatePassword()`, which resets
+  `password_updated_at` (the reminder clock) without touching any other field.
 - **AI-account type is an FK to `ai_providers`** (admin-managed via the "จัดการประเภท" modal on
   `ai-accounts.php`). `ai_accounts.provider` is a denormalized copy of the type name kept in sync by
   `AiProvider::rename()`; reads prefer `COALESCE(p.name, a.provider)`. The shared login password
