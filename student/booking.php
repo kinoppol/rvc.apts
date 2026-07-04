@@ -30,7 +30,7 @@ require __DIR__ . '/../includes/header.php';
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
   <div>
     <h5 style="font-weight:700;margin:0">จองคิว AI Pro</h5>
-    <p style="color:#64748B;font-size:14px;margin:4px 0 0">คลิกช่วงเวลาสีฟ้าเพื่อจอง · โควต้าคงเหลือ <?= (int) $quotaRemaining ?>/<?= (int) $settings['weekly_quota'] ?> รอบ/สัปดาห์</p>
+    <p style="color:var(--bs-secondary-color);font-size:14px;margin:4px 0 0">คลิกช่วงเวลาสีฟ้าเพื่อจอง · โควต้าคงเหลือ <?= (int) $quotaRemaining ?>/<?= (int) $settings['weekly_quota'] ?> รอบ/สัปดาห์</p>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <a href="<?= url('student/booking.php') ?>?week=<?= max(0, $week - 1) ?>" class="btn btn-outline-secondary btn-sm<?= $week <= 0 ? ' disabled' : '' ?>"><i class="bi bi-chevron-left"></i></a>
@@ -53,16 +53,16 @@ require __DIR__ . '/../includes/header.php';
       <div style="flex-shrink:0;width:52px;padding-top:52px;display:flex;flex-direction:column;gap:6px">
         <?php for ($i = 0; $i < $settings['slots_per_day']; $i++): ?>
           <div style="height:74px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:1px;padding-right:6px">
-            <span style="font-size:10px;font-weight:600;color:#64748B"><?= e(SlotSettings::slotLabel($i)) ?></span>
-            <span style="font-size:9px;color:#94A3B8"><?= e(SlotSettings::slotStart($settings, $i)) ?></span>
-            <span style="font-size:9px;color:#94A3B8"><?= e(SlotSettings::slotEnd($settings, $i)) ?></span>
+            <span style="font-size:10px;font-weight:600;color:var(--bs-secondary-color)"><?= e(SlotSettings::slotLabel($i)) ?></span>
+            <span style="font-size:9px;color:var(--bs-tertiary-color)"><?= e(SlotSettings::slotStart($settings, $i)) ?></span>
+            <span style="font-size:9px;color:var(--bs-tertiary-color)"><?= e(SlotSettings::slotEnd($settings, $i)) ?></span>
           </div>
         <?php endfor; ?>
       </div>
       <?php foreach ($grid as $day): ?>
         <div style="flex:1;min-width:80px;display:flex;flex-direction:column;gap:6px">
           <div style="height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
-            <span style="font-size:10px;font-weight:600;color:#94A3B8;letter-spacing:.05em"><?= e($day['dayName']) ?></span>
+            <span style="font-size:10px;font-weight:600;color:var(--bs-tertiary-color);letter-spacing:.05em"><?= e($day['dayName']) ?></span>
             <span class="<?= $day['todayCls'] ?>"><?= (int) $day['date'] ?></span>
           </div>
           <?php foreach ($day['slots'] as $slot): ?>
@@ -98,10 +98,10 @@ require __DIR__ . '/../includes/header.php';
         <input type="hidden" name="booking_date" id="bookModalDate">
         <input type="hidden" name="slot_index" id="bookModalSlotIndex">
         <div class="modal-body" style="padding:20px">
-          <p style="font-size:13px;color:#64748B;margin:0 0 14px">โปรดตรวจสอบรายละเอียดก่อนยืนยัน ระบบจะจัดสรร AI Account ที่ว่างให้โดยอัตโนมัติ</p>
+          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">โปรดตรวจสอบรายละเอียดก่อนยืนยัน ระบบจะจัดสรร AI Account ที่ว่างให้โดยอัตโนมัติ</p>
           <div class="info-box">
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:#64748B">วันที่</span><span style="font-weight:600;font-size:13px" id="bookModalDayLabel">—</span></div>
-            <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:#64748B">ช่วงเวลา</span><span style="font-weight:600;font-size:13px" id="bookModalSlotTime">—</span></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--bs-secondary-color)">วันที่</span><span style="font-weight:600;font-size:13px" id="bookModalDayLabel">—</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--bs-secondary-color)">ช่วงเวลา</span><span style="font-weight:600;font-size:13px" id="bookModalSlotTime">—</span></div>
           </div>
         </div>
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">

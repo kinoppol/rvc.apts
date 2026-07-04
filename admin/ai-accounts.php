@@ -67,7 +67,7 @@ require __DIR__ . '/../includes/header.php';
             <div class="stat-icon" style="background:#EFF6FF;width:40px;height:40px"><i class="bi bi-robot" style="color:#2563EB;font-size:17px"></i></div>
             <div>
               <div style="font-weight:700;font-size:14px"><?= e($ac['name']) ?></div>
-              <div style="font-size:11px;color:#64748B"><?= e($ac['provider']) ?></div>
+              <div style="font-size:11px;color:var(--bs-secondary-color)"><?= e($ac['provider']) ?></div>
             </div>
           </div>
           <span class="<?= $ac['statusCls'] ?>"><?= e($ac['statusLabel']) ?></span>
@@ -75,16 +75,16 @@ require __DIR__ . '/../includes/header.php';
 
         <!-- Credentials -->
         <div style="background:var(--bs-secondary-bg);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;color:#64748B">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;color:var(--bs-secondary-color)">
             <i class="bi bi-envelope" style="width:14px"></i>
             <span style="color:var(--bs-body-color);word-break:break-all"><?= e($ac['email'] ?: '—') ?></span>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;color:#64748B">
+          <div style="display:flex;align-items:center;gap:6px;color:var(--bs-secondary-color)">
             <i class="bi bi-key" style="width:14px"></i>
             <?php if (!empty($ac['account_password'])): ?>
               <input type="password" class="pw-field" value="<?= e($ac['account_password']) ?>" readonly
                      style="border:none;background:transparent;padding:0;font-size:12px;color:var(--bs-body-color);flex:1;min-width:0;font-family:monospace">
-              <button type="button" class="pw-toggle" title="แสดง/ซ่อนรหัสผ่าน" style="border:none;background:none;cursor:pointer;color:#64748B;padding:0"><i class="bi bi-eye"></i></button>
+              <button type="button" class="pw-toggle" title="แสดง/ซ่อนรหัสผ่าน" style="border:none;background:none;cursor:pointer;color:var(--bs-secondary-color);padding:0"><i class="bi bi-eye"></i></button>
             <?php else: ?>
               <span>—</span>
             <?php endif; ?>
@@ -92,7 +92,7 @@ require __DIR__ . '/../includes/header.php';
         </div>
 
         <!-- Usage today -->
-        <div style="font-size:12px;color:#64748B;margin-bottom:6px">ใช้วันนี้: <?= (int) $ac['usedToday'] ?>/<?= (int) $ac['totalSlots'] ?> slots</div>
+        <div style="font-size:12px;color:var(--bs-secondary-color);margin-bottom:6px">ใช้วันนี้: <?= (int) $ac['usedToday'] ?>/<?= (int) $ac['totalSlots'] ?> slots</div>
         <div style="background:var(--bs-border-color);border-radius:4px;height:6px;overflow:hidden;margin-bottom:12px">
           <div style="background:#2563EB;width:<?= e($ac['usagePct']) ?>;height:100%;border-radius:4px"></div>
         </div>
@@ -100,13 +100,13 @@ require __DIR__ . '/../includes/header.php';
         <!-- Expiry + password reminder -->
         <div style="display:flex;flex-direction:column;gap:7px;font-size:12px;margin-bottom:14px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-            <span style="color:#64748B"><i class="bi bi-calendar-x me-1"></i>หมดอายุ</span>
+            <span style="color:var(--bs-secondary-color)"><i class="bi bi-calendar-x me-1"></i>หมดอายุ</span>
             <span style="text-align:right;<?= $ac['expiryWarn'] ? 'color:#DC2626;font-weight:600' : 'color:var(--bs-body-color)' ?>">
               <?= e($ac['expiresLabel']) ?><?php if (!empty($ac['expires_at'])): ?> · <?= e($ac['expiryText']) ?><?php endif; ?>
             </span>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-            <span style="color:#64748B"><i class="bi bi-shield-lock me-1"></i>เตือนเปลี่ยนรหัส</span>
+            <span style="color:var(--bs-secondary-color)"><i class="bi bi-shield-lock me-1"></i>เตือนเปลี่ยนรหัส</span>
             <span style="text-align:right;<?= $ac['pwdWarn'] ? 'color:#D97706;font-weight:600' : 'color:var(--bs-body-color)' ?>">
               <?php if ($ac['pwdReminderOn']): ?><?= e($ac['reminderLabel']) ?> · <?= e($ac['pwdText']) ?><?php else: ?>ไม่แจ้งเตือน<?php endif; ?>
             </span>
@@ -135,7 +135,7 @@ require __DIR__ . '/../includes/header.php';
     </div>
   <?php endforeach; ?>
   <?php if (!$accounts): ?>
-    <div style="grid-column:1/-1;text-align:center;padding:40px;color:#94A3B8">ยังไม่มีบัญชี AI ในระบบ</div>
+    <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--bs-tertiary-color)">ยังไม่มีบัญชี AI ในระบบ</div>
   <?php endif; ?>
 </div>
 
@@ -145,20 +145,20 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
 {
     ?>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">ชื่อบัญชี *</label><input name="name" required class="form-control" placeholder="เช่น Claude Pro #3" style="font-size:13px"></div>
-      <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">ประเภท *</label>
+      <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ชื่อบัญชี *</label><input name="name" required class="form-control" placeholder="เช่น Claude Pro #3" style="font-size:13px"></div>
+      <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ประเภท *</label>
         <select name="provider_id" required class="form-select" style="font-size:13px">
           <?php if (!$providers): ?><option value="">— ยังไม่มีประเภท กรุณาเพิ่มก่อน —</option><?php endif; ?>
           <?= provider_options($providers) ?>
         </select>
       </div>
-      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">อีเมลบัญชี</label><input type="email" name="email" class="form-control" placeholder="account@example.com" style="font-size:13px"></div>
-      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">รหัสผ่านบัญชี</label><input name="account_password" class="form-control" placeholder="<?= $prefix === 'edit' ? 'เว้นว่างไว้หากไม่เปลี่ยน' : 'รหัสผ่านสำหรับใช้ร่วมกัน' ?>" style="font-size:13px;font-family:monospace"></div>
-      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">วันเวลาหมดอายุ</label><input type="datetime-local" name="expires_at" class="form-control" style="font-size:13px"></div>
-      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">สถานะ</label>
+      <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">อีเมลบัญชี</label><input type="email" name="email" class="form-control" placeholder="account@example.com" style="font-size:13px"></div>
+      <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">รหัสผ่านบัญชี</label><input name="account_password" class="form-control" placeholder="<?= $prefix === 'edit' ? 'เว้นว่างไว้หากไม่เปลี่ยน' : 'รหัสผ่านสำหรับใช้ร่วมกัน' ?>" style="font-size:13px;font-family:monospace"></div>
+      <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">วันเวลาหมดอายุ</label><input type="datetime-local" name="expires_at" class="form-control" style="font-size:13px"></div>
+      <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">สถานะ</label>
         <select name="status" class="form-select" style="font-size:13px"><option value="active">ใช้งานได้</option><option value="maintenance">บำรุงรักษา</option></select>
       </div>
-      <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">แจ้งเตือนให้เปลี่ยนรหัสผ่าน</label>
+      <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">แจ้งเตือนให้เปลี่ยนรหัสผ่าน</label>
         <select name="password_reminder" class="form-select" style="font-size:13px">
           <?php foreach ($reminderOpts as $val => $lbl): ?><option value="<?= e($val) ?>"><?= e($lbl) ?></option><?php endforeach; ?>
         </select>
@@ -230,7 +230,7 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
                 <input name="type_name" value="<?= e($t['name']) ?>" class="form-control form-control-sm" style="font-size:13px">
                 <button type="submit" class="btn btn-sm btn-outline-primary" style="font-size:12px;white-space:nowrap" title="บันทึกชื่อ"><i class="bi bi-check-lg"></i></button>
               </form>
-              <span style="font-size:11px;color:#94A3B8;white-space:nowrap"><?= (int) $t['usage'] ?> บัญชี</span>
+              <span style="font-size:11px;color:var(--bs-tertiary-color);white-space:nowrap"><?= (int) $t['usage'] ?> บัญชี</span>
               <form method="post" style="margin:0" onsubmit="return confirm('ลบประเภทนี้?')">
                 <?= Csrf::field() ?>
                 <input type="hidden" name="action" value="type_delete">
@@ -240,7 +240,7 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
             </div>
           <?php endforeach; ?>
           <?php if (!$typeRows): ?>
-            <div style="text-align:center;color:#94A3B8;font-size:13px;padding:12px">ยังไม่มีประเภท</div>
+            <div style="text-align:center;color:var(--bs-tertiary-color);font-size:13px;padding:12px">ยังไม่มีประเภท</div>
           <?php endif; ?>
         </div>
         <form method="post" style="display:flex;gap:8px;border-top:1px solid var(--bs-border-color);padding-top:16px">

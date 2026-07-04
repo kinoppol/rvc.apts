@@ -31,7 +31,7 @@ require __DIR__ . '/../includes/header.php';
   <div class="card-body" style="padding:20px">
     <div style="display:flex;gap:0;border-bottom:2px solid var(--bs-border-color);margin-bottom:20px;flex-wrap:wrap">
       <?php foreach ($filters as $key => $label): ?>
-        <a href="<?= url('student/my-bookings.php') ?>?filter=<?= $key ?>" style="text-decoration:none;padding:8px 16px;font-size:13px;font-weight:600;<?= $filter === $key ? 'color:#2563EB;border-bottom:2px solid #2563EB;margin-bottom:-2px' : 'color:#64748B' ?>"><?= e($label) ?></a>
+        <a href="<?= url('student/my-bookings.php') ?>?filter=<?= $key ?>" style="text-decoration:none;padding:8px 16px;font-size:13px;font-weight:600;<?= $filter === $key ? 'color:#2563EB;border-bottom:2px solid #2563EB;margin-bottom:-2px' : 'color:var(--bs-secondary-color)' ?>"><?= e($label) ?></a>
       <?php endforeach; ?>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px">
@@ -42,7 +42,7 @@ require __DIR__ . '/../includes/header.php';
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-weight:600;font-size:14px"><?= e($bk['slotLabel']) ?></div>
-            <div style="font-size:12px;color:#64748B;margin-top:2px"><?= e($bk['dateLabel']) ?> · <?= e($bk['ai_name']) ?></div>
+            <div style="font-size:12px;color:var(--bs-secondary-color);margin-top:2px"><?= e($bk['dateLabel']) ?> · <?= e($bk['ai_name']) ?></div>
           </div>
           <span class="<?= $bk['badgeCls'] ?>"><?= e($bk['statusLabel']) ?></span>
           <?php if ($bk['canCancel']): ?>
@@ -56,7 +56,7 @@ require __DIR__ . '/../includes/header.php';
         </div>
       <?php endforeach; ?>
       <?php if (!$bookings): ?>
-        <div style="text-align:center;padding:40px 16px;color:#94A3B8">
+        <div style="text-align:center;padding:40px 16px;color:var(--bs-tertiary-color)">
           <i class="bi bi-calendar-x" style="font-size:32px;display:block;margin-bottom:10px"></i>
           <div style="font-size:14px">ไม่มีรายการจองในหมวดนี้</div>
           <a href="<?= url('student/booking.php') ?>" style="font-size:13px;color:#2563EB;text-decoration:none;font-weight:600;display:inline-block;margin-top:10px">จองคิวตอนนี้ <i class="bi bi-arrow-right"></i></a>

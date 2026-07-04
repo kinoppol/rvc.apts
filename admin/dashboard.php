@@ -78,7 +78,7 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div style="margin-bottom:22px">
   <h5 style="font-weight:700;margin:0">ภาพรวมระบบ</h5>
-  <p style="color:#64748B;font-size:14px;margin:4px 0 0">อัปเดตล่าสุด: <?= e(Booking::thaiDate($today)) ?></p>
+  <p style="color:var(--bs-secondary-color);font-size:14px;margin:4px 0 0">อัปเดตล่าสุด: <?= e(Booking::thaiDate($today)) ?></p>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:22px">
@@ -125,7 +125,7 @@ require __DIR__ . '/../includes/header.php';
   <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
     <div class="card-body" style="padding:20px">
       <h6 style="font-weight:700;margin:0 0 4px">อัตราการใช้งาน AI (% ต่อวัน)</h6>
-      <p style="color:#64748B;font-size:12px;margin:0 0 16px">สัปดาห์ปัจจุบัน เทียบรายประเภทบัญชี</p>
+      <p style="color:var(--bs-secondary-color);font-size:12px;margin:0 0 16px">สัปดาห์ปัจจุบัน เทียบรายประเภทบัญชี</p>
       <div style="height:220px;position:relative">
         <canvas id="adminUsageChart"></canvas>
       </div>
@@ -141,7 +141,7 @@ require __DIR__ . '/../includes/header.php';
               <div style="font-size:13px;font-weight:600"><?= e($ac['name']) ?></div>
               <span class="<?= $ac['statusCls'] ?>"><?= e($ac['statusLabel']) ?></span>
             </div>
-            <div style="font-size:11px;color:#64748B"><?= e($ac['provider']) ?> · <?= (int) $ac['usedToday'] ?>/<?= (int) $ac['totalSlots'] ?> slots วันนี้</div>
+            <div style="font-size:11px;color:var(--bs-secondary-color)"><?= e($ac['provider']) ?> · <?= (int) $ac['usedToday'] ?>/<?= (int) $ac['totalSlots'] ?> slots วันนี้</div>
             <div style="background:var(--bs-border-color);border-radius:3px;height:4px;margin-top:8px;overflow:hidden">
               <div style="background:#2563EB;width:<?= e($ac['usagePct']) ?>;height:100%;border-radius:3px"></div>
             </div>
@@ -157,7 +157,7 @@ require __DIR__ . '/../includes/header.php';
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div>
         <h6 style="font-weight:700;margin:0">รออนุมัติสมาชิก</h6>
-        <p style="color:#64748B;font-size:12px;margin:2px 0 0"><?= (int) $pendingCount ?> รายการรอการตรวจสอบ</p>
+        <p style="color:var(--bs-secondary-color);font-size:12px;margin:2px 0 0"><?= (int) $pendingCount ?> รายการรอการตรวจสอบ</p>
       </div>
       <a href="<?= url('admin/members.php') ?>?status=pending" class="btn btn-sm btn-primary" style="background:#2563EB;border:none;font-size:12px">ดูทั้งหมด</a>
     </div>
@@ -167,7 +167,7 @@ require __DIR__ . '/../includes/header.php';
           <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#0EA5E9);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px;flex-shrink:0"><?= e($pm['initial']) ?></div>
           <div style="flex:1;min-width:0">
             <div style="font-weight:600;font-size:14px"><?= e($pm['name']) ?></div>
-            <div style="font-size:12px;color:#64748B"><?= e($pm['student_id'] ?? '') ?> · <?= e($pm['major'] ?? '') ?></div>
+            <div style="font-size:12px;color:var(--bs-secondary-color)"><?= e($pm['student_id'] ?? '') ?> · <?= e($pm['major'] ?? '') ?></div>
           </div>
           <div style="display:flex;gap:6px">
             <form method="post" style="margin:0">
@@ -186,7 +186,7 @@ require __DIR__ . '/../includes/header.php';
         </div>
       <?php endforeach; ?>
       <?php if (!$pendingMembers): ?>
-        <div style="text-align:center;padding:24px;color:#94A3B8;font-size:13px">ไม่มีสมาชิกรออนุมัติ</div>
+        <div style="text-align:center;padding:24px;color:var(--bs-tertiary-color);font-size:13px">ไม่มีสมาชิกรออนุมัติ</div>
       <?php endif; ?>
     </div>
   </div>

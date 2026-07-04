@@ -60,10 +60,10 @@ function nav_cls(string $key, ?string $active): string
         <div class="dropdown-menu dropdown-menu-end shadow" style="width:340px;max-height:400px;overflow-y:auto;padding:0;border:1px solid var(--bs-border-color)">
           <div style="padding:12px 16px;border-bottom:1px solid var(--bs-border-color);display:flex;align-items:center;justify-content:space-between">
             <span style="font-weight:700;font-size:14px">การแจ้งเตือน</span>
-            <?php if ($__notifCount > 0): ?><span style="font-size:11px;color:#64748B"><?= (int) $__notifCount ?> รายการ</span><?php endif; ?>
+            <?php if ($__notifCount > 0): ?><span style="font-size:11px;color:var(--bs-secondary-color)"><?= (int) $__notifCount ?> รายการ</span><?php endif; ?>
           </div>
           <?php if (!$__notifications): ?>
-            <div style="padding:28px 16px;text-align:center;color:#94A3B8;font-size:13px">
+            <div style="padding:28px 16px;text-align:center;color:var(--bs-tertiary-color);font-size:13px">
               <i class="bi bi-check2-circle" style="font-size:24px;display:block;margin-bottom:8px"></i>
               ไม่มีการแจ้งเตือน
             </div>
@@ -73,7 +73,7 @@ function nav_cls(string $key, ?string $active): string
                 <span style="flex-shrink:0;width:30px;height:30px;border-radius:8px;background:<?= $__c ?>1a;display:flex;align-items:center;justify-content:center"><i class="bi <?= e($n['icon']) ?>" style="color:<?= $__c ?>;font-size:15px"></i></span>
                 <span style="min-width:0">
                   <span style="display:block;font-size:13px;font-weight:600;line-height:1.35"><?= e($n['title']) ?></span>
-                  <span style="display:block;font-size:11px;color:#64748B;margin-top:2px"><?= e($n['detail']) ?></span>
+                  <span style="display:block;font-size:11px;color:var(--bs-secondary-color);margin-top:2px"><?= e($n['detail']) ?></span>
                 </span>
               </a>
             <?php endforeach; ?>
@@ -86,7 +86,7 @@ function nav_cls(string $key, ?string $active): string
           <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#0EA5E9);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:13px"><?= e($__initial) ?></div>
           <div style="line-height:1.2">
             <div style="font-size:13px;font-weight:600"><?= e($__user['name']) ?></div>
-            <div style="font-size:11px;color:#64748B"><?= e($__roleLabel) ?></div>
+            <div style="font-size:11px;color:var(--bs-secondary-color)"><?= e($__roleLabel) ?></div>
           </div>
         </a>
         <a href="<?= url('logout.php') ?>" class="btn btn-sm" style="background:transparent;border:1px solid var(--bs-border-color);color:var(--bs-secondary-color);font-size:12px;padding:4px 10px;margin-left:4px"><i class="bi bi-box-arrow-right"></i></a>

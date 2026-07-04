@@ -33,7 +33,7 @@ require __DIR__ . '/../includes/header.php';
       <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#2563EB,#0EA5E9);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:28px;flex-shrink:0"><?= e(mb_substr($user['name'], 0, 1)) ?></div>
       <div>
         <div style="font-size:20px;font-weight:700"><?= e($user['name']) ?></div>
-        <div style="color:#64748B;font-size:13px"><?= e($user['student_id'] ?? '—') ?> · <?= e($user['major'] ?? '—') ?></div>
+        <div style="color:var(--bs-secondary-color);font-size:13px"><?= e($user['student_id'] ?? '—') ?> · <?= e($user['major'] ?? '—') ?></div>
         <span class="<?= $statusBadge ?>" style="margin-top:6px;display:inline-block"><?= e($statusLabel) ?></span>
       </div>
     </div>
@@ -44,9 +44,9 @@ require __DIR__ . '/../includes/header.php';
       <form method="post" style="display:flex;flex-direction:column;gap:12px">
         <?= Csrf::field() ?>
         <input type="hidden" name="action" value="profile">
-        <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">ชื่อ-นามสกุล</label><input name="name" required class="form-control" value="<?= e($user['name']) ?>" style="font-size:13px"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">อีเมล</label><input type="email" name="email" required class="form-control" value="<?= e($user['email']) ?>" style="font-size:13px"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">เบอร์โทร</label><input name="phone" class="form-control" value="<?= e($user['phone'] ?? '') ?>" placeholder="08X-XXX-XXXX" style="font-size:13px"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ชื่อ-นามสกุล</label><input name="name" required class="form-control" value="<?= e($user['name']) ?>" style="font-size:13px"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">อีเมล</label><input type="email" name="email" required class="form-control" value="<?= e($user['email']) ?>" style="font-size:13px"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">เบอร์โทร</label><input name="phone" class="form-control" value="<?= e($user['phone'] ?? '') ?>" placeholder="08X-XXX-XXXX" style="font-size:13px"></div>
         <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px">บันทึกข้อมูล</button>
       </form>
     </div>
@@ -57,9 +57,9 @@ require __DIR__ . '/../includes/header.php';
       <form method="post" style="display:flex;flex-direction:column;gap:12px">
         <?= Csrf::field() ?>
         <input type="hidden" name="action" value="password">
-        <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">รหัสผ่านปัจจุบัน</label><input type="password" name="current" required class="form-control" placeholder="••••••••" style="font-size:13px"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">รหัสผ่านใหม่</label><input type="password" name="new" required class="form-control" placeholder="อย่างน้อย 8 ตัวอักษร" style="font-size:13px"></div>
-        <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px">ยืนยันรหัสผ่านใหม่</label><input type="password" name="new_confirm" required class="form-control" placeholder="••••••••" style="font-size:13px"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">รหัสผ่านปัจจุบัน</label><input type="password" name="current" required class="form-control" placeholder="••••••••" style="font-size:13px"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">รหัสผ่านใหม่</label><input type="password" name="new" required class="form-control" placeholder="อย่างน้อย 8 ตัวอักษร" style="font-size:13px"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ยืนยันรหัสผ่านใหม่</label><input type="password" name="new_confirm" required class="form-control" placeholder="••••••••" style="font-size:13px"></div>
         <button type="submit" class="btn btn-outline-primary" style="font-size:13px">เปลี่ยนรหัสผ่าน</button>
       </form>
     </div>

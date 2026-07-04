@@ -20,7 +20,7 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div style="margin-bottom:22px">
   <h5 style="font-weight:700;margin:0">สวัสดี, <?= e(explode(' ', $user['name'])[0]) ?> 👋</h5>
-  <p style="color:#64748B;font-size:14px;margin:4px 0 0"><?= e(Booking::thaiDate(new DateTimeImmutable('today'))) ?></p>
+  <p style="color:var(--bs-secondary-color);font-size:14px;margin:4px 0 0"><?= e(Booking::thaiDate(new DateTimeImmutable('today'))) ?></p>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-bottom:22px">
@@ -32,10 +32,10 @@ require __DIR__ . '/../includes/header.php';
       </div>
       <?php if ($next): ?>
         <div style="font-size:22px;font-weight:700;line-height:1"><?= substr($next['start_datetime'], 11, 5) ?>–<?= substr($next['end_datetime'], 11, 5) ?></div>
-        <div style="font-size:12px;color:#64748B;margin-top:4px">การจองถัดไป · <?= e($next['ai_name']) ?></div>
+        <div style="font-size:12px;color:var(--bs-secondary-color);margin-top:4px">การจองถัดไป · <?= e($next['ai_name']) ?></div>
       <?php else: ?>
-        <div style="font-size:16px;font-weight:700;line-height:1;color:#94A3B8">ไม่มีการจอง</div>
-        <div style="font-size:12px;color:#64748B;margin-top:4px">ยังไม่มีการจองที่กำลังจะมาถึง</div>
+        <div style="font-size:16px;font-weight:700;line-height:1;color:var(--bs-tertiary-color)">ไม่มีการจอง</div>
+        <div style="font-size:12px;color:var(--bs-secondary-color);margin-top:4px">ยังไม่มีการจองที่กำลังจะมาถึง</div>
       <?php endif; ?>
     </div>
   </div>
@@ -44,8 +44,8 @@ require __DIR__ . '/../includes/header.php';
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
         <div class="stat-icon" style="background:#F0FDF4"><i class="bi bi-clock-history" style="color:#059669"></i></div>
       </div>
-      <div style="font-size:22px;font-weight:700;line-height:1"><?= (int) $hoursUsed ?> <span style="font-size:14px;font-weight:400;color:#64748B">/ <?= (int) $weeklyMaxHours ?> ชม.</span></div>
-      <div style="font-size:12px;color:#64748B;margin-top:4px">ชั่วโมงที่ใช้สัปดาห์นี้</div>
+      <div style="font-size:22px;font-weight:700;line-height:1"><?= (int) $hoursUsed ?> <span style="font-size:14px;font-weight:400;color:var(--bs-secondary-color)">/ <?= (int) $weeklyMaxHours ?> ชม.</span></div>
+      <div style="font-size:12px;color:var(--bs-secondary-color);margin-top:4px">ชั่วโมงที่ใช้สัปดาห์นี้</div>
       <div style="background:#E2E8F0;border-radius:4px;height:4px;margin-top:10px;overflow:hidden">
         <div style="background:#059669;width:<?= $weeklyMaxHours > 0 ? min(100, round($hoursUsed / $weeklyMaxHours * 100)) : 0 ?>%;height:100%;border-radius:4px"></div>
       </div>
@@ -56,8 +56,8 @@ require __DIR__ . '/../includes/header.php';
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
         <div class="stat-icon" style="background:#FFF7ED"><i class="bi bi-ticket-perforated" style="color:#EA580C"></i></div>
       </div>
-      <div style="font-size:22px;font-weight:700;line-height:1"><?= (int) $quotaRemaining ?> <span style="font-size:14px;font-weight:400;color:#64748B">/ <?= (int) $settings['weekly_quota'] ?> รอบ</span></div>
-      <div style="font-size:12px;color:#64748B;margin-top:4px">โควต้าคงเหลือสัปดาห์นี้</div>
+      <div style="font-size:22px;font-weight:700;line-height:1"><?= (int) $quotaRemaining ?> <span style="font-size:14px;font-weight:400;color:var(--bs-secondary-color)">/ <?= (int) $settings['weekly_quota'] ?> รอบ</span></div>
+      <div style="font-size:12px;color:var(--bs-secondary-color);margin-top:4px">โควต้าคงเหลือสัปดาห์นี้</div>
       <div style="display:flex;gap:4px;margin-top:10px">
         <?php for ($i = 0; $i < $settings['weekly_quota']; $i++): ?>
           <div style="flex:1;height:6px;border-radius:3px;background:<?= $i < $quotaRemaining ? '#2563EB' : '#E2E8F0' ?>"></div>
@@ -72,7 +72,7 @@ require __DIR__ . '/../includes/header.php';
         <?php if ($next): ?><span class="badge-ok">ออนไลน์</span><?php endif; ?>
       </div>
       <div style="font-size:18px;font-weight:700;line-height:1"><?= $next ? e($next['ai_name']) : '—' ?></div>
-      <div style="font-size:12px;color:#64748B;margin-top:4px">AI Account การจองถัดไป</div>
+      <div style="font-size:12px;color:var(--bs-secondary-color);margin-top:4px">AI Account การจองถัดไป</div>
     </div>
   </div>
 </div>
@@ -87,10 +87,10 @@ require __DIR__ . '/../includes/header.php';
       <?php if ($next): ?>
         <div class="info-box">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-            <div><div style="font-size:11px;color:#64748B;margin-bottom:3px">วันที่</div><div style="font-weight:600;font-size:14px"><?= e($next['dateLabel']) ?></div></div>
-            <div><div style="font-size:11px;color:#64748B;margin-bottom:3px">ช่วงเวลา</div><div style="font-weight:600;font-size:14px"><?= e($next['slotLabel']) ?></div></div>
-            <div><div style="font-size:11px;color:#64748B;margin-bottom:3px">ระยะเวลา</div><div style="font-weight:600;font-size:14px"><?= (int) $settings['slot_hours'] ?> ชั่วโมง</div></div>
-            <div><div style="font-size:11px;color:#64748B;margin-bottom:3px">AI Account</div><div style="font-weight:600;font-size:14px"><?= e($next['ai_name']) ?></div></div>
+            <div><div style="font-size:11px;color:var(--bs-secondary-color);margin-bottom:3px">วันที่</div><div style="font-weight:600;font-size:14px"><?= e($next['dateLabel']) ?></div></div>
+            <div><div style="font-size:11px;color:var(--bs-secondary-color);margin-bottom:3px">ช่วงเวลา</div><div style="font-weight:600;font-size:14px"><?= e($next['slotLabel']) ?></div></div>
+            <div><div style="font-size:11px;color:var(--bs-secondary-color);margin-bottom:3px">ระยะเวลา</div><div style="font-weight:600;font-size:14px"><?= (int) $settings['slot_hours'] ?> ชั่วโมง</div></div>
+            <div><div style="font-size:11px;color:var(--bs-secondary-color);margin-bottom:3px">AI Account</div><div style="font-weight:600;font-size:14px"><?= e($next['ai_name']) ?></div></div>
           </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:14px">
@@ -103,7 +103,7 @@ require __DIR__ . '/../includes/header.php';
           </form>
         </div>
       <?php else: ?>
-        <p style="color:#64748B;font-size:13px;margin:0">ยังไม่มีการจอง — <a href="<?= url('student/booking.php') ?>">จองคิวตอนนี้</a></p>
+        <p style="color:var(--bs-secondary-color);font-size:13px;margin:0">ยังไม่มีการจอง — <a href="<?= url('student/booking.php') ?>">จองคิวตอนนี้</a></p>
       <?php endif; ?>
     </div>
   </div>
@@ -111,11 +111,11 @@ require __DIR__ . '/../includes/header.php';
     <div class="card-body" style="padding:20px">
       <h6 style="font-weight:700;margin:0 0 14px">สถิติการใช้งาน</h6>
       <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:#64748B">จองทั้งหมด</span><span style="font-weight:700"><?= (int) $totalCount ?> รอบ</span></div>
-        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:#64748B">ชั่วโมงสะสม</span><span style="font-weight:700"><?= (int) $totalHours ?> ชม.</span></div>
-        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:#64748B">ยกเลิก</span><span style="font-weight:700;color:#EF4444"><?= (int) $cancelledCount ?> รอบ</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:var(--bs-secondary-color)">จองทั้งหมด</span><span style="font-weight:700"><?= (int) $totalCount ?> รอบ</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:var(--bs-secondary-color)">ชั่วโมงสะสม</span><span style="font-weight:700"><?= (int) $totalHours ?> ชม.</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:var(--bs-secondary-color)">ยกเลิก</span><span style="font-weight:700;color:#EF4444"><?= (int) $cancelledCount ?> รอบ</span></div>
         <div style="background:var(--bs-border-color);height:1px"></div>
-        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:#64748B">อัตราการใช้งาน</span><span style="font-weight:700;color:#059669"><?= e((string) $utilization) ?>%</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:var(--bs-secondary-color)">อัตราการใช้งาน</span><span style="font-weight:700;color:#059669"><?= e((string) $utilization) ?>%</span></div>
       </div>
     </div>
   </div>
@@ -131,10 +131,10 @@ require __DIR__ . '/../includes/header.php';
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
           <tr style="border-bottom:2px solid var(--bs-border-color)">
-            <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748B;white-space:nowrap">วันที่</th>
-            <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748B;white-space:nowrap">ช่วงเวลา</th>
-            <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748B;white-space:nowrap">AI Account</th>
-            <th style="padding:8px 10px;text-align:left;font-weight:600;color:#64748B">สถานะ</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">วันที่</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">ช่วงเวลา</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">AI Account</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">สถานะ</th>
           </tr>
         </thead>
         <tbody>
@@ -142,12 +142,12 @@ require __DIR__ . '/../includes/header.php';
             <tr style="border-bottom:1px solid var(--bs-border-color)">
               <td style="padding:10px"><?= e($b['dateLabel']) ?></td>
               <td style="padding:10px"><?= e($b['slotLabel']) ?></td>
-              <td style="padding:10px;color:#64748B"><?= e($b['ai_name']) ?></td>
+              <td style="padding:10px;color:var(--bs-secondary-color)"><?= e($b['ai_name']) ?></td>
               <td style="padding:10px"><span class="<?= $b['badgeCls'] ?>"><?= e($b['statusLabel']) ?></span></td>
             </tr>
           <?php endforeach; ?>
           <?php if (!$recent): ?>
-            <tr><td colspan="4" style="padding:16px;text-align:center;color:#94A3B8">ยังไม่มีประวัติการจอง</td></tr>
+            <tr><td colspan="4" style="padding:16px;text-align:center;color:var(--bs-tertiary-color)">ยังไม่มีประวัติการจอง</td></tr>
           <?php endif; ?>
         </tbody>
       </table>

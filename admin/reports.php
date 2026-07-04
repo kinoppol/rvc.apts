@@ -21,11 +21,11 @@ require __DIR__ . '/../includes/header.php';
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
           <tr style="border-bottom:2px solid var(--bs-border-color);background:var(--bs-secondary-bg)">
-            <th style="padding:10px 14px;text-align:left;font-weight:600;color:#64748B">สมาชิก</th>
-            <th style="padding:10px 14px;text-align:left;font-weight:600;color:#64748B">รหัสนักศึกษา</th>
-            <th style="padding:10px 14px;text-align:left;font-weight:600;color:#64748B">จองทั้งหมด</th>
-            <th style="padding:10px 14px;text-align:left;font-weight:600;color:#64748B">ชม.สะสม</th>
-            <th style="padding:10px 14px;text-align:left;font-weight:600;color:#64748B">อัตราการใช้งาน</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">สมาชิก</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">รหัสนักศึกษา</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">จองทั้งหมด</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">ชม.สะสม</th>
+            <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">อัตราการใช้งาน</th>
           </tr>
         </thead>
         <tbody>
@@ -46,7 +46,7 @@ require __DIR__ . '/../includes/header.php';
             </tr>
           <?php endforeach; ?>
           <?php if (!$rows): ?>
-            <tr><td colspan="5" style="padding:32px;text-align:center;color:#94A3B8">ยังไม่มีข้อมูลการใช้งานที่เสร็จสิ้น</td></tr>
+            <tr><td colspan="5" style="padding:32px;text-align:center;color:var(--bs-tertiary-color)">ยังไม่มีข้อมูลการใช้งานที่เสร็จสิ้น</td></tr>
           <?php endif; ?>
         </tbody>
       </table>

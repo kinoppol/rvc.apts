@@ -114,7 +114,7 @@ function check_row(string $label, bool $ok, string $detail = ''): string
     $icon = $ok
         ? '<i class="bi bi-check-circle-fill" style="color:#059669"></i>'
         : '<i class="bi bi-x-circle-fill" style="color:#DC2626"></i>';
-    $d = $detail !== '' ? '<span style="color:#94A3B8;font-size:12px;margin-left:6px">' . h($detail) . '</span>' : '';
+    $d = $detail !== '' ? '<span style="color:var(--bs-tertiary-color);font-size:12px;margin-left:6px">' . h($detail) . '</span>' : '';
     return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;font-size:13px">' . $icon
         . '<span>' . h($label) . '</span>' . $d . '</div>';
 }
@@ -140,7 +140,7 @@ function check_row(string $label, bool $ok, string $detail = ''): string
       </div>
       <div>
         <h5 style="font-weight:700;color:#0F172A;margin:0">ติดตั้งระบบ</h5>
-        <p style="color:#64748B;font-size:13px;margin:0">AI Pro Time-Sharing — วิทยาลัย RVC</p>
+        <p style="color:var(--bs-secondary-color);font-size:13px;margin:0">AI Pro Time-Sharing — วิทยาลัย RVC</p>
       </div>
     </div>
 
@@ -170,7 +170,7 @@ function check_row(string $label, bool $ok, string $detail = ''): string
       <?php endif; ?>
 
       <div style="border:1px solid var(--bs-border-color);border-radius:10px;padding:12px 16px;margin-bottom:16px">
-        <div style="font-weight:700;font-size:12px;color:#64748B;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">ตรวจสอบความพร้อม</div>
+        <div style="font-weight:700;font-size:12px;color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">ตรวจสอบความพร้อม</div>
         <?= check_row('PHP ' . PHP_VERSION, $phpOk, $phpOk ? '' : 'ต้องการ PHP 8.0 ขึ้นไป') ?>
         <?= check_row('ส่วนขยาย pdo_mysql', $pdoMysqlOk, $pdoMysqlOk ? '' : 'ยังไม่ได้เปิดใช้งาน') ?>
         <?= check_row('ไฟล์ schema.sql / seed.sql', $filesOk, $filesOk ? '' : 'ไม่พบในโฟลเดอร์ database/') ?>
@@ -207,7 +207,7 @@ function check_row(string $label, bool $ok, string $detail = ''): string
           <i class="bi bi-download me-2"></i><?= $dbExists && $seeded ? 'ติดตั้งใหม่' : 'ติดตั้งฐานข้อมูล' ?>
         </button>
       </form>
-      <p style="text-align:center;font-size:12px;color:#94A3B8;margin:14px 0 0">
+      <p style="text-align:center;font-size:12px;color:var(--bs-tertiary-color);margin:14px 0 0">
         ติดตั้งแล้ว? <a href="login.php" style="color:#2563EB;font-weight:600;text-decoration:none">ไปหน้าเข้าสู่ระบบ</a>
       </p>
     <?php endif; ?>

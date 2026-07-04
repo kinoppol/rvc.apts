@@ -25,10 +25,10 @@ require __DIR__ . '/../includes/header.php';
   <form method="post">
     <?= Csrf::field() ?>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:600px">
-      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:5px">ความยาวช่วงเวลา (ชั่วโมง)</label><input name="slot_hours" class="form-control" value="<?= (int) $settings['slot_hours'] ?>" type="number" min="1" max="24" required style="font-size:13px"></div>
-      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:5px">จำนวน Slots/วัน</label><input name="slots_per_day" class="form-control" value="<?= (int) $settings['slots_per_day'] ?>" type="number" min="1" max="24" required style="font-size:13px"></div>
-      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:5px">โควต้า/สัปดาห์/คน</label><input name="weekly_quota" class="form-control" value="<?= (int) $settings['weekly_quota'] ?>" type="number" min="1" required style="font-size:13px"></div>
-      <div><label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:5px">จองล่วงหน้าสูงสุด (วัน)</label><input name="max_advance_days" class="form-control" value="<?= (int) $settings['max_advance_days'] ?>" type="number" min="1" required style="font-size:13px"></div>
+      <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">ความยาวช่วงเวลา (ชั่วโมง)</label><input name="slot_hours" class="form-control" value="<?= (int) $settings['slot_hours'] ?>" type="number" min="1" max="24" required style="font-size:13px"></div>
+      <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">จำนวน Slots/วัน</label><input name="slots_per_day" class="form-control" value="<?= (int) $settings['slots_per_day'] ?>" type="number" min="1" max="24" required style="font-size:13px"></div>
+      <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">โควต้า/สัปดาห์/คน</label><input name="weekly_quota" class="form-control" value="<?= (int) $settings['weekly_quota'] ?>" type="number" min="1" required style="font-size:13px"></div>
+      <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">จองล่วงหน้าสูงสุด (วัน)</label><input name="max_advance_days" class="form-control" value="<?= (int) $settings['max_advance_days'] ?>" type="number" min="1" required style="font-size:13px"></div>
     </div>
     <div style="background:#FFF7ED;border-radius:8px;padding:10px 14px;margin-top:16px;font-size:12px;color:#92400E;display:flex;gap:8px;align-items:flex-start;max-width:600px">
       <i class="bi bi-info-circle-fill" style="margin-top:1px;flex-shrink:0"></i>
