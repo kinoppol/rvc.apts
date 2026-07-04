@@ -45,7 +45,8 @@ require __DIR__ . '/../includes/header.php';
           <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">กลุ่ม</th>
           <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">โควต้า/สัปดาห์</th>
           <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">จองล่วงหน้า</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">Pool ที่จองได้ / พร้อมกัน</th>
+          <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">สิทธิ์เข้าถึง Pool</th>
+          <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">จองพร้อมกันสูงสุด</th>
           <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">สมาชิก</th>
           <th style="padding:12px 16px;text-align:center;font-weight:600;color:var(--bs-secondary-color)">การดำเนินการ</th>
         </tr>
@@ -60,9 +61,9 @@ require __DIR__ . '/../includes/header.php';
             <td style="padding:12px 16px"><?= $g['weekly_quota'] !== null ? (int) $g['weekly_quota'] . ' รอบ' : '<span style="color:var(--bs-tertiary-color)">ค่าเริ่มต้น</span>' ?></td>
             <td style="padding:12px 16px"><?= $g['max_advance_days'] !== null ? (int) $g['max_advance_days'] . ' วัน' : '<span style="color:var(--bs-tertiary-color)">ค่าเริ่มต้น</span>' ?></td>
             <td style="padding:12px 16px">
-              <?php if ($gPools): ?><?= count($gPools) ?> Pool<?php else: ?><span style="color:#DC2626">ยังไม่ได้กำหนด</span><?php endif; ?>
-              <span style="color:var(--bs-tertiary-color)"> · จองพร้อมกัน <?= (int) $g['max_concurrent'] ?></span>
+              <?php if ($gPools): ?><?= count($gPools) ?> Pool ที่เลือกจองได้<?php else: ?><span style="color:#DC2626">ยังไม่ได้กำหนด Pool</span><?php endif; ?>
             </td>
+            <td style="padding:12px 16px"><?= (int) $g['max_concurrent'] ?> Pool/ช่วงเวลา</td>
             <td style="padding:12px 16px"><?= (int) $g['member_count'] ?> คน</td>
             <td style="padding:12px 16px">
               <div style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap">
@@ -84,7 +85,7 @@ require __DIR__ . '/../includes/header.php';
           </tr>
         <?php endforeach; ?>
         <?php if (!$groups): ?>
-          <tr><td colspan="6" style="padding:32px;text-align:center;color:var(--bs-tertiary-color)">ยังไม่มีกลุ่ม — กด"เพิ่มกลุ่ม" เพื่อสร้าง</td></tr>
+          <tr><td colspan="7" style="padding:32px;text-align:center;color:var(--bs-tertiary-color)">ยังไม่มีกลุ่ม — กด"เพิ่มกลุ่ม" เพื่อสร้าง</td></tr>
         <?php endif; ?>
       </tbody>
     </table>
@@ -106,14 +107,13 @@ require __DIR__ . '/../includes/header.php';
         <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:12px">
           <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ชื่อกลุ่ม *</label><input name="name" required class="form-control" style="font-size:13px"></div>
           <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">คำอธิบาย</label><input name="description" class="form-control" style="font-size:13px"></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">โควต้า/สัปดาห์</label><input type="number" name="weekly_quota" min="1" class="form-control" placeholder="ค่าเริ่มต้น" style="font-size:13px"></div>
             <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">จองล่วงหน้า (วัน)</label><input type="number" name="max_advance_days" min="1" class="form-control" placeholder="ค่าเริ่มต้น" style="font-size:13px"></div>
-            <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">จองพร้อมกัน (Pool)</label><input type="number" name="max_concurrent" min="1" value="1" class="form-control" style="font-size:13px"></div>
           </div>
-          <div style="font-size:11px;color:var(--bs-tertiary-color)">เว้นว่างช่องโควต้า/จองล่วงหน้าเพื่อใช้ค่าเริ่มต้นของระบบ · "จองพร้อมกัน" = จำนวน Pool ที่จองได้ในช่วงเวลาเดียวกัน</div>
+          <div style="font-size:11px;color:var(--bs-tertiary-color)">เว้นว่างช่องโควต้า/จองล่วงหน้าเพื่อใช้ค่าเริ่มต้นของระบบ</div>
           <div>
-            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:6px">Pool ที่กลุ่มนี้จองได้ <span style="color:#DC2626">*</span></label>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:6px">1) Pool ที่กลุ่มนี้<u>มีสิทธิ์เข้าถึง</u> <span style="color:#DC2626">*</span></label>
             <div style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;border:1px solid var(--bs-border-color);border-radius:8px;padding:10px">
               <?php foreach ($accounts as $ac): ?>
                 <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
@@ -124,7 +124,12 @@ require __DIR__ . '/../includes/header.php';
               <?php endforeach; ?>
               <?php if (!$accounts): ?><div style="font-size:12px;color:var(--bs-tertiary-color)">ยังไม่มีบัญชี AI ในระบบ</div><?php endif; ?>
             </div>
-            <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">ถ้าไม่เลือก Pool ใดเลย สมาชิกกลุ่มนี้จะยังจองไม่ได้</div>
+            <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">ถ้าไม่เลือก Pool ใดเลย สมาชิกกลุ่มนี้จะยังจองไม่ได้ — เลือกได้หลาย Pool ไม่จำกัดจำนวน</div>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">2) จาก Pool ด้านบน <u>จองพร้อมกันได้สูงสุดกี่ Pool ต่อช่วงเวลา</u></label>
+            <input type="number" name="max_concurrent" min="1" value="1" class="form-control" style="font-size:13px;max-width:160px">
+            <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">คนละเรื่องกับข้อ 1 — เช่น มีสิทธิ์เข้าถึง 4 Pool แต่ตั้งค่านี้เป็น 2 หมายความว่าในช่วงเวลาเดียวกัน จองพร้อมกันได้สูงสุดแค่ 2 Pool จาก 4 Pool นั้น (เลือกใช้ Pool ไหนก็ได้ในเวลาต่างกัน)</div>
           </div>
         </div>
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
