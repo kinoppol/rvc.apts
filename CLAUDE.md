@@ -58,8 +58,8 @@ toast UI.
 - `assets/app.css` (ported verbatim from the prototype's `<style>`), `assets/app.js` (sidebar collapse,
   theme toggle, booking modal population, AI-account edit modal, `initUsageChart` for Chart.js).
 - `database/schema.sql`, `database/seed.sql`, and idempotent ALTER migrations for existing DBs
-  (`database/migrate_ai_account_details.sql`, `database/migrate_groups_and_reports.sql`) — fresh
-  installs get everything from `schema.sql`.
+  (`database/migrate_ai_account_details.sql`, `database/migrate_groups_and_reports.sql`,
+  `database/migrate_group_pools.sql`) — fresh installs get everything from `schema.sql`.
 
 ### Architecture rules to respect when editing
 
@@ -73,9 +73,14 @@ toast UI.
 - **Booking `status` only stores `'upcoming'` / `'cancelled'`.** `'completed'` and `'now'` (in-progress)
   are *derived at read time* by `Booking::displayStatus()` comparing `start/end_datetime` to `NOW()` — no
   cron flips statuses. Don't add a stored "completed" state.
-- **Booking a slot auto-assigns an AI account** via `SELECT ... FOR UPDATE` inside a transaction in
-  `Booking::create()` (picks the lowest-id `active`, non-expired account not already booked for that
-  date+slot) to avoid a race on the last free account. Weekly quota is enforced there too.
+- **Booking is per-pool, gated by group access.** A group's members may only book the AI accounts
+  listed in `group_ai_accounts` (admin-managed on `admin/groups.php`); no group / no rows = cannot book
+  (`Booking::allowedAccountsFor` returns `[]` and the booking page shows an empty state). Students pick a
+  **specific** pool per slot — `Booking::create($userId, $date, $slot, $accountId, $purpose)` validates
+  the pool is granted + active + non-expired, enforces the group's `max_concurrent` pools-per-slot cap,
+  and books it inside a `SELECT ... FOR UPDATE` transaction (unique `(ai_account_id, booking_date,
+  slot_index)` prevents double-booking). No auto-assign. `Booking::getWeekGrid` returns, per slot, the
+  per-pool status (`available`/`busy`/`mine`/`now`/`off`) the booking grid renders as one chip per pool.
 - **AI-account expiry is derived, not stored.** An account with `expires_at <= NOW()` is treated as
   disabled at read time — `AiAccount::listWithUsage()` shows a "ปิดใช้งาน (หมดอายุ)" badge, and every
   booking-availability query (`Booking::activeAccountCount/getWeekGrid/create`, plus the admin dashboard
@@ -102,7 +107,8 @@ toast UI.
 - **Per-user booking limits go through `Booking::limitsFor($userId)`**, not `SlotSettings::get()`
   directly: it returns the global settings with the user's group (`user_groups`, admin-managed on
   `admin/groups.php`) overriding `weekly_quota` / `max_advance_days` when those group columns aren't
-  NULL. Any new quota/advance logic must resolve limits through `limitsFor`, not the raw global row.
+  NULL, plus the group's `max_concurrent` (pools bookable in one slot; default 1). Any new quota/advance/
+  concurrency logic must resolve through `limitsFor`, not the raw global row.
 - **Every booking must carry a `purpose`** (required by `Booking::create()`), and after a slot ends the
   student must file a usage report (free text and/or an image/PDF upload) within
   `Booking::REPORT_DEADLINE_DAYS` (7). This is enforced with the same derive-at-read-time pattern as

@@ -6,9 +6,14 @@ final class Booking
     private const THAI_WEEKDAYS_SHORT = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
     private const THAI_MONTHS_SHORT = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
-    private const CLS_MAP = ['available' => 'slt slt-avail', 'busy' => 'slt slt-busy', 'mine' => 'slt slt-mine', 'now' => 'slt slt-now', 'off' => 'slt slt-off'];
-    private const ICON_MAP = ['available' => 'bi bi-sun', 'busy' => 'bi bi-person-fill', 'mine' => 'bi bi-check-circle-fill', 'now' => 'bi bi-circle-fill', 'off' => 'bi bi-tools'];
-    private const TEXT_MAP = ['available' => 'ว่าง', 'busy' => 'จองแล้ว', 'mine' => 'ของฉัน', 'now' => 'ใช้งานอยู่', 'off' => 'ปิด'];
+    /** Per-pool cell presentation in the booking grid (bg tint / text colour / icon). */
+    private const POOL_MAP = [
+        'available' => ['label' => 'ว่าง',       'bg' => '#EFF6FF',    'fg' => '#2563EB', 'icon' => 'bi-plus-circle'],
+        'busy'      => ['label' => 'จองแล้ว',    'bg' => '#F1F5F9',    'fg' => '#64748B', 'icon' => 'bi-person-fill'],
+        'mine'      => ['label' => 'ของฉัน',     'bg' => '#DBEAFE',    'fg' => '#1D4ED8', 'icon' => 'bi-check-circle-fill'],
+        'now'       => ['label' => 'ใช้งานอยู่', 'bg' => '#DCFCE7',    'fg' => '#059669', 'icon' => 'bi-broadcast'],
+        'off'       => ['label' => 'ปิด',        'bg' => 'transparent', 'fg' => '#94A3B8', 'icon' => 'bi-dash-circle'],
+    ];
 
     /** Days a student has, after a slot ends, to file the usage report before booking is blocked. */
     public const REPORT_DEADLINE_DAYS = 7;
@@ -41,39 +46,33 @@ final class Booking
         return self::thaiDate($start) . ' – ' . self::thaiDate($end);
     }
 
-    private static function activeAccountCount(): int
-    {
-        static $count = null;
-        if ($count === null) {
-            $count = (int) Database::pdo()->query(
-                "SELECT COUNT(*) FROM ai_accounts WHERE status = 'active' AND (expires_at IS NULL OR expires_at > NOW())"
-            )->fetchColumn();
-        }
-        return $count;
-    }
-
     /**
-     * Builds the 7-day x N-slot calendar grid for a student, mirroring the prototype's
-     * generateWeekSlots() but backed by real bookings.
+     * 7-day × N-slot calendar. Each slot lists the pools the user's group is allowed to book, with each
+     * pool's per-cell status (available / busy / mine / now / off), so students see exactly which pool
+     * is free or already taken. Concurrency: once the user holds max_concurrent pools in a slot, the
+     * remaining free pools in that slot become non-bookable.
      */
     public static function getWeekGrid(int $userId, int $weekOffset): array
     {
         $settings = self::limitsFor($userId);
+        $maxConcurrent = (int) $settings['max_concurrent'];
+        $allowed = self::allowedAccountsFor($userId);
         $start = self::weekStart($weekOffset);
+        $end = $start->modify('+6 days');
         $today = new DateTimeImmutable('today');
         $now = new DateTimeImmutable();
         $maxDate = $today->modify('+' . $settings['max_advance_days'] . ' days');
-        $activeAccounts = self::activeAccountCount();
 
-        $pdo = Database::pdo();
-        $bookedStmt = $pdo->prepare(
-            "SELECT COUNT(*) FROM bookings b JOIN ai_accounts a ON a.id = b.ai_account_id
-             WHERE b.booking_date = ? AND b.slot_index = ? AND b.status = 'upcoming' AND a.status = 'active'
-               AND (a.expires_at IS NULL OR a.expires_at > NOW())"
+        // Week's upcoming bookings in one query -> map[date][slot][accountId] = user_id
+        $booked = [];
+        $stmt = Database::pdo()->prepare(
+            "SELECT ai_account_id, booking_date, slot_index, user_id FROM bookings
+             WHERE status = 'upcoming' AND booking_date BETWEEN ? AND ?"
         );
-        $mineStmt = $pdo->prepare(
-            "SELECT COUNT(*) FROM bookings WHERE user_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming'"
-        );
+        $stmt->execute([$start->format('Y-m-d'), $end->format('Y-m-d')]);
+        foreach ($stmt->fetchAll() as $r) {
+            $booked[$r['booking_date']][(int) $r['slot_index']][(int) $r['ai_account_id']] = (int) $r['user_id'];
+        }
 
         $days = [];
         for ($d = 0; $d < 7; $d++) {
@@ -83,44 +82,56 @@ final class Booking
             for ($i = 0; $i < $settings['slots_per_day']; $i++) {
                 $slotStart = $date->setTime(...array_map('intval', explode(':', SlotSettings::slotStart($settings, $i))));
                 $slotEnd = $date->setTime(...array_map('intval', explode(':', SlotSettings::slotEnd($settings, $i))));
-
-                $bookedStmt->execute([$dateStr, $i]);
-                $booked = (int) $bookedStmt->fetchColumn();
-                $mineStmt->execute([$userId, $dateStr, $i]);
-                $mine = (int) $mineStmt->fetchColumn();
-
                 $isLiveNow = $now >= $slotStart && $now < $slotEnd;
                 $isPast = $now >= $slotEnd;
+                $beyondMax = $date > $maxDate;
+                $cellBooked = $booked[$dateStr][$i] ?? [];
 
-                if ($mine > 0 && $isLiveNow) {
-                    $status = 'now';
-                } elseif ($mine > 0) {
-                    $status = 'mine';
-                } elseif ($isPast) {
-                    $status = 'off';
-                } elseif ($date > $maxDate) {
-                    $status = 'off';
-                } elseif ($isLiveNow) {
-                    $status = 'busy';
-                } elseif ($activeAccounts === 0 || $booked >= $activeAccounts) {
-                    $status = 'busy';
-                } else {
-                    $status = 'available';
+                $mineCount = 0;
+                foreach ($allowed as $ac) {
+                    if (($cellBooked[(int) $ac['id']] ?? null) === $userId) {
+                        $mineCount++;
+                    }
+                }
+                $atLimit = $mineCount >= $maxConcurrent;
+
+                $pools = [];
+                foreach ($allowed as $ac) {
+                    $aid = (int) $ac['id'];
+                    $bkUser = $cellBooked[$aid] ?? null;
+                    $isExpired = !empty($ac['expires_at']) && new DateTimeImmutable($ac['expires_at']) <= $now;
+                    if ($bkUser === $userId) {
+                        $status = $isLiveNow ? 'now' : 'mine';
+                    } elseif ($bkUser !== null) {
+                        $status = 'busy';
+                    } elseif ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax || $isLiveNow) {
+                        $status = 'off';
+                    } else {
+                        $status = 'available';
+                    }
+                    $bookable = $status === 'available' && !$atLimit;
+                    $meta = self::POOL_MAP[$status];
+                    $pools[] = [
+                        'accountId' => $aid,
+                        'name' => $ac['name'],
+                        'status' => $status,
+                        'statusText' => ($status === 'available' && $atLimit) ? 'เต็มช่วงนี้' : $meta['label'],
+                        'bg' => $meta['bg'],
+                        'fg' => $meta['fg'],
+                        'icon' => $meta['icon'],
+                        'bookable' => $bookable,
+                    ];
                 }
 
                 $slots[] = [
-                    'cls' => self::CLS_MAP[$status],
-                    'iconCls' => self::ICON_MAP[$status],
                     'label' => SlotSettings::slotLabel($i),
                     'time' => SlotSettings::slotStart($settings, $i) . '–' . SlotSettings::slotEnd($settings, $i),
-                    'statusText' => self::TEXT_MAP[$status],
-                    'bookable' => $status === 'available',
                     'date' => $dateStr,
                     'dateLabel' => self::THAI_WEEKDAYS[$d] . 'ที่ ' . $date->format('j'),
                     'slotIndex' => $i,
+                    'pools' => $pools,
                 ];
             }
-
             $days[] = [
                 'dayName' => self::THAI_WEEKDAYS_SHORT[$d],
                 'date' => (int) $date->format('j'),
@@ -128,7 +139,6 @@ final class Booking
                 'slots' => $slots,
             ];
         }
-
         return $days;
     }
 
@@ -151,8 +161,8 @@ final class Booking
         return (int) $stmt->fetchColumn();
     }
 
-    /** @return array{ok:bool,error?:string} */
-    public static function create(int $userId, string $dateStr, int $slotIndex, string $purpose = ''): array
+    /** @return array{ok:bool,error?:string} Books a specific AI pool the user's group is allowed to use. */
+    public static function create(int $userId, string $dateStr, int $slotIndex, int $accountId, string $purpose = ''): array
     {
         if (self::isRestricted($userId)) {
             return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับการจองชั่วคราว เนื่องจากมีรายงานการใช้งานค้างเกิน ' . self::REPORT_DEADLINE_DAYS . ' วัน กรุณารายงานการใช้งานที่ค้างให้ครบก่อน'];
@@ -186,6 +196,22 @@ final class Booking
             return ['ok' => false, 'error' => 'ไม่สามารถจองช่วงเวลาที่ผ่านไปแล้วหรือกำลังเริ่มได้'];
         }
 
+        // The chosen pool must be one this user's group is allowed to book, and be usable.
+        $accStmt = Database::pdo()->prepare(
+            'SELECT a.status, a.expires_at FROM users u
+             JOIN group_ai_accounts ga ON ga.group_id = u.group_id AND ga.ai_account_id = ?
+             JOIN ai_accounts a ON a.id = ga.ai_account_id
+             WHERE u.id = ?'
+        );
+        $accStmt->execute([$accountId, $userId]);
+        $acc = $accStmt->fetch();
+        if (!$acc) {
+            return ['ok' => false, 'error' => 'คุณไม่มีสิทธิ์จอง Pool นี้'];
+        }
+        if ($acc['status'] !== 'active' || (!empty($acc['expires_at']) && new DateTimeImmutable($acc['expires_at']) <= new DateTimeImmutable())) {
+            return ['ok' => false, 'error' => 'Pool นี้ไม่พร้อมใช้งาน (ปิดปรับปรุงหรือหมดอายุ)'];
+        }
+
         if (self::quotaUsed($userId, $date) >= $settings['weekly_quota']) {
             return ['ok' => false, 'error' => 'คุณใช้โควต้าการจองของสัปดาห์นี้ครบแล้ว'];
         }
@@ -193,31 +219,24 @@ final class Booking
         $pdo = Database::pdo();
         $pdo->beginTransaction();
         try {
+            // How many pools the user already holds in this slot (max_concurrent cap).
             $mineStmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM bookings WHERE user_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming'"
+                "SELECT COUNT(*) FROM bookings WHERE user_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming' FOR UPDATE"
             );
             $mineStmt->execute([$userId, $dateStr, $slotIndex]);
-            if ((int) $mineStmt->fetchColumn() > 0) {
+            if ((int) $mineStmt->fetchColumn() >= (int) $settings['max_concurrent']) {
                 $pdo->rollBack();
-                return ['ok' => false, 'error' => 'คุณจองช่วงเวลานี้ไว้แล้ว'];
+                return ['ok' => false, 'error' => 'คุณจองครบจำนวน Pool สูงสุดต่อช่วงเวลาแล้ว (' . (int) $settings['max_concurrent'] . ' Pool)'];
             }
 
-            $accountStmt = $pdo->prepare(
-                "SELECT a.id FROM ai_accounts a
-                 WHERE a.status = 'active'
-                   AND (a.expires_at IS NULL OR a.expires_at > NOW())
-                   AND a.id NOT IN (
-                       SELECT ai_account_id FROM bookings
-                       WHERE booking_date = ? AND slot_index = ? AND status = 'upcoming'
-                   )
-                 ORDER BY a.id LIMIT 1 FOR UPDATE"
+            // Is this specific pool still free for this slot?
+            $takenStmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM bookings WHERE ai_account_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming' FOR UPDATE"
             );
-            $accountStmt->execute([$dateStr, $slotIndex]);
-            $accountId = $accountStmt->fetchColumn();
-
-            if (!$accountId) {
+            $takenStmt->execute([$accountId, $dateStr, $slotIndex]);
+            if ((int) $takenStmt->fetchColumn() > 0) {
                 $pdo->rollBack();
-                return ['ok' => false, 'error' => 'ช่วงเวลานี้ถูกจองเต็มแล้ว กรุณาเลือกช่วงเวลาอื่น'];
+                return ['ok' => false, 'error' => 'Pool นี้ถูกจองในช่วงเวลานี้แล้ว กรุณาเลือก Pool อื่น'];
             }
 
             $insert = $pdo->prepare(
@@ -362,8 +381,9 @@ final class Booking
     public static function limitsFor(int $userId): array
     {
         $settings = SlotSettings::get();
+        $settings['max_concurrent'] = 1;
         $stmt = Database::pdo()->prepare(
-            'SELECT g.weekly_quota, g.max_advance_days FROM users u
+            'SELECT g.weekly_quota, g.max_advance_days, g.max_concurrent FROM users u
              JOIN user_groups g ON g.id = u.group_id WHERE u.id = ?'
         );
         $stmt->execute([$userId]);
@@ -375,8 +395,24 @@ final class Booking
             if ($group['max_advance_days'] !== null) {
                 $settings['max_advance_days'] = (int) $group['max_advance_days'];
             }
+            $settings['max_concurrent'] = max(1, (int) $group['max_concurrent']);
         }
         return $settings;
+    }
+
+    /** @return array<int,array> AI pools the user's group may book (empty if no group / no pools granted). */
+    public static function allowedAccountsFor(int $userId): array
+    {
+        $stmt = Database::pdo()->prepare(
+            'SELECT a.id, a.name, a.provider, a.status, a.expires_at
+             FROM users u
+             JOIN group_ai_accounts ga ON ga.group_id = u.group_id
+             JOIN ai_accounts a ON a.id = ga.ai_account_id
+             WHERE u.id = ?
+             ORDER BY a.id'
+        );
+        $stmt->execute([$userId]);
+        return $stmt->fetchAll();
     }
 
     /** @return array<int,array> Completed bookings the user still has to report on. */

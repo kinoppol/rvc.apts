@@ -10,6 +10,7 @@ CREATE TABLE user_groups (
     description      VARCHAR(255) NULL,
     weekly_quota     TINYINT UNSIGNED NULL,
     max_advance_days SMALLINT UNSIGNED NULL,
+    max_concurrent   TINYINT UNSIGNED NOT NULL DEFAULT 1,   -- how many pools a member may book in the same slot
     created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -49,6 +50,15 @@ CREATE TABLE ai_accounts (
     created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_ai_accounts_provider FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE SET NULL,
     KEY idx_ai_accounts_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Which AI pools each group's members may book (no row for a group = that group can't book anything).
+CREATE TABLE group_ai_accounts (
+    group_id      INT UNSIGNED NOT NULL,
+    ai_account_id INT UNSIGNED NOT NULL,
+    PRIMARY KEY (group_id, ai_account_id),
+    CONSTRAINT fk_gaa_group   FOREIGN KEY (group_id)      REFERENCES user_groups(id)  ON DELETE CASCADE,
+    CONSTRAINT fk_gaa_account FOREIGN KEY (ai_account_id) REFERENCES ai_accounts(id)  ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE slot_settings (

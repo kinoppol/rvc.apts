@@ -19,6 +19,7 @@ reinstalling:
 ```sh
 "$MYSQL" -u root -h 127.0.0.1 --port=3307 < migrate_ai_account_details.sql
 "$MYSQL" -u root -h 127.0.0.1 --port=3307 < migrate_groups_and_reports.sql
+"$MYSQL" -u root -h 127.0.0.1 --port=3307 < migrate_group_pools.sql
 ```
 
 `migrate_ai_account_details.sql` adds the `ai_providers` table and the new `ai_accounts` columns;

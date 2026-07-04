@@ -106,6 +106,15 @@ final class AiAccount
         return $stmt->fetch() ?: null;
     }
 
+    /** @return array<int,array{id:int,name:string,provider:string}> Lightweight list for pickers. */
+    public static function allBasic(): array
+    {
+        return Database::pdo()->query(
+            'SELECT a.id, a.name, COALESCE(p.name, a.provider) AS provider
+             FROM ai_accounts a LEFT JOIN ai_providers p ON p.id = a.provider_id ORDER BY a.id'
+        )->fetchAll();
+    }
+
     /** @return array{ok:bool,error?:string} */
     public static function add(array $d): array
     {

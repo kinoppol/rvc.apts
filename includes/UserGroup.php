@@ -50,19 +50,43 @@ final class UserGroup
         if ($advance === false) {
             return ['ok' => false, 'error' => 'จองล่วงหน้าสูงสุดต้องเป็นจำนวนเต็มบวก หรือเว้นว่างเพื่อใช้ค่าเริ่มต้น'];
         }
+        $concurrent = max(1, (int) ($d['max_concurrent'] ?? 1));
         $desc = trim($d['description'] ?? '') ?: null;
+        $poolIds = array_map('intval', (array) ($d['pool_ids'] ?? []));
 
+        $pdo = Database::pdo();
         if ($id === null) {
-            $stmt = Database::pdo()->prepare('INSERT INTO user_groups (name, description, weekly_quota, max_advance_days) VALUES (?, ?, ?, ?)');
-            $stmt->execute([$name, $desc, $quota, $advance]);
+            $stmt = $pdo->prepare('INSERT INTO user_groups (name, description, weekly_quota, max_advance_days, max_concurrent) VALUES (?, ?, ?, ?, ?)');
+            $stmt->execute([$name, $desc, $quota, $advance, $concurrent]);
+            $id = (int) $pdo->lastInsertId();
         } else {
             if (!self::find($id)) {
                 return ['ok' => false, 'error' => 'ไม่พบกลุ่มที่ต้องการแก้ไข'];
             }
-            $stmt = Database::pdo()->prepare('UPDATE user_groups SET name = ?, description = ?, weekly_quota = ?, max_advance_days = ? WHERE id = ?');
-            $stmt->execute([$name, $desc, $quota, $advance, $id]);
+            $stmt = $pdo->prepare('UPDATE user_groups SET name = ?, description = ?, weekly_quota = ?, max_advance_days = ?, max_concurrent = ? WHERE id = ?');
+            $stmt->execute([$name, $desc, $quota, $advance, $concurrent, $id]);
         }
+        self::setAccounts($id, $poolIds);
         return ['ok' => true];
+    }
+
+    /** @return int[] AI-account ids this group's members are allowed to book. */
+    public static function accountIds(int $groupId): array
+    {
+        $stmt = Database::pdo()->prepare('SELECT ai_account_id FROM group_ai_accounts WHERE group_id = ?');
+        $stmt->execute([$groupId]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /** Replaces a group's allowed-pool set. */
+    public static function setAccounts(int $groupId, array $accountIds): void
+    {
+        $pdo = Database::pdo();
+        $pdo->prepare('DELETE FROM group_ai_accounts WHERE group_id = ?')->execute([$groupId]);
+        $ins = $pdo->prepare('INSERT IGNORE INTO group_ai_accounts (group_id, ai_account_id) VALUES (?, ?)');
+        foreach (array_unique(array_filter($accountIds, fn ($x) => (int) $x > 0)) as $aid) {
+            $ins->execute([$groupId, (int) $aid]);
+        }
     }
 
     /** Deletes a group; members in it revert to the global default (FK ON DELETE SET NULL). */

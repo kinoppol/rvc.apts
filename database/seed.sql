@@ -3,10 +3,10 @@
 USE rvc_apts;
 
 -- User groups (per-group limits; NULL = use the global slot_settings default)
-INSERT INTO user_groups (id, name, description, weekly_quota, max_advance_days) VALUES
-(1, 'นักศึกษาทั่วไป', 'สิทธิ์มาตรฐานตามค่าเริ่มต้นของระบบ', NULL, NULL),
-(2, 'นักวิจัย',       'โควต้าสูงและจองล่วงหน้าได้นานกว่า',   5,    30),
-(3, 'ทดลองใช้',       'สิทธิ์จำกัดสำหรับผู้ใช้ทดลอง',         1,    7);
+INSERT INTO user_groups (id, name, description, weekly_quota, max_advance_days, max_concurrent) VALUES
+(1, 'นักศึกษาทั่วไป', 'สิทธิ์มาตรฐานตามค่าเริ่มต้นของระบบ',            NULL, NULL, 1),
+(2, 'นักวิจัย',       'โควต้าสูง จองล่วงหน้าได้นานกว่า จองได้หลาย Pool', 5,   30,   2),
+(3, 'ทดลองใช้',       'สิทธิ์จำกัดสำหรับผู้ใช้ทดลอง',                  1,    7,   1);
 
 -- id 1: admin
 INSERT INTO users (role, name, student_id, major, email, phone, password_hash, status) VALUES
@@ -48,6 +48,13 @@ INSERT INTO ai_accounts (name, provider_id, provider, email, account_password, s
     TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 7 DAY), '23:59:00'),   TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 2 DAY), '09:00:00'),  'daily'),
 ('ChatGPT Plus #2', 2, 'OpenAI ChatGPT Plus',  'gpt.plus2@rvc.ac.th',   'Gpt+Pool#2',   'maintenance',
     TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 1 DAY), '23:59:00'),   TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 40 DAY), '09:00:00'), 'monthly');
+
+-- Pool access per group (which AI pools each group's members may book):
+--   นักศึกษาทั่วไป → Claude #1 + ChatGPT #1   นักวิจัย → ทุก Pool   ทดลองใช้ → ChatGPT #1 เท่านั้น
+INSERT INTO group_ai_accounts (group_id, ai_account_id) VALUES
+(1, 1), (1, 3),
+(2, 1), (2, 2), (2, 3), (2, 4),
+(3, 3);
 
 -- Bookings for สมชาย (user id 2), dates relative to import time so "upcoming" stays upcoming.
 -- Completed ones carry a usage report so สมชาย is NOT blocked; นภา (user 7) has one overdue

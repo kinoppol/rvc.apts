@@ -59,13 +59,15 @@
     }, 3200);
   }
 
-  // ── Booking confirmation modal (student/booking.php) ──
+  // ── Booking confirmation modal (student/booking.php) — one clickable chip per allowed pool ──
   var bookModal = document.getElementById("bookSlotModal");
   if (bookModal) {
-    document.querySelectorAll(".slt-avail").forEach(function (cell) {
+    document.querySelectorAll(".pool-book").forEach(function (cell) {
       cell.addEventListener("click", function () {
         document.getElementById("bookModalDate").value = cell.dataset.date;
         document.getElementById("bookModalSlotIndex").value = cell.dataset.slotIndex;
+        document.getElementById("bookModalAccountId").value = cell.dataset.accountId;
+        document.getElementById("bookModalAccountName").textContent = cell.dataset.accountName;
         document.getElementById("bookModalDayLabel").textContent = cell.dataset.dayLabel;
         document.getElementById("bookModalSlotTime").textContent = cell.dataset.slotLabel + " (" + cell.dataset.slotTime + ")";
         new bootstrap.Modal(bookModal).show();
@@ -114,6 +116,11 @@
       groupModal.querySelector("[name=description]").value = data.description || "";
       groupModal.querySelector("[name=weekly_quota]").value = data.weekly_quota || "";
       groupModal.querySelector("[name=max_advance_days]").value = data.max_advance_days || "";
+      groupModal.querySelector("[name=max_concurrent]").value = data.max_concurrent || "1";
+      var pools = (data.pools || "").split(",").filter(Boolean);
+      groupModal.querySelectorAll(".group-pool-cb").forEach(function (cb) {
+        cb.checked = pools.indexOf(cb.value) !== -1;
+      });
       var title = document.getElementById("groupModalTitle");
       if (title) title.textContent = isEdit ? "แก้ไขกลุ่ม" : "เพิ่มกลุ่ม";
     };

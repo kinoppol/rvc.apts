@@ -9,19 +9,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
     $date = trim($_POST['booking_date'] ?? '');
     $slotIndex = (int) ($_POST['slot_index'] ?? -1);
-    $result = Booking::create($user['id'], $date, $slotIndex, $_POST['purpose'] ?? '');
-    if ($result['ok']) {
-        flash_set('ok', 'จองคิวสำเร็จ! ระบบได้จัดสรร AI Account ให้เรียบร้อยแล้ว');
-    } else {
-        flash_set('err', $result['error'] ?? 'ไม่สามารถจองได้');
-    }
+    $accountId = (int) ($_POST['ai_account_id'] ?? 0);
+    $result = Booking::create($user['id'], $date, $slotIndex, $accountId, $_POST['purpose'] ?? '');
+    flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'จองคิวสำเร็จ!' : ($result['error'] ?? 'ไม่สามารถจองได้'));
     header('Location: ' . url('student/booking.php') . '?week=' . $week);
     exit;
 }
 
 $settings = Booking::limitsFor($user['id']);
+$maxConcurrent = (int) $settings['max_concurrent'];
 $restricted = Booking::isRestricted($user['id']);
 $pendingReports = Booking::pendingReportsForUser($user['id']);
+$allowedPools = Booking::allowedAccountsFor($user['id']);
 $grid = Booking::getWeekGrid($user['id'], $week);
 $weekLabel = Booking::getWeekLabel($week);
 $quotaRemaining = Booking::weeklyQuotaRemaining($user['id']);
@@ -40,6 +39,15 @@ require __DIR__ . '/../includes/header.php';
   </div>
 <?php require __DIR__ . '/../includes/footer.php'; exit; ?>
 <?php endif; ?>
+<?php if (!$allowedPools): ?>
+  <h5 style="font-weight:700;margin:0 0 16px">จองคิว AI Pro</h5>
+  <div style="background:var(--bs-secondary-bg);border:1px solid var(--bs-border-color);border-radius:12px;padding:28px;text-align:center;max-width:560px">
+    <i class="bi bi-lock" style="font-size:30px;color:var(--bs-tertiary-color);display:block;margin-bottom:10px"></i>
+    <div style="font-weight:700;margin-bottom:4px">ยังไม่มี Pool ที่จองได้</div>
+    <p style="color:var(--bs-secondary-color);font-size:13px;margin:0">กลุ่มของคุณยังไม่ได้รับสิทธิ์เข้าถึง AI Pool ใด ๆ กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์การจอง</p>
+  </div>
+<?php require __DIR__ . '/../includes/footer.php'; exit; ?>
+<?php endif; ?>
 <?php if ($pendingReports): ?>
   <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400E;display:flex;gap:8px;align-items:center">
     <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0"></i>
@@ -49,7 +57,7 @@ require __DIR__ . '/../includes/header.php';
 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
   <div>
     <h5 style="font-weight:700;margin:0">จองคิว AI Pro</h5>
-    <p style="color:var(--bs-secondary-color);font-size:14px;margin:4px 0 0">คลิกช่วงเวลาสีฟ้าเพื่อจอง · โควต้าคงเหลือ <?= (int) $quotaRemaining ?>/<?= (int) $settings['weekly_quota'] ?> รอบ/สัปดาห์</p>
+    <p style="color:var(--bs-secondary-color);font-size:14px;margin:4px 0 0">คลิก Pool สีฟ้าเพื่อจอง · โควต้าคงเหลือ <?= (int) $quotaRemaining ?>/<?= (int) $settings['weekly_quota'] ?> รอบ/สัปดาห์ · จองพร้อมกันได้ <?= $maxConcurrent ?> Pool/ช่วงเวลา</p>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
     <a href="<?= url('student/booking.php') ?>?week=<?= max(0, $week - 1) ?>" class="btn btn-outline-secondary btn-sm<?= $week <= 0 ? ' disabled' : '' ?>"><i class="bi bi-chevron-left"></i></a>
@@ -59,48 +67,65 @@ require __DIR__ . '/../includes/header.php';
 </div>
 
 <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;font-size:12px">
-  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#EFF6FF;border:1.5px solid #BFDBFE"></div>ว่าง (จองได้)</div>
-  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#2563EB"></div>ของฉัน</div>
-  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#059669"></div>กำลังใช้งาน</div>
-  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#F1F5F9;border:1.5px solid #E2E8F0"></div>จองแล้ว</div>
+  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#EFF6FF;border:1.5px solid #2563EB"></div>ว่าง (จองได้)</div>
+  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#DBEAFE;border:1.5px solid #1D4ED8"></div>ของฉัน</div>
+  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#DCFCE7;border:1.5px solid #059669"></div>กำลังใช้งาน</div>
+  <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;background:#F1F5F9;border:1.5px solid #94A3B8"></div>จองแล้ว</div>
   <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:12px;border-radius:3px;border:1.5px dashed #CBD5E1"></div>ปิด</div>
 </div>
 
 <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
-  <div class="card-body" style="padding:20px">
-    <div style="display:flex;gap:6px;overflow-x:auto;min-width:0">
-      <div style="flex-shrink:0;width:52px;padding-top:52px;display:flex;flex-direction:column;gap:6px">
-        <?php for ($i = 0; $i < $settings['slots_per_day']; $i++): ?>
-          <div style="height:74px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:1px;padding-right:6px">
-            <span style="font-size:10px;font-weight:600;color:var(--bs-secondary-color)"><?= e(SlotSettings::slotLabel($i)) ?></span>
-            <span style="font-size:9px;color:var(--bs-tertiary-color)"><?= e(SlotSettings::slotStart($settings, $i)) ?></span>
-            <span style="font-size:9px;color:var(--bs-tertiary-color)"><?= e(SlotSettings::slotEnd($settings, $i)) ?></span>
-          </div>
-        <?php endfor; ?>
-      </div>
-      <?php foreach ($grid as $day): ?>
-        <div style="flex:1;min-width:80px;display:flex;flex-direction:column;gap:6px">
-          <div style="height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
-            <span style="font-size:10px;font-weight:600;color:var(--bs-tertiary-color);letter-spacing:.05em"><?= e($day['dayName']) ?></span>
-            <span class="<?= $day['todayCls'] ?>"><?= (int) $day['date'] ?></span>
-          </div>
-          <?php foreach ($day['slots'] as $slot): ?>
-            <div class="<?= $slot['cls'] ?>"
-                 <?php if ($slot['bookable']): ?>
-                 data-date="<?= e($slot['date']) ?>"
-                 data-slot-index="<?= (int) $slot['slotIndex'] ?>"
-                 data-day-label="<?= e($slot['dateLabel']) ?>"
-                 data-slot-label="<?= e($slot['label']) ?>"
-                 data-slot-time="<?= e($slot['time']) ?>"
-                 <?php endif; ?>>
-              <i class="<?= $slot['iconCls'] ?>" style="font-size:13px;margin-bottom:2px"></i>
-              <div style="font-size:10px;font-weight:600;line-height:1.2"><?= e($slot['label']) ?></div>
-              <div style="font-size:9px;opacity:.7;margin-top:1px"><?= e($slot['statusText']) ?></div>
-            </div>
+  <div class="card-body" style="padding:16px;overflow-x:auto">
+    <table style="border-collapse:separate;border-spacing:5px;min-width:100%">
+      <thead>
+        <tr>
+          <th style="width:56px"></th>
+          <?php foreach ($grid as $day): ?>
+            <th style="text-align:center;padding:2px;min-width:118px">
+              <div style="font-size:10px;font-weight:600;color:var(--bs-tertiary-color);letter-spacing:.05em"><?= e($day['dayName']) ?></div>
+              <span class="<?= $day['todayCls'] ?>"><?= (int) $day['date'] ?></span>
+            </th>
           <?php endforeach; ?>
-        </div>
-      <?php endforeach; ?>
-    </div>
+        </tr>
+      </thead>
+      <tbody>
+        <?php for ($i = 0; $i < $settings['slots_per_day']; $i++): ?>
+          <tr>
+            <td style="vertical-align:top;text-align:right;padding:6px 6px 0 0;white-space:nowrap">
+              <div style="font-size:11px;font-weight:600;color:var(--bs-secondary-color)"><?= e(SlotSettings::slotLabel($i)) ?></div>
+              <div style="font-size:9px;color:var(--bs-tertiary-color)"><?= e(SlotSettings::slotStart($settings, $i)) ?></div>
+              <div style="font-size:9px;color:var(--bs-tertiary-color)"><?= e(SlotSettings::slotEnd($settings, $i)) ?></div>
+            </td>
+            <?php foreach ($grid as $day): $slot = $day['slots'][$i]; ?>
+              <td style="vertical-align:top">
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <?php foreach ($slot['pools'] as $p): ?>
+                    <?php
+                      $border = $p['status'] === 'off' ? '1px dashed var(--bs-border-color)' : '1px solid ' . $p['fg'] . '66';
+                      $chip = 'display:block;width:100%;border:' . $border . ';background:' . $p['bg'] . ';color:' . $p['fg'] . ';border-radius:6px;padding:4px 6px;text-align:left;font-size:9px;line-height:1.2';
+                    ?>
+                    <?php if ($p['bookable']): ?>
+                      <button type="button" class="pool-book" style="<?= $chip ?>;cursor:pointer"
+                        data-date="<?= e($slot['date']) ?>" data-slot-index="<?= (int) $slot['slotIndex'] ?>"
+                        data-account-id="<?= (int) $p['accountId'] ?>" data-account-name="<?= e($p['name']) ?>"
+                        data-day-label="<?= e($slot['dateLabel']) ?>" data-slot-label="<?= e($slot['label']) ?>" data-slot-time="<?= e($slot['time']) ?>">
+                        <span style="display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><i class="bi <?= e($p['icon']) ?>"></i> <?= e($p['name']) ?></span>
+                        <span style="opacity:.85"><?= e($p['statusText']) ?></span>
+                      </button>
+                    <?php else: ?>
+                      <div style="<?= $chip ?><?= $p['status'] === 'off' ? ';opacity:.6' : '' ?>">
+                        <span style="display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><i class="bi <?= e($p['icon']) ?>"></i> <?= e($p['name']) ?></span>
+                        <span style="opacity:.85"><?= e($p['statusText']) ?></span>
+                      </div>
+                    <?php endif; ?>
+                  <?php endforeach; ?>
+                </div>
+              </td>
+            <?php endforeach; ?>
+          </tr>
+        <?php endfor; ?>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -116,9 +141,11 @@ require __DIR__ . '/../includes/header.php';
         <?= Csrf::field() ?>
         <input type="hidden" name="booking_date" id="bookModalDate">
         <input type="hidden" name="slot_index" id="bookModalSlotIndex">
+        <input type="hidden" name="ai_account_id" id="bookModalAccountId">
         <div class="modal-body" style="padding:20px">
-          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">โปรดตรวจสอบรายละเอียดก่อนยืนยัน ระบบจะจัดสรร AI Account ที่ว่างให้โดยอัตโนมัติ</p>
+          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">โปรดตรวจสอบรายละเอียดก่อนยืนยันการจอง Pool ที่เลือก</p>
           <div class="info-box">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--bs-secondary-color)">Pool</span><span style="font-weight:700;font-size:13px;color:#2563EB" id="bookModalAccountName">—</span></div>
             <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--bs-secondary-color)">วันที่</span><span style="font-weight:600;font-size:13px" id="bookModalDayLabel">—</span></div>
             <div style="display:flex;justify-content:space-between"><span style="font-size:12px;color:var(--bs-secondary-color)">ช่วงเวลา</span><span style="font-weight:600;font-size:13px" id="bookModalSlotTime">—</span></div>
           </div>
