@@ -270,6 +270,12 @@
       if (textarea) textarea.value = btn.dataset.reportText || "";
       var fileInput = modalEl.querySelector("[name=report_file]");
       if (fileInput) fileInput.value = ""; // reset file picker; existing file is kept server-side
+      var tsStart = modalEl.querySelector("[name=token_start_pct]");
+      if (tsStart) tsStart.value = btn.dataset.tokenStart || "";
+      var tsEnd = modalEl.querySelector("[name=token_end_pct]");
+      if (tsEnd) tsEnd.value = btn.dataset.tokenEnd || "";
+      var tsReset = modalEl.querySelector("[name=token_reset_at]");
+      if (tsReset) tsReset.value = btn.dataset.tokenReset || "";
       new bootstrap.Modal(modalEl).show();
     });
   });

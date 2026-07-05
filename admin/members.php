@@ -356,6 +356,13 @@ require __DIR__ . '/../includes/header.php';
                     <div><?= e($b['purpose'] ?: '—') ?></div>
                     <?php if (!empty($b['report_text'])): ?><div style="font-size:11px;color:var(--bs-secondary-color);margin-top:3px"><i class="bi bi-journal-text me-1"></i><?= e($b['report_text']) ?></div><?php endif; ?>
                     <?php if (!empty($b['report_file'])): ?><div style="font-size:11px;margin-top:3px"><a href="<?= url('uploads/reports/' . $b['report_file']) ?>" target="_blank" style="color:#2563EB;text-decoration:none"><i class="bi bi-paperclip me-1"></i>ไฟล์แนบ</a></div><?php endif; ?>
+                    <?php if ($b['token_start_pct'] !== null || $b['token_end_pct'] !== null || !empty($b['token_reset_at'])): ?>
+                    <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:6px">
+                      <?php if ($b['token_start_pct'] !== null): ?><span style="font-size:10px;background:var(--bs-secondary-bg);border-radius:5px;padding:2px 6px;color:var(--bs-secondary-color)"><i class="bi bi-speedometer2 me-1"></i>ก่อน <?= (int)$b['token_start_pct'] ?>%</span><?php endif; ?>
+                      <?php if ($b['token_end_pct'] !== null): ?><span style="font-size:10px;background:var(--bs-secondary-bg);border-radius:5px;padding:2px 6px;color:var(--bs-secondary-color)"><i class="bi bi-speedometer2 me-1"></i>หลัง <?= (int)$b['token_end_pct'] ?>%</span><?php endif; ?>
+                      <?php if (!empty($b['token_reset_at'])): ?><span style="font-size:10px;background:var(--bs-secondary-bg);border-radius:5px;padding:2px 6px;color:var(--bs-secondary-color)"><i class="bi bi-arrow-clockwise me-1"></i>รีเซ็ต <?= e((new DateTimeImmutable($b['token_reset_at']))->format('d/m H:i')) ?></span><?php endif; ?>
+                    </div>
+                    <?php endif; ?>
                   </td>
                   <td style="padding:10px">
                     <span class="<?= $b['badgeCls'] ?>"><?= e($b['statusLabel']) ?></span>

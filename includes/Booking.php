@@ -556,11 +556,12 @@ final class Booking
     }
 
     /**
-     * Student submits the post-use report (free text and/or an image/PDF file).
-     * @param array|null $file A single $_FILES entry, or null when no file was attached.
+     * Student submits the post-use report (free text and/or an image/PDF file, optional token stats).
+     * @param array|null $file  A single $_FILES entry, or null when no file was attached.
+     * @param array      $extra Optional token stats: token_start_pct (0-100), token_end_pct (0-100), token_reset_at (Y-m-d H:i:s).
      * @return array{ok:bool,error?:string}
      */
-    public static function submitReport(int $userId, int $bookingId, string $text, ?array $file): array
+    public static function submitReport(int $userId, int $bookingId, string $text, ?array $file, array $extra = []): array
     {
         $stmt = Database::pdo()->prepare('SELECT * FROM bookings WHERE id = ? AND user_id = ?');
         $stmt->execute([$bookingId, $userId]);
@@ -591,8 +592,32 @@ final class Booking
             $storedFile = $res['file'];
         }
 
-        $upd = Database::pdo()->prepare('UPDATE bookings SET report_text = ?, report_file = ?, reported_at = NOW() WHERE id = ?');
-        $upd->execute([$text !== '' ? mb_substr($text, 0, 2000) : null, $storedFile, $bookingId]);
+        // Token stats — optional, validate range
+        $tokenStart = isset($extra['token_start_pct']) && $extra['token_start_pct'] !== ''
+            ? max(0, min(100, (int) $extra['token_start_pct'])) : null;
+        $tokenEnd = isset($extra['token_end_pct']) && $extra['token_end_pct'] !== ''
+            ? max(0, min(100, (int) $extra['token_end_pct'])) : null;
+        $tokenResetRaw = trim($extra['token_reset_at'] ?? '');
+        $tokenReset = null;
+        if ($tokenResetRaw !== '') {
+            $ts = strtotime(str_replace('T', ' ', $tokenResetRaw));
+            if ($ts !== false) {
+                $tokenReset = date('Y-m-d H:i:s', $ts);
+            }
+        }
+
+        $upd = Database::pdo()->prepare(
+            'UPDATE bookings SET
+                report_text = ?, report_file = ?, reported_at = NOW(),
+                token_start_pct = ?, token_end_pct = ?, token_reset_at = ?
+             WHERE id = ?'
+        );
+        $upd->execute([
+            $text !== '' ? mb_substr($text, 0, 2000) : null,
+            $storedFile,
+            $tokenStart, $tokenEnd, $tokenReset,
+            $bookingId,
+        ]);
         return ['ok' => true];
     }
 

@@ -20,7 +20,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = Booking::checkOut($user['id'], (int) ($_POST['id'] ?? 0));
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'เช็คเอาท์เรียบร้อย — ช่วงเวลาคืนสู่ระบบแล้ว' : ($result['error'] ?? 'เช็คเอาท์ไม่สำเร็จ'));
     } elseif ($action === 'report') {
-        $result = Booking::submitReport($user['id'], (int) ($_POST['id'] ?? 0), $_POST['report_text'] ?? '', $_FILES['report_file'] ?? null);
+        $extra = [
+            'token_start_pct' => $_POST['token_start_pct'] ?? '',
+            'token_end_pct'   => $_POST['token_end_pct'] ?? '',
+            'token_reset_at'  => $_POST['token_reset_at'] ?? '',
+        ];
+        $result = Booking::submitReport($user['id'], (int) ($_POST['id'] ?? 0), $_POST['report_text'] ?? '', $_FILES['report_file'] ?? null, $extra);
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'ส่งรายงานการใช้งานเรียบร้อยแล้ว' : ($result['error'] ?? 'ส่งรายงานไม่สำเร็จ'));
     }
     header('Location: ' . url('student/my-bookings.php') . (($_GET['filter'] ?? '') !== '' ? '?filter=' . urlencode($_GET['filter']) : ''));
@@ -181,7 +186,10 @@ require __DIR__ . '/../includes/header.php';
               <button type="button" class="action-btn-blue" data-report-booking
                 data-id="<?= (int) $bk['id'] ?>"
                 data-meta="<?= e($bk['dateLabel'] . ' · ' . $bk['slotLabel']) ?>"
-                data-report-text="<?= e($bk['report_text'] ?? '') ?>">
+                data-report-text="<?= e($bk['report_text'] ?? '') ?>"
+                data-token-start="<?= $bk['token_start_pct'] !== null ? (int) $bk['token_start_pct'] : '' ?>"
+                data-token-end="<?= $bk['token_end_pct'] !== null ? (int) $bk['token_end_pct'] : '' ?>"
+                data-token-reset="<?= !empty($bk['token_reset_at']) ? date('Y-m-d\TH:i', strtotime($bk['token_reset_at'])) : '' ?>">
                 <i class="bi bi-journal-text me-1"></i><?= $bk['reported'] ? 'แก้ไขรายงาน' : 'รายงาน' ?>
               </button>
             <?php endif; ?>
@@ -230,6 +238,29 @@ require __DIR__ . '/../includes/header.php';
             <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">แนบไฟล์ (ไม่บังคับ)</label>
             <input type="file" name="report_file" accept="image/*,application/pdf" class="form-control" style="font-size:13px">
             <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">รองรับรูปภาพ (JPG/PNG/GIF/WEBP) หรือ PDF ขนาดไม่เกิน 5 MB</div>
+          </div>
+          <div style="border-top:1px solid var(--bs-border-color);padding-top:14px;margin-top:2px">
+            <div style="font-size:11px;font-weight:700;color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px"><i class="bi bi-speedometer2 me-1"></i>ข้อมูล Token (ไม่บังคับ)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+              <div>
+                <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">% Token ก่อนใช้งาน</label>
+                <div style="position:relative">
+                  <input type="number" name="token_start_pct" min="0" max="100" class="form-control" placeholder="0–100" style="font-size:13px;padding-right:32px">
+                  <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--bs-secondary-color);pointer-events:none">%</span>
+                </div>
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">% Token เมื่อสิ้นสุด</label>
+                <div style="position:relative">
+                  <input type="number" name="token_end_pct" min="0" max="100" class="form-control" placeholder="0–100" style="font-size:13px;padding-right:32px">
+                  <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--bs-secondary-color);pointer-events:none">%</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">เวลารีเซ็ต Token ครั้งต่อไป</label>
+              <input type="datetime-local" name="token_reset_at" class="form-control" style="font-size:13px">
+            </div>
           </div>
         </div>
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">

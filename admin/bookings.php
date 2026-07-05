@@ -228,7 +228,14 @@ require __DIR__ . '/../includes/header.php';
               <?php if (!empty($bk['report_file'])): ?>
                 <div style="margin-top:3px"><a href="<?= url('uploads/reports/' . $bk['report_file']) ?>" target="_blank" style="font-size:11px;color:#2563EB;text-decoration:none"><i class="bi bi-paperclip me-1"></i>ไฟล์แนบ</a></div>
               <?php endif; ?>
-              <?php if (empty($bk['purpose']) && empty($bk['report_text']) && empty($bk['report_file'])): ?>
+              <?php if ($bk['token_start_pct'] !== null || $bk['token_end_pct'] !== null || !empty($bk['token_reset_at'])): ?>
+                <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
+                  <?php if ($bk['token_start_pct'] !== null): ?><span style="font-size:10px;background:var(--bs-secondary-bg);border-radius:4px;padding:2px 5px;color:var(--bs-secondary-color);white-space:nowrap"><i class="bi bi-speedometer2 me-1"></i>ก่อน <?= (int)$bk['token_start_pct'] ?>%</span><?php endif; ?>
+                  <?php if ($bk['token_end_pct'] !== null): ?><span style="font-size:10px;background:var(--bs-secondary-bg);border-radius:4px;padding:2px 5px;color:var(--bs-secondary-color);white-space:nowrap"><i class="bi bi-speedometer2 me-1"></i>หลัง <?= (int)$bk['token_end_pct'] ?>%</span><?php endif; ?>
+                  <?php if (!empty($bk['token_reset_at'])): ?><span style="font-size:10px;background:var(--bs-secondary-bg);border-radius:4px;padding:2px 5px;color:var(--bs-secondary-color);white-space:nowrap"><i class="bi bi-arrow-clockwise me-1"></i>รีเซ็ต <?= e((new DateTimeImmutable($bk['token_reset_at']))->format('d/m H:i')) ?></span><?php endif; ?>
+                </div>
+              <?php endif; ?>
+              <?php if (empty($bk['purpose']) && empty($bk['report_text']) && empty($bk['report_file']) && $bk['token_start_pct'] === null): ?>
                 <span style="font-size:12px;color:var(--bs-tertiary-color)">—</span>
               <?php endif; ?>
             </td>
