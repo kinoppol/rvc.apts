@@ -95,8 +95,8 @@ final class Booking
 
                 $mineCount = 0;
                 foreach ($allowed as $ac) {
-                    $d = $cellBooked[(int) $ac['id']] ?? null;
-                    if ($d && $d['uid'] === $userId) {
+                    $entry = $cellBooked[(int) $ac['id']] ?? null;
+                    if ($entry && $entry['uid'] === $userId) {
                         $mineCount++;
                     }
                 }
