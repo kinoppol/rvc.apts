@@ -94,6 +94,13 @@ function nav_cls(string $key, ?string $active): string
     </div>
   </nav>
 
+  <?php if (is_impersonating()): ?>
+  <div style="background:#D97706;color:white;padding:8px 20px;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0">
+    <span><i class="bi bi-person-badge me-2"></i>คุณกำลังดูในฐานะ <strong><?= e($__user['name']) ?></strong> (สิทธิ์นักศึกษา)</span>
+    <a href="<?= url('logout.php') ?>" style="color:white;font-size:12px;text-decoration:none;border:1px solid rgba(255,255,255,.55);padding:3px 12px;border-radius:6px;white-space:nowrap"><i class="bi bi-arrow-return-left me-1"></i>คืนสิทธิ์ Admin</a>
+  </div>
+  <?php endif; ?>
+
   <div style="display:flex;flex:1;overflow:hidden">
     <aside class="sidebar" id="sidebar" style="background:var(--bs-body-bg)">
       <div style="padding:8px 0">
@@ -139,11 +146,5 @@ function nav_cls(string $key, ?string $active): string
       </div>
     </aside>
 
-    <?php if (is_impersonating()): ?>
-    <div style="background:#D97706;color:white;padding:8px 20px;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:56px;z-index:190;flex-shrink:0">
-      <span><i class="bi bi-person-badge me-2"></i>คุณกำลังดูในฐานะ <strong><?= e($__user['name']) ?></strong> (สิทธิ์นักศึกษา)</span>
-      <a href="<?= url('logout.php') ?>" style="color:white;font-size:12px;text-decoration:none;border:1px solid rgba(255,255,255,.55);padding:3px 12px;border-radius:6px;white-space:nowrap"><i class="bi bi-arrow-return-left me-1"></i>คืนสิทธิ์ Admin</a>
-    </div>
-    <?php endif; ?>
     <main style="flex:1;overflow-y:auto;padding:24px;background:var(--bs-secondary-bg)">
       <div class="page-anim">
