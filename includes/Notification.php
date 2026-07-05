@@ -84,6 +84,16 @@ final class Notification
         $items = [];
         $now = new DateTimeImmutable();
 
+        foreach (Booking::earlyAccessForUser($userId) as $ea) {
+            $items[] = [
+                'level' => 'ok',
+                'icon' => 'bi-lightning-charge-fill',
+                'title' => 'ใช้งาน ' . $ea['ai_name'] . ' ได้เลยล่วงหน้า',
+                'detail' => $ea['dateLabel'] . ' · ' . $ea['slotLabel'] . ' · ช่วงก่อนหน้าว่าง',
+                'url' => url('student/dashboard.php'),
+            ];
+        }
+
         foreach (Booking::listForUser($userId, 'upcoming') as $b) {
             $start = new DateTimeImmutable($b['start_datetime']);
             $hours = ($start->getTimestamp() - $now->getTimestamp()) / 3600;

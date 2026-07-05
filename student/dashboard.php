@@ -16,10 +16,32 @@ $utilization = count($allBookings) > 0 ? round($totalCount / count($allBookings)
 $recent = array_slice($allBookings, 0, 5);
 $restricted = Booking::isRestricted($user['id']);
 $pendingReports = Booking::pendingReportsForUser($user['id']);
+$earlyAccess = Booking::earlyAccessForUser($user['id']);
 
 $activeNav = 'student-dashboard';
 require __DIR__ . '/../includes/header.php';
 ?>
+<?php foreach ($earlyAccess as $ea): ?>
+<div style="background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:10px;padding:14px 16px;margin-bottom:16px">
+  <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+    <i class="bi bi-lightning-charge-fill" style="color:#059669;font-size:17px;margin-top:1px;flex-shrink:0"></i>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:14px;font-weight:700;color:#065F46">ใช้งาน <?= e($ea['ai_name']) ?> ได้เลยล่วงหน้า!</div>
+      <div style="font-size:12px;color:#059669;margin-top:2px">ช่วง <?= e($ea['prevSlotLabel']) ?> ไม่มีผู้ใช้งาน · คุณสามารถเริ่มได้ทันทีจนถึงสิ้นสุด<?= e($ea['slotLabel']) ?></div>
+    </div>
+    <span class="badge-ok" style="flex-shrink:0">ช่วงก่อนหน้าว่าง</span>
+  </div>
+  <div style="background:white;border-radius:8px;padding:10px 14px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;font-size:13px">
+    <div><span style="font-size:12px;color:var(--bs-secondary-color)">อีเมลเข้าใช้: </span><strong><?= e($ea['ai_email']) ?></strong></div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:12px;color:var(--bs-secondary-color)">รหัสผ่าน:</span>
+      <code id="eaPw<?= (int) $ea['id'] ?>" style="font-size:13px;letter-spacing:0.12em;background:transparent">••••••••</code>
+      <button type="button" class="btn btn-sm" style="font-size:11px;padding:2px 8px;border:1px solid var(--bs-border-color);border-radius:5px"
+        onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'eaPw<?= (int) $ea['id'] ?>',<?= json_encode($ea['account_password'], JSON_UNESCAPED_UNICODE) ?>)">แสดง</button>
+    </div>
+  </div>
+</div>
+<?php endforeach; ?>
 <?php if ($restricted): ?>
   <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px 16px;margin-bottom:18px;font-size:13px;color:#991B1B;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     <i class="bi bi-slash-circle-fill" style="flex-shrink:0"></i>

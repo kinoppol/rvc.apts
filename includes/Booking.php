@@ -8,11 +8,12 @@ final class Booking
 
     /** Per-pool cell presentation in the booking grid (bg tint / text colour / icon). */
     private const POOL_MAP = [
-        'available' => ['label' => 'ว่าง',       'bg' => '#EFF6FF',    'fg' => '#2563EB', 'icon' => 'bi-plus-circle'],
-        'busy'      => ['label' => 'จองแล้ว',    'bg' => '#F1F5F9',    'fg' => '#64748B', 'icon' => 'bi-person-fill'],
-        'mine'      => ['label' => 'ของฉัน',     'bg' => '#DBEAFE',    'fg' => '#1D4ED8', 'icon' => 'bi-check-circle-fill'],
-        'now'       => ['label' => 'ใช้งานอยู่', 'bg' => '#DCFCE7',    'fg' => '#059669', 'icon' => 'bi-broadcast'],
-        'off'       => ['label' => 'ปิด',        'bg' => 'transparent', 'fg' => '#94A3B8', 'icon' => 'bi-dash-circle'],
+        'available' => ['label' => 'ว่าง',           'bg' => '#EFF6FF',    'fg' => '#2563EB', 'icon' => 'bi-plus-circle'],
+        'busy'      => ['label' => 'จองแล้ว',        'bg' => '#F1F5F9',    'fg' => '#64748B', 'icon' => 'bi-person-fill'],
+        'mine'      => ['label' => 'ของฉัน',         'bg' => '#DBEAFE',    'fg' => '#1D4ED8', 'icon' => 'bi-check-circle-fill'],
+        'now'       => ['label' => 'ใช้งานอยู่',     'bg' => '#DCFCE7',    'fg' => '#059669', 'icon' => 'bi-broadcast'],
+        'early'     => ['label' => 'ใช้ได้เลย',     'bg' => '#DCFCE7',    'fg' => '#059669', 'icon' => 'bi-lightning-charge-fill'],
+        'off'       => ['label' => 'ปิด',            'bg' => 'transparent', 'fg' => '#94A3B8', 'icon' => 'bi-dash-circle'],
     ];
 
     /** Days a student has, after a slot ends, to file the usage report before booking is blocked. */
@@ -108,6 +109,15 @@ final class Booking
                         $status = 'off';
                     } else {
                         $status = 'available';
+                    }
+                    // Early access: user is booked in this slot, the previous slot for the same
+                    // account is empty, and 15+ minutes have elapsed since that slot started.
+                    if ($status === 'mine' && $i > 0) {
+                        $prevStart = $slotStart->modify('-' . (int) $settings['slot_hours'] . ' hours');
+                        if ($now >= $prevStart->modify('+15 minutes') && $now < $slotStart
+                            && empty($booked[$dateStr][$i - 1][$aid])) {
+                            $status = 'early';
+                        }
                     }
                     $bookable = $status === 'available' && !$atLimit;
                     $meta = self::POOL_MAP[$status];
@@ -526,6 +536,48 @@ final class Booking
             return ['ok' => false, 'error' => 'อัปโหลดไฟล์ไม่สำเร็จ'];
         }
         return ['ok' => true, 'file' => $name];
+    }
+
+    /**
+     * Bookings the user may start using RIGHT NOW as early access:
+     * the previous slot on the same AI account has been running 15+ minutes with no bookings.
+     * Returns the booking rows augmented with dateLabel, slotLabel, and AI credentials.
+     */
+    public static function earlyAccessForUser(int $userId): array
+    {
+        $slotHours = (int) SlotSettings::get()['slot_hours'];
+        $stmt = Database::pdo()->prepare("
+            SELECT b.id, b.ai_account_id, b.booking_date, b.slot_index,
+                   b.start_datetime, b.end_datetime, b.purpose,
+                   a.name AS ai_name, a.email AS ai_email, a.account_password
+            FROM bookings b
+            JOIN ai_accounts a ON a.id = b.ai_account_id
+            WHERE b.user_id = ?
+              AND b.status = 'upcoming'
+              AND b.start_datetime > NOW()
+              AND b.slot_index > 0
+              AND DATE_SUB(b.start_datetime, INTERVAL ? HOUR) <= DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+              AND NOT EXISTS (
+                  SELECT 1 FROM bookings prev
+                  WHERE prev.ai_account_id = b.ai_account_id
+                    AND prev.booking_date = b.booking_date
+                    AND prev.slot_index = b.slot_index - 1
+                    AND prev.status = 'upcoming'
+              )
+            ORDER BY b.start_datetime
+        ");
+        $stmt->execute([$userId, $slotHours]);
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$row) {
+            $bDate = new DateTimeImmutable($row['booking_date']);
+            $row['dateLabel'] = self::THAI_WEEKDAYS_SHORT[(int) $bDate->format('N') - 1]
+                . '. ' . self::thaiDate($bDate);
+            $row['prevSlotLabel'] = SlotSettings::slotLabel((int) $row['slot_index'] - 1);
+            $row['slotLabel'] = SlotSettings::slotLabel((int) $row['slot_index'])
+                . ' (' . self::thirtyHour($row['booking_date'], $row['start_datetime'])
+                . '–' . self::thirtyHour($row['booking_date'], $row['end_datetime']) . ')';
+        }
+        return $rows;
     }
 
     /** Admin clears a user's pending reports (lifts the temporary block). @return int rows waived */
