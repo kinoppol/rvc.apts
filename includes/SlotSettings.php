@@ -33,6 +33,22 @@ final class SlotSettings
         return ['ok' => true];
     }
 
+    public static function getTermsFile(): ?string
+    {
+        $row = Database::pdo()->query('SELECT terms_file FROM slot_settings WHERE id = 1')->fetch();
+        return ($row && $row['terms_file'] !== null && $row['terms_file'] !== '') ? $row['terms_file'] : null;
+    }
+
+    public static function updateTermsFile(string $filename): void
+    {
+        Database::pdo()->prepare('UPDATE slot_settings SET terms_file = ? WHERE id = 1')->execute([$filename]);
+    }
+
+    public static function deleteTermsFile(): void
+    {
+        Database::pdo()->prepare('UPDATE slot_settings SET terms_file = NULL WHERE id = 1')->execute();
+    }
+
     /** Thai labels for the first few slots; falls back to a generic label beyond that. */
     public static function slotLabel(int $index): string
     {

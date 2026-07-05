@@ -6,20 +6,25 @@ if (current_user()) {
     exit;
 }
 
-$majors = ['วิทยาการคอมพิวเตอร์', 'เทคโนโลยีสารสนเทศ', 'วิทยาการข้อมูล', 'วิศวกรรมซอฟต์แวร์'];
-$error = null;
-$values = ['name' => '', 'student_id' => '', 'major' => $majors[0], 'phone' => '', 'email' => ''];
+$majors    = ['วิทยาการคอมพิวเตอร์', 'เทคโนโลยีสารสนเทศ', 'วิทยาการข้อมูล', 'วิศวกรรมซอฟต์แวร์'];
+$error     = null;
+$values    = ['name' => '', 'student_id' => '', 'major' => $majors[0], 'phone' => '', 'email' => ''];
+$termsFile = SlotSettings::getTermsFile();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
     $values = array_merge($values, array_intersect_key($_POST, $values));
-    $result = Auth::register($_POST);
-    if ($result['ok']) {
-        flash_set('ok', 'สมัครสำเร็จ! รอการอนุมัติจากผู้ดูแลระบบ');
-        header('Location: ' . url('login.php'));
-        exit;
+    if ($termsFile && empty($_POST['terms_agreed'])) {
+        $error = 'กรุณายอมรับข้อตกลงการใช้งานก่อนสมัครสมาชิก';
+    } else {
+        $result = Auth::register($_POST);
+        if ($result['ok']) {
+            flash_set('ok', 'สมัครสำเร็จ! รอการอนุมัติจากผู้ดูแลระบบ');
+            header('Location: ' . url('login.php'));
+            exit;
+        }
+        $error = $result['error'];
     }
-    $error = $result['error'];
 }
 
 require __DIR__ . '/includes/guest-header.php';
@@ -79,6 +84,18 @@ require __DIR__ . '/includes/guest-header.php';
       <i class="bi bi-info-circle-fill" style="margin-top:1px;flex-shrink:0"></i>
       <span>หลังสมัครสมาชิก บัญชีของคุณจะอยู่ในสถานะ <strong>รอการอนุมัติ</strong> จนกว่าผู้ดูแลระบบจะตรวจสอบและอนุมัติ</span>
     </div>
+    <?php if ($termsFile): ?>
+    <div style="background:var(--bs-secondary-bg);border:1px solid var(--bs-border-color);border-radius:8px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px">
+      <input class="form-check-input" type="checkbox" name="terms_agreed" id="terms_agreed" value="1" required style="margin-top:2px;flex-shrink:0;width:16px;height:16px">
+      <label for="terms_agreed" style="font-size:13px;color:var(--bs-body-color);margin:0;cursor:pointer">
+        ฉันได้อ่านและยอมรับ
+        <a href="<?= url('uploads/terms/' . $termsFile) ?>" target="_blank" style="color:#2563EB;font-weight:600;text-decoration:none">
+          <i class="bi bi-file-earmark-pdf me-1"></i>ข้อตกลงการใช้งาน
+        </a>
+        ของระบบ AI Pro Time-Sharing
+      </label>
+    </div>
+    <?php endif; ?>
     <button type="submit" class="btn btn-primary w-100" style="background:linear-gradient(90deg,#2563EB,#0EA5E9);border:none;font-weight:600;padding:11px;margin-bottom:12px">
       <i class="bi bi-person-check-fill me-2"></i>สมัครสมาชิก
     </button>
