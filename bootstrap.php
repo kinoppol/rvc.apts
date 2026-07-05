@@ -85,6 +85,11 @@ function asset(string $path): string
     return is_file($full) ? $url . '?v=' . filemtime($full) : $url;
 }
 
+function is_impersonating(): bool
+{
+    return !empty($_SESSION['impersonating']) && !empty($_SESSION['admin_id']);
+}
+
 function e(?string $value): string
 {
     return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');

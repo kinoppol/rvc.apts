@@ -61,6 +61,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'waive') {
         $n = Booking::waiveOverdueForUser($id);
         flash_set('ok', 'ปลดการระงับเรียบร้อยแล้ว (ยกเว้นรายงานค้าง ' . $n . ' รายการ)');
+    } elseif ($action === 'impersonate') {
+        $target = Member::find($id);
+        if ($target && $target['role'] === 'student' && $target['status'] === 'approved') {
+            $_SESSION['admin_id'] = $user['id'];
+            $_SESSION['impersonating'] = true;
+            $_SESSION['user_id'] = $id;
+            session_regenerate_id(true);
+            header('Location: ' . url('student/dashboard.php'));
+            exit;
+        }
+        flash_set('err', 'ไม่สามารถสวมสิทธิ์ผู้ใช้นี้ได้');
     }
     header('Location: ' . members_return_url());
     exit;
@@ -190,6 +201,7 @@ require __DIR__ . '/../includes/header.php';
                   <?= member_action_form($m['id'], 'reject', 'action-btn-err', 'bi-x-lg', 'ปฏิเสธ', 'ปฏิเสธและลบคำขอนี้?') ?>
                 <?php elseif ($m['isApproved']): ?>
                   <?php if ($m['restricted']): ?><?= member_action_form($m['id'], 'waive', 'action-btn-warn', 'bi-unlock', 'ปลดระงับ', 'ปลดการระงับการจองของสมาชิกนี้ (ยกเว้นรายงานค้าง)?') ?><?php endif; ?>
+                  <?= member_action_form($m['id'], 'impersonate', 'action-btn-blue', 'bi-person-badge', 'สวมสิทธิ์', 'สวมสิทธิ์เป็น ' . $m['name'] . '?') ?>
                   <?= member_action_form($m['id'], 'suspend', 'action-btn-warn', 'bi-slash-circle', 'ระงับ', 'ระงับสิทธิ์สมาชิกนี้?') ?>
                   <button type="button" class="action-btn-blue" data-reset-pw data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>"><i class="bi bi-key me-1"></i>รีเซตรหัส</button>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
