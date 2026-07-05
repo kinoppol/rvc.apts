@@ -127,6 +127,9 @@ function nav_cls(string $key, ?string $active): string
             <i class="bi bi-people" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการสมาชิก</span>
             <?php if ($__pendingCount > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__pendingCount ?></span><?php endif; ?>
           </a>
+          <a class="<?= nav_cls('booking-management', $activeNav ?? null) ?>" href="<?= url('admin/bookings.php') ?>">
+            <i class="bi bi-calendar-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการการจอง</span>
+          </a>
           <a class="<?= nav_cls('groups', $activeNav ?? null) ?>" href="<?= url('admin/groups.php') ?>">
             <i class="bi bi-diagram-3" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการกลุ่มผู้ใช้</span>
           </a>

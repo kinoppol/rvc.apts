@@ -756,6 +756,108 @@ final class Booking
         return ['ok' => true];
     }
 
+    /**
+     * Paginated, filtered booking list for the admin bookings page.
+     * Status filter maps to SQL conditions for the derived display status.
+     * @return array{rows:array, total:int}
+     */
+    public static function adminList(
+        string $search,
+        string $statusFilter,
+        int $accountId,
+        string $dateFrom,
+        string $dateTo,
+        int $page,
+        int $perPage
+    ): array {
+        $where = [];
+        $params = [];
+
+        if ($search !== '') {
+            $where[] = '(u.name LIKE ? OR u.email LIKE ? OR u.student_id LIKE ?)';
+            $like = '%' . $search . '%';
+            array_push($params, $like, $like, $like);
+        }
+        if ($dateFrom !== '') { $where[] = 'b.booking_date >= ?'; $params[] = $dateFrom; }
+        if ($dateTo   !== '') { $where[] = 'b.booking_date <= ?'; $params[] = $dateTo; }
+        if ($accountId > 0)  { $where[] = 'b.ai_account_id = ?'; $params[] = $accountId; }
+
+        switch ($statusFilter) {
+            case 'upcoming':
+                $where[] = "b.status = 'upcoming' AND b.start_datetime > NOW() AND b.checked_in_at IS NULL";
+                break;
+            case 'checked_in':
+                $where[] = "b.status = 'upcoming' AND b.start_datetime > NOW() AND b.checked_in_at IS NOT NULL";
+                break;
+            case 'now':
+                $where[] = "b.status = 'upcoming' AND b.start_datetime <= NOW() AND b.end_datetime > NOW() AND b.checked_in_at IS NOT NULL AND b.checked_out_at IS NULL";
+                break;
+            case 'checked_out':
+                $where[] = "b.status = 'upcoming' AND b.checked_out_at IS NOT NULL AND b.end_datetime > NOW()";
+                break;
+            case 'completed':
+                $where[] = "b.status = 'upcoming' AND b.end_datetime <= NOW()";
+                break;
+            case 'no_show':
+                $where[] = "b.status = 'upcoming' AND b.end_datetime > NOW() AND b.checked_in_at IS NULL AND NOW() >= DATE_ADD(b.start_datetime, INTERVAL 15 MINUTE)";
+                break;
+            case 'cancelled':
+                $where[] = "b.status = 'cancelled'";
+                break;
+        }
+
+        $wc  = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+        $pdo = Database::pdo();
+
+        $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM bookings b JOIN users u ON u.id = b.user_id JOIN ai_accounts a ON a.id = b.ai_account_id $wc");
+        $cntStmt->execute($params);
+        $total = (int) $cntStmt->fetchColumn();
+
+        $offset = ($page - 1) * $perPage;
+        $rowStmt = $pdo->prepare(
+            "SELECT b.*, u.name AS student_name, u.email AS student_email,
+                    u.student_id AS student_code, a.name AS ai_name
+             FROM bookings b
+             JOIN users u ON u.id = b.user_id
+             JOIN ai_accounts a ON a.id = b.ai_account_id
+             $wc
+             ORDER BY b.booking_date DESC, b.slot_index DESC, b.id DESC
+             LIMIT ? OFFSET ?"
+        );
+        $rowStmt->execute([...$params, $perPage, $offset]);
+
+        return ['rows' => self::attachDisplay($rowStmt->fetchAll()), 'total' => $total];
+    }
+
+    /** Admin-side cancel: allows cancelling upcoming/check_in_ready/checked_in (before slot starts). */
+    public static function adminCancel(int $bookingId): array
+    {
+        $stmt = Database::pdo()->prepare('SELECT * FROM bookings WHERE id = ?');
+        $stmt->execute([$bookingId]);
+        $booking = $stmt->fetch();
+        if (!$booking) return ['ok' => false, 'error' => 'ไม่พบรายการจอง'];
+        $dStatus = self::displayStatus($booking);
+        if (!in_array($dStatus, ['upcoming', 'check_in_ready', 'checked_in'])) {
+            return ['ok' => false, 'error' => 'ยกเลิกได้เฉพาะรายการที่ยังไม่เริ่มใช้งาน'];
+        }
+        Database::pdo()->prepare(
+            "UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = ?"
+        )->execute([$bookingId]);
+        return ['ok' => true];
+    }
+
+    /** Admin waives the report requirement for a single booking. */
+    public static function waiveReportForBooking(int $bookingId): array
+    {
+        $stmt = Database::pdo()->prepare('SELECT id FROM bookings WHERE id = ?');
+        $stmt->execute([$bookingId]);
+        if (!$stmt->fetch()) return ['ok' => false, 'error' => 'ไม่พบรายการจอง'];
+        Database::pdo()->prepare(
+            "UPDATE bookings SET reported_at = NOW(), report_text = COALESCE(report_text, 'ยกเว้นโดยผู้ดูแลระบบ') WHERE id = ?"
+        )->execute([$bookingId]);
+        return ['ok' => true];
+    }
+
     /** Admin clears a user's pending reports (lifts the temporary block). @return int rows waived */
     public static function waiveOverdueForUser(int $userId): int
     {
