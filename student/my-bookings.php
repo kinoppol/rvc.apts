@@ -57,7 +57,7 @@ require __DIR__ . '/../includes/header.php';
       <span style="font-size:12px;color:var(--bs-secondary-color)">รหัสผ่าน:</span>
       <code id="mbPw<?= (int) $ea['id'] ?>" style="font-size:13px;letter-spacing:0.12em;background:transparent">••••••••</code>
       <button type="button" class="btn btn-sm" style="font-size:11px;padding:2px 8px;border:1px solid var(--bs-border-color);border-radius:5px"
-        onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'mbPw<?= (int) $ea['id'] ?>',<?= json_encode($ea['account_password'], JSON_UNESCAPED_UNICODE) ?>)">แสดง</button>
+        onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'mbPw<?= (int) $ea['id'] ?>',<?= e(json_encode($ea['account_password'], JSON_UNESCAPED_UNICODE)) ?>)">แสดง</button>
     </div>
   </div>
   <?php else: ?>
@@ -117,7 +117,7 @@ require __DIR__ . '/../includes/header.php';
               <span style="display:flex;align-items:center;gap:5px;color:var(--bs-secondary-color)">รหัสผ่าน:
                 <code id="rowPw<?= (int) $bk['id'] ?>" style="letter-spacing:0.12em;background:transparent">••••••••</code>
                 <button type="button" class="btn btn-sm" style="font-size:10px;padding:1px 7px;border:1px solid var(--bs-border-color);border-radius:4px"
-                  onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'rowPw<?= (int) $bk['id'] ?>',<?= json_encode($bk['account_password'], JSON_UNESCAPED_UNICODE) ?>)">แสดง</button>
+                  onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'rowPw<?= (int) $bk['id'] ?>',<?= e(json_encode($bk['account_password'], JSON_UNESCAPED_UNICODE)) ?>)">แสดง</button>
               </span>
             </div>
             <?php elseif ($bk['displayStatus'] === 'checked_in'): ?>

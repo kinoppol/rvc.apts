@@ -38,7 +38,7 @@ require __DIR__ . '/../includes/header.php';
       <span style="font-size:12px;color:var(--bs-secondary-color)">รหัสผ่าน:</span>
       <code id="eaPw<?= (int) $ea['id'] ?>" style="font-size:13px;letter-spacing:0.12em;background:transparent">••••••••</code>
       <button type="button" class="btn btn-sm" style="font-size:11px;padding:2px 8px;border:1px solid var(--bs-border-color);border-radius:5px"
-        onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'eaPw<?= (int) $ea['id'] ?>',<?= json_encode($ea['account_password'], JSON_UNESCAPED_UNICODE) ?>)">แสดง</button>
+        onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'eaPw<?= (int) $ea['id'] ?>',<?= e(json_encode($ea['account_password'], JSON_UNESCAPED_UNICODE)) ?>)">แสดง</button>
     </div>
   </div>
   <?php else: ?>
@@ -145,7 +145,7 @@ require __DIR__ . '/../includes/header.php';
             <span style="display:flex;align-items:center;gap:6px;color:var(--bs-secondary-color)">รหัสผ่าน:
               <code id="dashPw<?= (int) $next['id'] ?>" style="letter-spacing:0.12em;background:transparent">••••••••</code>
               <button type="button" class="btn btn-sm" style="font-size:11px;padding:2px 8px;border:1px solid var(--bs-border-color);border-radius:5px"
-                onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'dashPw<?= (int) $next['id'] ?>',<?= json_encode($next['account_password'], JSON_UNESCAPED_UNICODE) ?>)">แสดง</button>
+                onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'dashPw<?= (int) $next['id'] ?>',<?= e(json_encode($next['account_password'], JSON_UNESCAPED_UNICODE)) ?>)">แสดง</button>
             </span>
           </div>
           <?php elseif ($next['displayStatus'] === 'checked_in'): ?>
