@@ -320,6 +320,51 @@
     });
   }
 
+  // ── Generic confirm modal (replaces native confirm() on admin/members.php) ──
+  var confirmActionModal = document.getElementById("confirmActionModal");
+  var confirmActionBtn = document.getElementById("confirmActionBtn");
+  var pendingConfirmForm = null;
+  if (confirmActionModal && confirmActionBtn) {
+    document.addEventListener("submit", function (e) {
+      var form = e.target;
+      if (form.hasAttribute("data-confirm-modal") && !form._confirmOk) {
+        e.preventDefault();
+        pendingConfirmForm = form;
+
+        var icon = form.dataset.confirmIcon || "bi-question-circle";
+        var color = form.dataset.confirmColor || "#2563EB";
+        var title = form.dataset.confirmTitle || "ยืนยัน";
+        var msg = form.dataset.confirmMsg || "";
+        var btn = form.dataset.confirmBtn || "ยืนยัน";
+        var btnCls = form.dataset.confirmBtnCls || "btn-primary";
+
+        var iconEl = document.getElementById("confirmActionIcon");
+        if (iconEl) {
+          iconEl.style.background = color + "1a";
+          iconEl.innerHTML = '<i class="bi ' + icon + '" style="color:' + color + ';font-size:26px"></i>';
+        }
+        var titleEl = document.getElementById("confirmActionTitle");
+        if (titleEl) titleEl.textContent = title;
+        var msgEl = document.getElementById("confirmActionMsg");
+        if (msgEl) msgEl.textContent = msg;
+
+        confirmActionBtn.className = "btn " + btnCls;
+        confirmActionBtn.textContent = btn;
+        confirmActionBtn.style.cssText = "font-size:13px;min-width:90px;border-radius:8px;font-weight:600";
+
+        new bootstrap.Modal(confirmActionModal).show();
+      }
+    });
+    confirmActionBtn.addEventListener("click", function () {
+      bootstrap.Modal.getInstance(confirmActionModal).hide();
+      if (pendingConfirmForm) {
+        pendingConfirmForm._confirmOk = true;
+        pendingConfirmForm.requestSubmit();
+        pendingConfirmForm = null;
+      }
+    });
+  }
+
   // ── Clipboard copy helper (used by credential copy buttons) ──
   window.copyText = function (btn, text) {
     var orig = btn.innerHTML;

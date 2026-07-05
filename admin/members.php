@@ -12,12 +12,25 @@ function members_return_url(): string
     return url('admin/members.php') . ($q ? '?' . http_build_query($q) : '');
 }
 
-/** Renders an inline POST form for a single member row action. */
-function member_action_form(int $id, string $action, string $btnCls, string $icon, string $label, ?string $confirm = null): string
+/**
+ * Renders an inline POST form for a single member row action.
+ * Pass $modal to show a custom Bootstrap confirm modal instead of the native confirm().
+ * $modal keys: title, msg, icon (Bootstrap icon class), color (hex), btn (button label), btnCls (Bootstrap btn class).
+ */
+function member_action_form(int $id, string $action, string $btnCls, string $icon, string $label, ?array $modal = null): string
 {
     global $search, $status, $page;
-    $onsubmit = $confirm ? ' onsubmit="return confirm(' . htmlspecialchars(json_encode($confirm, JSON_UNESCAPED_UNICODE), ENT_QUOTES) . ')"' : '';
-    return '<form method="post" style="margin:0"' . $onsubmit . '>'
+    $confirmAttrs = '';
+    if ($modal) {
+        $confirmAttrs = ' data-confirm-modal'
+            . ' data-confirm-title="' . e($modal['title'] ?? '') . '"'
+            . ' data-confirm-msg="' . e($modal['msg'] ?? '') . '"'
+            . ' data-confirm-icon="' . e($modal['icon'] ?? 'bi-question-circle') . '"'
+            . ' data-confirm-color="' . e($modal['color'] ?? '#2563EB') . '"'
+            . ' data-confirm-btn="' . e($modal['btn'] ?? 'ยืนยัน') . '"'
+            . ' data-confirm-btn-cls="' . e($modal['btnCls'] ?? 'btn-primary') . '"';
+    }
+    return '<form method="post" style="margin:0"' . $confirmAttrs . '>'
         . Csrf::field()
         . '<input type="hidden" name="action" value="' . e($action) . '">'
         . '<input type="hidden" name="id" value="' . $id . '">'
@@ -198,18 +211,20 @@ require __DIR__ . '/../includes/header.php';
               <div style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap">
                 <?php if ($m['isPending']): ?>
                   <?= member_action_form($m['id'], 'approve', 'action-btn-ok', 'bi-check-lg', 'อนุมัติ') ?>
-                  <?= member_action_form($m['id'], 'reject', 'action-btn-err', 'bi-x-lg', 'ปฏิเสธ', 'ปฏิเสธและลบคำขอนี้?') ?>
+                  <?= member_action_form($m['id'], 'reject', 'action-btn-err', 'bi-x-lg', 'ปฏิเสธ', ['title' => 'ปฏิเสธคำขอ', 'msg' => 'ปฏิเสธและลบคำขอสมัครนี้ถาวร ไม่สามารถเรียกคืนได้', 'icon' => 'bi-x-circle', 'color' => '#DC2626', 'btn' => 'ปฏิเสธและลบ', 'btnCls' => 'btn-danger']) ?>
                 <?php elseif ($m['isApproved']): ?>
-                  <?php if ($m['restricted']): ?><?= member_action_form($m['id'], 'waive', 'action-btn-warn', 'bi-unlock', 'ปลดระงับ', 'ปลดการระงับการจองของสมาชิกนี้ (ยกเว้นรายงานค้าง)?') ?><?php endif; ?>
-                  <?= member_action_form($m['id'], 'impersonate', 'action-btn-blue', 'bi-person-badge', 'สวมสิทธิ์', 'สวมสิทธิ์เป็น ' . $m['name'] . '?') ?>
-                  <?= member_action_form($m['id'], 'suspend', 'action-btn-warn', 'bi-slash-circle', 'ระงับ', 'ระงับสิทธิ์สมาชิกนี้?') ?>
+                  <?php if ($m['restricted']): ?>
+                    <?= member_action_form($m['id'], 'waive', 'action-btn-warn', 'bi-unlock', 'ปลดระงับ', ['title' => 'ปลดการระงับ', 'msg' => 'ปลดการระงับการจองของ ' . $m['name'] . ' (ยกเว้นรายงานค้างทั้งหมด)', 'icon' => 'bi-unlock', 'color' => '#D97706', 'btn' => 'ปลดระงับ', 'btnCls' => 'btn-warning']) ?>
+                  <?php endif; ?>
+                  <?= member_action_form($m['id'], 'impersonate', 'action-btn-blue', 'bi-person-badge', 'สวมสิทธิ์', ['title' => 'สวมสิทธิ์', 'msg' => 'ดูระบบในมุมมองของ ' . $m['name'] . ' (นักศึกษา) — กด "คืนสิทธิ์ Admin" บนแถบแจ้งเตือนเพื่อออก', 'icon' => 'bi-person-badge', 'color' => '#2563EB', 'btn' => 'สวมสิทธิ์', 'btnCls' => 'btn-primary']) ?>
+                  <?= member_action_form($m['id'], 'suspend', 'action-btn-warn', 'bi-slash-circle', 'ระงับ', ['title' => 'ระงับสิทธิ์', 'msg' => 'ระงับสิทธิ์ของ ' . $m['name'] . ' — ผู้ใช้จะไม่สามารถเข้าสู่ระบบและจองได้จนกว่าจะเปิดใช้งาน', 'icon' => 'bi-slash-circle', 'color' => '#D97706', 'btn' => 'ระงับ', 'btnCls' => 'btn-warning']) ?>
                   <button type="button" class="action-btn-blue" data-reset-pw data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>"><i class="bi bi-key me-1"></i>รีเซตรหัส</button>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
                 <?php elseif ($m['isSuspended']): ?>
                   <?= member_action_form($m['id'], 'activate', 'action-btn-ok', 'bi-check-circle', 'เปิดใช้') ?>
                   <button type="button" class="action-btn-blue" data-reset-pw data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>"><i class="bi bi-key me-1"></i>รีเซตรหัส</button>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
-                  <?= member_action_form($m['id'], 'delete', 'action-btn-err', 'bi-trash', 'ลบ', 'ลบสมาชิกนี้อย่างถาวร?') ?>
+                  <?= member_action_form($m['id'], 'delete', 'action-btn-err', 'bi-trash', 'ลบ', ['title' => 'ลบสมาชิก', 'msg' => 'ลบ ' . $m['name'] . ' ออกจากระบบอย่างถาวร พร้อมประวัติการจองทั้งหมด ไม่สามารถเรียกคืนได้', 'icon' => 'bi-trash', 'color' => '#DC2626', 'btn' => 'ลบถาวร', 'btnCls' => 'btn-danger']) ?>
                 <?php endif; ?>
               </div>
             </td>
@@ -293,6 +308,23 @@ require __DIR__ . '/../includes/header.php';
           <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none">ตั้งรหัสผ่านใหม่</button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- Generic confirm modal — JS populates from data-confirm-* on the form -->
+<div class="modal fade" id="confirmActionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px">
+    <div class="modal-content" style="border:none;border-radius:16px;overflow:hidden">
+      <div class="modal-body" style="padding:32px 28px 20px;text-align:center">
+        <div id="confirmActionIcon" style="width:60px;height:60px;border-radius:18px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:26px"></div>
+        <h6 id="confirmActionTitle" style="font-weight:700;font-size:17px;margin:0 0 10px;color:var(--bs-body-color)"></h6>
+        <p id="confirmActionMsg" style="color:var(--bs-secondary-color);font-size:13px;margin:0;line-height:1.6"></p>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--bs-border-color);padding:16px 20px;justify-content:center;gap:10px">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="font-size:13px;min-width:90px;border-radius:8px">ยกเลิก</button>
+        <button type="button" id="confirmActionBtn" class="btn" style="font-size:13px;min-width:90px;border-radius:8px;font-weight:600"></button>
+      </div>
     </div>
   </div>
 </div>
