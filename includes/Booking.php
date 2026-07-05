@@ -412,12 +412,13 @@ final class Booking
                 . '–' . self::thirtyHour($row['booking_date'], $row['end_datetime']) . ')';
             $row['canCancel'] = in_array($status, ['upcoming', 'check_in_ready']) && !$row['hasCheckedIn'];
 
-            // Post-use report state: only applies to completed slots the student actually used (checked in).
-            // No-show bookings (checked_in_at IS NULL, slot ended) do not require a report.
+            // Post-use report state: applies to completed slots AND early checkouts the student actually
+            // used (checked in). No-show bookings (checked_in_at IS NULL) do not require a report.
             $reported = !empty($row['reported_at']);
-            $deadline = $end->modify('+' . self::REPORT_DEADLINE_DAYS . ' days');
+            $effectiveEnd = !empty($row['checked_out_at']) ? new DateTimeImmutable($row['checked_out_at']) : $end;
+            $deadline = $effectiveEnd->modify('+' . self::REPORT_DEADLINE_DAYS . ' days');
             $row['reported'] = $reported;
-            $row['needsReport'] = $status === 'completed' && !$reported && $row['hasCheckedIn'];
+            $row['needsReport'] = in_array($status, ['completed', 'checked_out']) && !$reported && $row['hasCheckedIn'];
             $row['reportOverdue'] = $row['needsReport'] && $now > $deadline;
             $row['reportDeadlineLabel'] = self::thaiDate($deadline);
             $daysLeft = (int) (new DateTimeImmutable($now->format('Y-m-d')))->diff(new DateTimeImmutable($deadline->format('Y-m-d')))->format('%r%a');
@@ -540,7 +541,7 @@ final class Booking
             "SELECT COUNT(*) FROM bookings
              WHERE user_id = ? AND status = 'upcoming' AND reported_at IS NULL
                AND checked_in_at IS NOT NULL
-               AND end_datetime < DATE_SUB(NOW(), INTERVAL ? DAY)"
+               AND COALESCE(checked_out_at, end_datetime) < DATE_SUB(NOW(), INTERVAL ? DAY)"
         );
         $stmt->execute([$userId, self::REPORT_DEADLINE_DAYS]);
         return (int) $stmt->fetchColumn();
@@ -568,7 +569,8 @@ final class Booking
         if ($b['status'] === 'cancelled') {
             return ['ok' => false, 'error' => 'รายการนี้ถูกยกเลิกแล้ว ไม่ต้องรายงาน'];
         }
-        if (new DateTimeImmutable() < new DateTimeImmutable($b['end_datetime'])) {
+        $doneEarly = !empty($b['checked_out_at']);
+        if (!$doneEarly && new DateTimeImmutable() < new DateTimeImmutable($b['end_datetime'])) {
             return ['ok' => false, 'error' => 'ยังใช้งานไม่เสร็จ ยังไม่ต้องรายงาน'];
         }
         if (!empty($b['reported_at'])) {
