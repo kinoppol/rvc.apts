@@ -3,14 +3,32 @@ require_once __DIR__ . '/../bootstrap.php';
 $user = require_role('admin');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // When a file exceeds post_max_size, PHP clears $_POST entirely — CSRF check would
+    // always fail with a cryptic message. Detect and redirect with a readable error first.
+    if (empty($_POST)) {
+        flash_set('err', 'ไฟล์มีขนาดใหญ่เกิน post_max_size (' . ini_get('post_max_size') . ') กรุณาอัปโหลดไฟล์ขนาดเล็กลง หรือแก้ไขค่า post_max_size ใน php.ini');
+        header('Location: ' . url('admin/slots.php'));
+        exit;
+    }
+
     Csrf::check();
 
     $action = $_POST['action'] ?? '';
 
     if ($action === 'terms_upload') {
+        $uploadErrMsg = [
+            UPLOAD_ERR_INI_SIZE   => 'ไฟล์มีขนาดเกิน upload_max_filesize (' . ini_get('upload_max_filesize') . ') กรุณาแก้ไขค่าใน php.ini หรืออัปโหลดไฟล์ขนาดเล็กลง',
+            UPLOAD_ERR_FORM_SIZE  => 'ไฟล์มีขนาดเกินค่าที่กำหนดในฟอร์ม',
+            UPLOAD_ERR_PARTIAL    => 'ไฟล์ถูกอัปโหลดเพียงบางส่วน กรุณาลองใหม่',
+            UPLOAD_ERR_NO_FILE    => 'กรุณาเลือกไฟล์ก่อนอัปโหลด',
+            UPLOAD_ERR_NO_TMP_DIR => 'ไม่พบโฟลเดอร์ชั่วคราวของเซิร์ฟเวอร์ กรุณาติดต่อผู้ดูแลระบบ',
+            UPLOAD_ERR_CANT_WRITE => 'บันทึกไฟล์ชั่วคราวไม่สำเร็จ กรุณาติดต่อผู้ดูแลระบบ',
+            UPLOAD_ERR_EXTENSION  => 'ส่วนขยาย PHP บล็อกการอัปโหลด',
+        ];
         $f = $_FILES['terms_pdf'] ?? null;
         if (!$f || $f['error'] !== UPLOAD_ERR_OK) {
-            flash_set('err', 'อัปโหลดไฟล์ไม่สำเร็จ กรุณาลองใหม่');
+            $code = $f['error'] ?? -1;
+            flash_set('err', $uploadErrMsg[$code] ?? 'อัปโหลดไฟล์ไม่สำเร็จ (PHP error ' . $code . ')');
         } elseif ($f['size'] > 10 * 1024 * 1024) {
             flash_set('err', 'ไฟล์ขนาดเกิน 10 MB');
         } else {
@@ -111,7 +129,7 @@ require __DIR__ . '/../includes/header.php';
       <div style="flex:1;min-width:220px">
         <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px"><?= $termsFile ? 'อัปโหลดไฟล์ใหม่ (แทนที่ไฟล์เดิม)' : 'เลือกไฟล์ PDF ข้อตกลงการใช้งาน' ?></label>
         <input type="file" name="terms_pdf" accept=".pdf,application/pdf" required class="form-control" style="font-size:13px">
-        <div style="font-size:11px;color:var(--bs-secondary-color);margin-top:4px">PDF เท่านั้น · ขนาดสูงสุด 10 MB</div>
+        <div style="font-size:11px;color:var(--bs-secondary-color);margin-top:4px">PDF เท่านั้น · ขนาดสูงสุด <?= ini_get('upload_max_filesize') ?> (ตามค่า PHP upload_max_filesize)</div>
       </div>
       <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px;white-space:nowrap"><i class="bi bi-upload me-1"></i><?= $termsFile ? 'อัปโหลดแทนที่' : 'อัปโหลดไฟล์' ?></button>
     </div>
