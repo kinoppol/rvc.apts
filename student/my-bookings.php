@@ -69,7 +69,7 @@ require __DIR__ . '/../includes/header.php';
   </div>
   <?php else: ?>
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-    <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0">
+    <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0" onsubmit="return confirm('ยืนยันการเช็คอิน?\nระบบจะบันทึกเวลาเริ่มใช้งานทันทีที่กดยืนยัน')">
       <?= Csrf::field() ?>
       <input type="hidden" name="action" value="checkin">
       <input type="hidden" name="id" value="<?= (int) $ea['id'] ?>">
@@ -143,14 +143,14 @@ require __DIR__ . '/../includes/header.php';
             <span class="<?= $bk['badgeCls'] ?>"><?= e($bk['statusLabel']) ?></span>
 
             <?php if ($showEarlyCheckIn): ?>
-            <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0">
+            <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0" onsubmit="return confirm('ยืนยันการเช็คอิน?\nระบบจะบันทึกเวลาเริ่มใช้งานทันทีที่กดยืนยัน')">
               <?= Csrf::field() ?>
               <input type="hidden" name="action" value="checkin">
               <input type="hidden" name="id" value="<?= (int) $bk['id'] ?>">
               <button type="submit" class="action-btn-blue"><i class="bi bi-lightning-charge-fill me-1"></i>เช็คอิน (ล่วงหน้า)</button>
             </form>
             <?php elseif ($bk['canCheckIn']): ?>
-            <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0">
+            <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0" onsubmit="return confirm('ยืนยันการเช็คอิน?\nระบบจะบันทึกเวลาเริ่มใช้งานทันทีที่กดยืนยัน')">
               <?= Csrf::field() ?>
               <input type="hidden" name="action" value="checkin">
               <input type="hidden" name="id" value="<?= (int) $bk['id'] ?>">
