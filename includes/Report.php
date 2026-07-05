@@ -35,6 +35,48 @@ final class Report
         return $rows;
     }
 
+    /**
+     * Per-AI-account cost summary for the current calendar month.
+     * Only returns accounts that have at least one cost field set.
+     */
+    public static function costRows(): array
+    {
+        $rows = Database::pdo()->query(
+            "SELECT a.id, a.name, COALESCE(p.name, a.provider) AS provider_name,
+                    a.monthly_cost, a.cost_per_slot,
+                    COUNT(b.id) AS bookings_this_month
+             FROM ai_accounts a
+             LEFT JOIN ai_providers p ON p.id = a.provider_id
+             LEFT JOIN bookings b ON b.ai_account_id = a.id
+                                  AND b.status = 'upcoming'
+                                  AND b.end_datetime < NOW()
+                                  AND YEAR(b.booking_date) = YEAR(CURDATE())
+                                  AND MONTH(b.booking_date) = MONTH(CURDATE())
+             WHERE a.monthly_cost IS NOT NULL OR a.cost_per_slot IS NOT NULL
+             GROUP BY a.id, a.name, a.provider, p.name, a.monthly_cost, a.cost_per_slot
+             ORDER BY a.id"
+        )->fetchAll();
+
+        return array_map(function ($r) {
+            $bookings = (int) $r['bookings_this_month'];
+            $monthlyCost = $r['monthly_cost'] !== null ? (float) $r['monthly_cost'] : null;
+            $costPerSlot = $r['cost_per_slot'] !== null ? (float) $r['cost_per_slot'] : null;
+            $usageCost = $costPerSlot !== null ? round($costPerSlot * $bookings, 2) : null;
+            $ratio = ($usageCost !== null && $monthlyCost !== null && $monthlyCost > 0)
+                ? min(100, (int) round($usageCost / $monthlyCost * 100))
+                : null;
+            return [
+                'name'           => $r['name'],
+                'provider'       => $r['provider_name'],
+                'monthly_cost'   => $monthlyCost,
+                'cost_per_slot'  => $costPerSlot,
+                'bookings'       => $bookings,
+                'usage_cost'     => $usageCost,
+                'cost_ratio'     => $ratio,
+            ];
+        }, $rows);
+    }
+
     /** Streams the report as a CSV download and terminates the request. */
     public static function streamCsv(): never
     {

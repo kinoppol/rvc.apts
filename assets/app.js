@@ -202,6 +202,8 @@
       set("status", btn.dataset.status);
       set("expires_at", btn.dataset.expires);
       set("password_reminder", btn.dataset.reminder);
+      set("monthly_cost", btn.dataset.monthlyCost);
+      set("cost_per_slot", btn.dataset.costPerSlot);
       new bootstrap.Modal(modalEl).show();
     });
   });

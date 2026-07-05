@@ -7,6 +7,7 @@ if (($_GET['export'] ?? '') === 'csv') {
 }
 
 $rows = Report::rows();
+$costRows = Report::costRows();
 
 $activeNav = 'reports';
 require __DIR__ . '/../includes/header.php';
@@ -53,4 +54,79 @@ require __DIR__ . '/../includes/header.php';
     </div>
   </div>
 </div>
+<?php if ($costRows): ?>
+<div style="margin-top:28px">
+  <h6 style="font-weight:700;margin-bottom:14px"><i class="bi bi-cash-coin me-2" style="color:#2563EB"></i>ต้นทุนและประสิทธิภาพ — <?= date('F Y') ?></h6>
+  <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+    <div class="card-body" style="padding:20px">
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="border-bottom:2px solid var(--bs-border-color);background:var(--bs-secondary-bg)">
+              <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">บัญชี AI</th>
+              <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">ประเภท</th>
+              <th style="padding:10px 14px;text-align:right;font-weight:600;color:var(--bs-secondary-color)">งบ/เดือน</th>
+              <th style="padding:10px 14px;text-align:right;font-weight:600;color:var(--bs-secondary-color)">ราคา/slot</th>
+              <th style="padding:10px 14px;text-align:right;font-weight:600;color:var(--bs-secondary-color)">การใช้งาน (เดือนนี้)</th>
+              <th style="padding:10px 14px;text-align:right;font-weight:600;color:var(--bs-secondary-color)">ต้นทุนจริง</th>
+              <th style="padding:10px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">สัดส่วนงบ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($costRows as $cr): ?>
+              <?php
+                $ratioWarn = $cr['cost_ratio'] !== null && $cr['cost_ratio'] >= 80;
+                $ratioColor = $cr['cost_ratio'] === null ? '#94A3B8' : ($cr['cost_ratio'] >= 80 ? '#DC2626' : '#2563EB');
+              ?>
+              <tr style="border-bottom:1px solid var(--bs-border-color)">
+                <td style="padding:10px 14px;font-weight:600"><?= e($cr['name']) ?></td>
+                <td style="padding:10px 14px;color:var(--bs-secondary-color)"><?= e($cr['provider']) ?></td>
+                <td style="padding:10px 14px;text-align:right">
+                  <?= $cr['monthly_cost'] !== null ? '฿' . number_format($cr['monthly_cost'], 2) : '<span style="color:var(--bs-tertiary-color)">—</span>' ?>
+                </td>
+                <td style="padding:10px 14px;text-align:right">
+                  <?= $cr['cost_per_slot'] !== null ? '฿' . number_format($cr['cost_per_slot'], 2) : '<span style="color:var(--bs-tertiary-color)">—</span>' ?>
+                </td>
+                <td style="padding:10px 14px;text-align:right"><?= (int) $cr['bookings'] ?> slot</td>
+                <td style="padding:10px 14px;text-align:right;font-weight:600;<?= $ratioWarn ? 'color:#DC2626' : '' ?>">
+                  <?= $cr['usage_cost'] !== null ? '฿' . number_format($cr['usage_cost'], 2) : '<span style="color:var(--bs-tertiary-color)">—</span>' ?>
+                </td>
+                <td style="padding:10px 14px;min-width:130px">
+                  <?php if ($cr['cost_ratio'] !== null): ?>
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <div style="flex:1;background:var(--bs-border-color);border-radius:3px;height:5px;overflow:hidden">
+                        <div style="background:<?= $ratioColor ?>;width:<?= $cr['cost_ratio'] ?>%;height:100%;border-radius:3px"></div>
+                      </div>
+                      <span style="font-size:12px;font-weight:600;color:<?= $ratioColor ?>;white-space:nowrap"><?= $cr['cost_ratio'] ?>%</span>
+                    </div>
+                  <?php else: ?>
+                    <span style="color:var(--bs-tertiary-color)">—</span>
+                  <?php endif; ?>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+          <?php
+            $totalBudget = array_sum(array_filter(array_column($costRows, 'monthly_cost'), fn($v) => $v !== null));
+            $totalUsage  = array_sum(array_filter(array_column($costRows, 'usage_cost'),  fn($v) => $v !== null));
+          ?>
+          <?php if (count($costRows) > 1): ?>
+          <tfoot>
+            <tr style="background:var(--bs-secondary-bg);font-weight:700;border-top:2px solid var(--bs-border-color)">
+              <td colspan="2" style="padding:10px 14px">รวม</td>
+              <td style="padding:10px 14px;text-align:right"><?= $totalBudget > 0 ? '฿' . number_format($totalBudget, 2) : '—' ?></td>
+              <td style="padding:10px 14px"></td>
+              <td style="padding:10px 14px;text-align:right"><?= array_sum(array_column($costRows, 'bookings')) ?> slot</td>
+              <td style="padding:10px 14px;text-align:right"><?= $totalUsage > 0 ? '฿' . number_format($totalUsage, 2) : '—' ?></td>
+              <td style="padding:10px 14px"></td>
+            </tr>
+          </tfoot>
+          <?php endif; ?>
+        </table>
+      </div>
+      <p style="font-size:11px;color:var(--bs-tertiary-color);margin:12px 0 0"><i class="bi bi-info-circle me-1"></i>นับเฉพาะ slot ที่เสร็จสิ้นในเดือนนี้ — บัญชีที่ยังไม่ได้ตั้งค่าต้นทุนจะไม่แสดงในตารางนี้</p>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

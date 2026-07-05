@@ -100,7 +100,7 @@ require __DIR__ . '/../includes/header.php';
           <div style="background:#2563EB;width:<?= e($ac['usagePct']) ?>;height:100%;border-radius:4px"></div>
         </div>
 
-        <!-- Expiry + password reminder -->
+        <!-- Expiry + password reminder + cost -->
         <div style="display:flex;flex-direction:column;gap:7px;font-size:12px;margin-bottom:14px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
             <span style="color:var(--bs-secondary-color)"><i class="bi bi-calendar-x me-1"></i>หมดอายุ</span>
@@ -114,6 +114,19 @@ require __DIR__ . '/../includes/header.php';
               <?php if ($ac['pwdReminderOn']): ?><?= e($ac['reminderLabel']) ?> · <?= e($ac['pwdText']) ?><?php else: ?>ไม่แจ้งเตือน<?php endif; ?>
             </span>
           </div>
+          <?php if ($ac['monthly_cost'] !== null || $ac['cost_per_slot'] !== null): ?>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span style="color:var(--bs-secondary-color)"><i class="bi bi-cash-coin me-1"></i>ต้นทุน</span>
+            <span style="text-align:right;color:var(--bs-body-color)">
+              <?php
+                $parts = [];
+                if ($ac['monthly_cost'] !== null) $parts[] = '฿' . number_format((float)$ac['monthly_cost'], 2) . '/เดือน';
+                if ($ac['cost_per_slot'] !== null) $parts[] = '฿' . number_format((float)$ac['cost_per_slot'], 2) . '/slot';
+                echo implode(' · ', $parts);
+              ?>
+            </span>
+          </div>
+          <?php endif; ?>
         </div>
 
         <?php if (!empty($ac['pwdWarn'])): ?>
@@ -132,7 +145,9 @@ require __DIR__ . '/../includes/header.php';
                   data-password="<?= e($ac['account_password'] ?? '') ?>"
                   data-status="<?= e($ac['status']) ?>"
                   data-expires="<?= e($expiresInput) ?>"
-                  data-reminder="<?= e($ac['password_reminder']) ?>"><i class="bi bi-pencil me-1"></i>แก้ไข</button>
+                  data-reminder="<?= e($ac['password_reminder']) ?>"
+                  data-monthly-cost="<?= $ac['monthly_cost'] !== null ? (float)$ac['monthly_cost'] : '' ?>"
+                  data-cost-per-slot="<?= $ac['cost_per_slot'] !== null ? (float)$ac['cost_per_slot'] : '' ?>"><i class="bi bi-pencil me-1"></i>แก้ไข</button>
           <form method="post" style="margin:0" onsubmit="return confirm('ลบบัญชี AI นี้?')">
             <?= Csrf::field() ?>
             <input type="hidden" name="action" value="delete">
@@ -178,6 +193,13 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
         <select name="password_reminder" class="form-select" style="font-size:13px">
           <?php foreach ($reminderOpts as $val => $lbl): ?><option value="<?= e($val) ?>"><?= e($lbl) ?></option><?php endforeach; ?>
         </select>
+      </div>
+      <div style="grid-column:span 2;border-top:1px solid var(--bs-border-color);padding-top:12px;margin-top:2px">
+        <div style="font-size:11px;font-weight:700;color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px"><i class="bi bi-cash-coin me-1"></i>ต้นทุน (ไม่บังคับ)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ค่าใช้จ่าย/เดือน (บาท)</label><input type="number" name="monthly_cost" min="0" step="0.01" class="form-control" placeholder="เช่น 800" style="font-size:13px"></div>
+          <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ค่าต่อ 1 ช่วงเวลา (บาท)</label><input type="number" name="cost_per_slot" min="0" step="0.01" class="form-control" placeholder="เช่น 50" style="font-size:13px"></div>
+        </div>
       </div>
     </div>
     <?php

@@ -126,8 +126,8 @@ final class AiAccount
         $password = (string) ($d['account_password'] ?? '');
         $stmt = Database::pdo()->prepare(
             'INSERT INTO ai_accounts
-                (name, provider_id, provider, email, account_password, status, expires_at, password_updated_at, password_reminder)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                (name, provider_id, provider, email, account_password, status, expires_at, password_updated_at, password_reminder, monthly_cost, cost_per_slot)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $fields['name'], $fields['provider_id'], $fields['provider'], $fields['email'],
@@ -135,6 +135,7 @@ final class AiAccount
             $fields['status'], $fields['expires_at'],
             $password !== '' ? date('Y-m-d H:i:s') : null,
             $fields['password_reminder'],
+            $fields['monthly_cost'], $fields['cost_per_slot'],
         ]);
         return ['ok' => true];
     }
@@ -164,12 +165,14 @@ final class AiAccount
         $stmt = Database::pdo()->prepare(
             'UPDATE ai_accounts SET
                 name = ?, provider_id = ?, provider = ?, email = ?, account_password = ?,
-                status = ?, expires_at = ?, password_updated_at = ?, password_reminder = ?
+                status = ?, expires_at = ?, password_updated_at = ?, password_reminder = ?,
+                monthly_cost = ?, cost_per_slot = ?
              WHERE id = ?'
         );
         $stmt->execute([
             $fields['name'], $fields['provider_id'], $fields['provider'], $fields['email'], $password,
-            $fields['status'], $fields['expires_at'], $passwordUpdatedAt, $fields['password_reminder'], $id,
+            $fields['status'], $fields['expires_at'], $passwordUpdatedAt, $fields['password_reminder'],
+            $fields['monthly_cost'], $fields['cost_per_slot'], $id,
         ]);
         return ['ok' => true];
     }
@@ -239,6 +242,15 @@ final class AiAccount
             $expiresAt = date('Y-m-d H:i:s', $ts);
         }
 
+        $monthlyCost = isset($d['monthly_cost']) && $d['monthly_cost'] !== '' ? round((float) $d['monthly_cost'], 2) : null;
+        if ($monthlyCost !== null && $monthlyCost < 0) {
+            return ['error' => 'ค่าใช้จ่ายต่อเดือนต้องไม่ติดลบ'];
+        }
+        $costPerSlot = isset($d['cost_per_slot']) && $d['cost_per_slot'] !== '' ? round((float) $d['cost_per_slot'], 2) : null;
+        if ($costPerSlot !== null && $costPerSlot < 0) {
+            return ['error' => 'ค่าต่อช่วงเวลาต้องไม่ติดลบ'];
+        }
+
         return [
             'name' => $name,
             'provider_id' => $providerId,
@@ -247,6 +259,8 @@ final class AiAccount
             'status' => $status,
             'password_reminder' => $reminder,
             'expires_at' => $expiresAt,
+            'monthly_cost' => $monthlyCost,
+            'cost_per_slot' => $costPerSlot,
         ];
     }
 
