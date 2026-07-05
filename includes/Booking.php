@@ -397,7 +397,9 @@ final class Booking
             $row['hasCheckedIn'] = !empty($row['checked_in_at']);
             $row['hasCheckedOut'] = !empty($row['checked_out_at']);
             $row['canCheckIn'] = $status === 'check_in_ready' && !$row['hasCheckedIn'];
-            $row['canCheckOut'] = $status === 'now'
+            // Allow checkout for both 'now' (slot in progress) and 'checked_in' (early check-in
+            // before slot officially starts). Either way the user has confirmed their presence.
+            $row['canCheckOut'] = in_array($status, ['now', 'checked_in'])
                 && $row['hasCheckedIn']
                 && !$row['hasCheckedOut']
                 && $now >= (new DateTimeImmutable($row['checked_in_at']))->modify('+30 minutes');
@@ -734,8 +736,8 @@ final class Booking
         if (!$booking) return ['ok' => false, 'error' => 'ไม่พบรายการจอง'];
 
         $status = self::displayStatus($booking);
-        if ($status !== 'now') {
-            return ['ok' => false, 'error' => 'สามารถเช็คเอาท์ได้เฉพาะช่วงเวลาที่กำลังใช้งานอยู่เท่านั้น'];
+        if (!in_array($status, ['now', 'checked_in'])) {
+            return ['ok' => false, 'error' => 'สามารถเช็คเอาท์ได้เฉพาะช่วงที่เช็คอินแล้วเท่านั้น'];
         }
         if (empty($booking['checked_in_at'])) {
             return ['ok' => false, 'error' => 'กรุณาเช็คอินก่อน'];
