@@ -89,6 +89,7 @@ CREATE TABLE bookings (
     reported_at    DATETIME NULL,                      -- when the usage report was submitted (NULL = not yet reported)
     created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     cancelled_at   DATETIME NULL,
+    checked_in_at  DATETIME NULL,                        -- when the student pressed check-in (NULL = not yet checked in)
     CONSTRAINT fk_bookings_user FOREIGN KEY (user_id) REFERENCES users(id),
     CONSTRAINT fk_bookings_ai_account FOREIGN KEY (ai_account_id) REFERENCES ai_accounts(id),
     UNIQUE KEY uniq_account_slot (ai_account_id, booking_date, slot_index),

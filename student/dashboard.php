@@ -26,11 +26,12 @@ require __DIR__ . '/../includes/header.php';
   <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
     <i class="bi bi-lightning-charge-fill" style="color:#059669;font-size:17px;margin-top:1px;flex-shrink:0"></i>
     <div style="flex:1;min-width:0">
-      <div style="font-size:14px;font-weight:700;color:#065F46">ใช้งาน <?= e($ea['ai_name']) ?> ได้เลยล่วงหน้า!</div>
-      <div style="font-size:12px;color:#059669;margin-top:2px">ช่วง <?= e($ea['prevSlotLabel']) ?> ไม่มีผู้ใช้งาน · คุณสามารถเริ่มได้ทันทีจนถึงสิ้นสุด<?= e($ea['slotLabel']) ?></div>
+      <div style="font-size:14px;font-weight:700;color:#065F46">ใช้งาน <?= e($ea['ai_name']) ?> ได้ล่วงหน้า!</div>
+      <div style="font-size:12px;color:#059669;margin-top:2px">ช่วง <?= e($ea['prevSlotLabel']) ?> ไม่มีผู้ใช้งาน · ใช้ได้จนถึงสิ้นสุด<?= e($ea['slotLabel']) ?></div>
     </div>
     <span class="badge-ok" style="flex-shrink:0">ช่วงก่อนหน้าว่าง</span>
   </div>
+  <?php if ($ea['hasCheckedIn']): ?>
   <div style="background:white;border-radius:8px;padding:10px 14px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;font-size:13px">
     <div><span style="font-size:12px;color:var(--bs-secondary-color)">อีเมลเข้าใช้: </span><strong><?= e($ea['ai_email']) ?></strong></div>
     <div style="display:flex;align-items:center;gap:6px">
@@ -40,6 +41,17 @@ require __DIR__ . '/../includes/header.php';
         onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'eaPw<?= (int) $ea['id'] ?>',<?= json_encode($ea['account_password'], JSON_UNESCAPED_UNICODE) ?>)">แสดง</button>
     </div>
   </div>
+  <?php else: ?>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0">
+      <?= Csrf::field() ?>
+      <input type="hidden" name="action" value="checkin">
+      <input type="hidden" name="id" value="<?= (int) $ea['id'] ?>">
+      <button type="submit" style="background:#059669;color:white;border:none;border-radius:8px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px"><i class="bi bi-qr-code-scan"></i>เช็คอินเพื่อใช้งานล่วงหน้า</button>
+    </form>
+    <span style="font-size:11px;color:#059669">กดเช็คอินเพื่อยืนยันตัวตนและรับข้อมูลบัญชี AI</span>
+  </div>
+  <?php endif; ?>
 </div>
 <?php endforeach; ?>
 <?php if ($restricted): ?>
@@ -63,7 +75,7 @@ require __DIR__ . '/../includes/header.php';
     <div class="card-body" style="padding:18px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
         <div class="stat-icon" style="background:#EFF6FF"><i class="bi bi-calendar-check" style="color:#2563EB"></i></div>
-        <?php if ($next): ?><span class="badge-up">กำลังจะมาถึง</span><?php endif; ?>
+        <?php if ($next): ?><span class="<?= $next['badgeCls'] ?>"><?= e($next['statusLabel']) ?></span><?php endif; ?>
       </div>
       <?php if ($next): ?>
         <div style="font-size:22px;font-weight:700;line-height:1"><?= substr($next['start_datetime'], 11, 5) ?>–<?= substr($next['end_datetime'], 11, 5) ?></div>
@@ -127,15 +139,38 @@ require __DIR__ . '/../includes/header.php';
             <div><div style="font-size:11px;color:var(--bs-secondary-color);margin-bottom:3px">ระยะเวลา</div><div style="font-weight:600;font-size:14px"><?= (int) $settings['slot_hours'] ?> ชั่วโมง</div></div>
             <div><div style="font-size:11px;color:var(--bs-secondary-color);margin-bottom:3px">AI Account</div><div style="font-weight:600;font-size:14px"><?= e($next['ai_name']) ?></div></div>
           </div>
+          <?php if ($next['displayStatus'] === 'now'): ?>
+          <div style="margin-top:12px;padding:10px 12px;background:var(--bs-secondary-bg);border-radius:8px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:13px;border:1px solid var(--bs-border-color)">
+            <span style="color:var(--bs-secondary-color)">อีเมล: <strong style="color:var(--bs-body-color)"><?= e($next['ai_email']) ?></strong></span>
+            <span style="display:flex;align-items:center;gap:6px;color:var(--bs-secondary-color)">รหัสผ่าน:
+              <code id="dashPw<?= (int) $next['id'] ?>" style="letter-spacing:0.12em;background:transparent">••••••••</code>
+              <button type="button" class="btn btn-sm" style="font-size:11px;padding:2px 8px;border:1px solid var(--bs-border-color);border-radius:5px"
+                onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'dashPw<?= (int) $next['id'] ?>',<?= json_encode($next['account_password'], JSON_UNESCAPED_UNICODE) ?>)">แสดง</button>
+            </span>
+          </div>
+          <?php elseif ($next['displayStatus'] === 'checked_in'): ?>
+          <div style="margin-top:10px;padding:8px 12px;background:#F0FDF4;border-radius:8px;font-size:12px;color:#059669;display:flex;align-items:center;gap:6px;border:1px solid #BBF7D0">
+            <i class="bi bi-check-circle-fill"></i>เช็คอินแล้ว — รหัสผ่านจะแสดงเมื่อถึงเวลาจอง
+          </div>
+          <?php endif; ?>
         </div>
-        <div style="display:flex;gap:8px;margin-top:14px">
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
           <a href="<?= url('student/booking.php') ?>" class="btn btn-primary" style="font-size:13px;background:#2563EB;border:none"><i class="bi bi-calendar-plus me-1"></i>จองคิวเพิ่ม</a>
+          <?php if ($next['canCheckIn']): ?>
+          <form method="post" action="<?= url('student/my-bookings.php') ?>" style="display:inline">
+            <?= Csrf::field() ?>
+            <input type="hidden" name="action" value="checkin">
+            <input type="hidden" name="id" value="<?= (int) $next['id'] ?>">
+            <button type="submit" class="btn btn-success" style="font-size:13px"><i class="bi bi-qr-code-scan me-1"></i>เช็คอิน</button>
+          </form>
+          <?php elseif ($next['canCancel']): ?>
           <form method="post" action="<?= url('student/my-bookings.php') ?>" style="display:inline">
             <?= Csrf::field() ?>
             <input type="hidden" name="action" value="cancel">
             <input type="hidden" name="id" value="<?= (int) $next['id'] ?>">
             <button type="submit" class="btn btn-outline-danger" style="font-size:13px"><i class="bi bi-x-circle me-1"></i>ยกเลิก</button>
           </form>
+          <?php endif; ?>
         </div>
       <?php else: ?>
         <p style="color:var(--bs-secondary-color);font-size:13px;margin:0">ยังไม่มีการจอง — <a href="<?= url('student/booking.php') ?>">จองคิวตอนนี้</a></p>

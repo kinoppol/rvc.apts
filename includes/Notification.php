@@ -32,7 +32,7 @@ final class Notification
 
         $restrictedCount = (int) Database::pdo()->query(
             "SELECT COUNT(DISTINCT user_id) FROM bookings
-             WHERE status = 'upcoming' AND reported_at IS NULL
+             WHERE status = 'upcoming' AND reported_at IS NULL AND checked_in_at IS NOT NULL
                AND end_datetime < DATE_SUB(NOW(), INTERVAL " . Booking::REPORT_DEADLINE_DAYS . " DAY)"
         )->fetchColumn();
         if ($restrictedCount > 0) {
@@ -88,13 +88,29 @@ final class Notification
             $items[] = [
                 'level' => 'ok',
                 'icon' => 'bi-lightning-charge-fill',
-                'title' => 'ใช้งาน ' . $ea['ai_name'] . ' ได้เลยล่วงหน้า',
+                'title' => $ea['hasCheckedIn']
+                    ? 'ใช้งาน ' . $ea['ai_name'] . ' ล่วงหน้าได้เลย'
+                    : 'เช็คอินเพื่อใช้ ' . $ea['ai_name'] . ' ล่วงหน้า',
                 'detail' => $ea['dateLabel'] . ' · ' . $ea['slotLabel'] . ' · ช่วงก่อนหน้าว่าง',
-                'url' => url('student/dashboard.php'),
+                'url' => url('student/my-bookings.php'),
             ];
         }
 
         foreach (Booking::listForUser($userId, 'upcoming') as $b) {
+            // Check-in reminder
+            if ($b['canCheckIn']) {
+                $items[] = [
+                    'level' => 'warn',
+                    'icon' => 'bi-qr-code-scan',
+                    'title' => 'กรุณาเช็คอินยืนยันการใช้งาน',
+                    'detail' => $b['dateLabel'] . ' · ' . $b['slotLabel'] . ' · ' . $b['ai_name'],
+                    'url' => url('student/my-bookings.php'),
+                ];
+                continue;
+            }
+            if (in_array($b['displayStatus'], ['checked_in', 'now', 'no_show'])) {
+                continue; // no bell noise for already-handled states
+            }
             $start = new DateTimeImmutable($b['start_datetime']);
             $hours = ($start->getTimestamp() - $now->getTimestamp()) / 3600;
             if ($hours < 0 || $hours > 48) {
