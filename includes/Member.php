@@ -154,7 +154,11 @@ final class Member
     /** Only suspended members may be hard-deleted, mirroring the prototype's member table actions. */
     public static function delete(int $id): void
     {
-        Database::pdo()->prepare("DELETE FROM users WHERE id = ? AND role = 'student' AND status = 'suspended'")->execute([$id]);
+        $pdo = Database::pdo();
+        $pdo->beginTransaction();
+        $pdo->prepare("DELETE FROM bookings WHERE user_id = ?")->execute([$id]);
+        $pdo->prepare("DELETE FROM users WHERE id = ? AND role = 'student' AND status = 'suspended'")->execute([$id]);
+        $pdo->commit();
     }
 
     /** @return array{ok:bool,error?:string} */
