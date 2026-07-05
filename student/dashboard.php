@@ -32,13 +32,20 @@ require __DIR__ . '/../includes/header.php';
     <span class="badge-ok" style="flex-shrink:0">ช่วงก่อนหน้าว่าง</span>
   </div>
   <?php if ($ea['hasCheckedIn']): ?>
-  <div style="background:white;border-radius:8px;padding:10px 14px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;font-size:13px">
-    <div><span style="font-size:12px;color:var(--bs-secondary-color)">อีเมลเข้าใช้: </span><strong><?= e($ea['ai_email']) ?></strong></div>
+  <div style="background:white;border-radius:8px;padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13px">
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:12px;color:var(--bs-secondary-color)">อีเมล:</span>
+      <strong><?= e($ea['ai_email']) ?></strong>
+      <button type="button" title="คัดลอกอีเมล" style="background:none;border:1px solid var(--bs-border-color);border-radius:4px;padding:2px 6px;cursor:pointer;color:var(--bs-secondary-color);font-size:12px;line-height:1"
+        onclick="copyText(this,<?= e(json_encode($ea['ai_email'], JSON_UNESCAPED_UNICODE)) ?>)"><i class="bi bi-clipboard"></i></button>
+    </div>
     <div style="display:flex;align-items:center;gap:6px">
       <span style="font-size:12px;color:var(--bs-secondary-color)">รหัสผ่าน:</span>
       <code id="eaPw<?= (int) $ea['id'] ?>" style="font-size:13px;letter-spacing:0.12em;background:transparent">••••••••</code>
       <button type="button" class="btn btn-sm" style="font-size:11px;padding:2px 8px;border:1px solid var(--bs-border-color);border-radius:5px"
         onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'eaPw<?= (int) $ea['id'] ?>',<?= e(json_encode($ea['account_password'], JSON_UNESCAPED_UNICODE)) ?>)">แสดง</button>
+      <button type="button" title="คัดลอกรหัสผ่าน" style="background:none;border:1px solid var(--bs-border-color);border-radius:4px;padding:2px 6px;cursor:pointer;color:var(--bs-secondary-color);font-size:12px;line-height:1"
+        onclick="copyText(this,<?= e(json_encode($ea['account_password'], JSON_UNESCAPED_UNICODE)) ?>)"><i class="bi bi-clipboard"></i></button>
     </div>
   </div>
   <?php else: ?>
@@ -140,12 +147,17 @@ require __DIR__ . '/../includes/header.php';
             <div><div style="font-size:11px;color:var(--bs-secondary-color);margin-bottom:3px">AI Account</div><div style="font-weight:600;font-size:14px"><?= e($next['ai_name']) ?></div></div>
           </div>
           <?php if ($next['displayStatus'] === 'now'): ?>
-          <div style="margin-top:12px;padding:10px 12px;background:var(--bs-secondary-bg);border-radius:8px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:13px;border:1px solid var(--bs-border-color)">
-            <span style="color:var(--bs-secondary-color)">อีเมล: <strong style="color:var(--bs-body-color)"><?= e($next['ai_email']) ?></strong></span>
+          <div style="margin-top:12px;padding:10px 12px;background:var(--bs-secondary-bg);border-radius:8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13px;border:1px solid var(--bs-border-color)">
+            <span style="display:flex;align-items:center;gap:5px;color:var(--bs-secondary-color)">อีเมล: <strong style="color:var(--bs-body-color)"><?= e($next['ai_email']) ?></strong>
+              <button type="button" title="คัดลอกอีเมล" style="background:none;border:1px solid var(--bs-border-color);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--bs-secondary-color);font-size:11px;line-height:1"
+                onclick="copyText(this,<?= e(json_encode($next['ai_email'], JSON_UNESCAPED_UNICODE)) ?>)"><i class="bi bi-clipboard"></i></button>
+            </span>
             <span style="display:flex;align-items:center;gap:6px;color:var(--bs-secondary-color)">รหัสผ่าน:
               <code id="dashPw<?= (int) $next['id'] ?>" style="letter-spacing:0.12em;background:transparent">••••••••</code>
               <button type="button" class="btn btn-sm" style="font-size:11px;padding:2px 8px;border:1px solid var(--bs-border-color);border-radius:5px"
                 onclick="(function(b,id,pw){var el=document.getElementById(id);if(el.textContent==='••••••••'){el.textContent=pw;b.textContent='ซ่อน';}else{el.textContent='••••••••';b.textContent='แสดง';}})(this,'dashPw<?= (int) $next['id'] ?>',<?= e(json_encode($next['account_password'], JSON_UNESCAPED_UNICODE)) ?>)">แสดง</button>
+              <button type="button" title="คัดลอกรหัสผ่าน" style="background:none;border:1px solid var(--bs-border-color);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--bs-secondary-color);font-size:11px;line-height:1"
+                onclick="copyText(this,<?= e(json_encode($next['account_password'], JSON_UNESCAPED_UNICODE)) ?>)"><i class="bi bi-clipboard"></i></button>
             </span>
           </div>
           <?php elseif ($next['displayStatus'] === 'checked_in'): ?>
