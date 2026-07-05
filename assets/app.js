@@ -268,6 +268,45 @@
     });
   });
 
+  // ── Check-in confirmation modal (intercepts forms with data-checkin-confirm) ──
+  var checkinModal = document.getElementById("checkinConfirmModal");
+  var checkinConfirmBtn = document.getElementById("checkinConfirmBtn");
+  var pendingCheckinForm = null;
+  if (checkinModal && checkinConfirmBtn) {
+    document.addEventListener("submit", function (e) {
+      var form = e.target;
+      if (form.hasAttribute("data-checkin-confirm") && !form._checkinOk) {
+        e.preventDefault();
+        pendingCheckinForm = form;
+        new bootstrap.Modal(checkinModal).show();
+      }
+    });
+    checkinConfirmBtn.addEventListener("click", function () {
+      bootstrap.Modal.getInstance(checkinModal).hide();
+      if (pendingCheckinForm) {
+        pendingCheckinForm._checkinOk = true;
+        pendingCheckinForm.requestSubmit();
+        pendingCheckinForm = null;
+      }
+    });
+  }
+
+  // ── Clipboard copy helper (used by credential copy buttons) ──
+  window.copyText = function (btn, text) {
+    var orig = btn.innerHTML;
+    var done = function () {
+      btn.innerHTML = '<i class="bi bi-clipboard-check" style="color:#059669"></i>';
+      setTimeout(function () { btn.innerHTML = orig; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function () {
+        try { done(); } catch (e) {}
+      });
+    } else {
+      done();
+    }
+  };
+
   // ── Chart.js init hook for admin/dashboard.php ──
   window.initUsageChart = function (canvasId, labels, datasets) {
     var canvas = document.getElementById(canvasId);

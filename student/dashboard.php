@@ -50,7 +50,7 @@ require __DIR__ . '/../includes/header.php';
   </div>
   <?php else: ?>
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-    <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0" onsubmit="return confirm('ยืนยันการเช็คอิน?\nระบบจะบันทึกเวลาเริ่มใช้งานทันทีที่กดยืนยัน')">
+    <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0" data-checkin-confirm>
       <?= Csrf::field() ?>
       <input type="hidden" name="action" value="checkin">
       <input type="hidden" name="id" value="<?= (int) $ea['id'] ?>">
@@ -169,7 +169,7 @@ require __DIR__ . '/../includes/header.php';
         <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
           <a href="<?= url('student/booking.php') ?>" class="btn btn-primary" style="font-size:13px;background:#2563EB;border:none"><i class="bi bi-calendar-plus me-1"></i>จองคิวเพิ่ม</a>
           <?php if ($next['canCheckIn']): ?>
-          <form method="post" action="<?= url('student/my-bookings.php') ?>" style="display:inline" onsubmit="return confirm('ยืนยันการเช็คอิน?\nระบบจะบันทึกเวลาเริ่มใช้งานทันทีที่กดยืนยัน')">
+          <form method="post" action="<?= url('student/my-bookings.php') ?>" style="display:inline" data-checkin-confirm>
             <?= Csrf::field() ?>
             <input type="hidden" name="action" value="checkin">
             <input type="hidden" name="id" value="<?= (int) $next['id'] ?>">
