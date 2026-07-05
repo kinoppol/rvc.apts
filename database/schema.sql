@@ -90,6 +90,7 @@ CREATE TABLE bookings (
     created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     cancelled_at   DATETIME NULL,
     checked_in_at  DATETIME NULL,                        -- when the student pressed check-in (NULL = not yet checked in)
+    checked_out_at DATETIME NULL,                        -- early checkout (NULL = no checkout); frees the pool before end_datetime
     CONSTRAINT fk_bookings_user FOREIGN KEY (user_id) REFERENCES users(id),
     CONSTRAINT fk_bookings_ai_account FOREIGN KEY (ai_account_id) REFERENCES ai_accounts(id),
     UNIQUE KEY uniq_account_slot (ai_account_id, booking_date, slot_index),

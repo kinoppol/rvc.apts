@@ -168,6 +168,14 @@ require __DIR__ . '/../includes/header.php';
         </div>
         <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
           <a href="<?= url('student/booking.php') ?>" class="btn btn-primary" style="font-size:13px;background:#2563EB;border:none"><i class="bi bi-calendar-plus me-1"></i>จองคิวเพิ่ม</a>
+          <?php if ($next['canCheckOut']): ?>
+          <form method="post" action="<?= url('student/my-bookings.php') ?>" style="display:inline" data-checkout-confirm>
+            <?= Csrf::field() ?>
+            <input type="hidden" name="action" value="checkout">
+            <input type="hidden" name="id" value="<?= (int) $next['id'] ?>">
+            <button type="submit" class="btn" style="font-size:13px;background:#D97706;color:white;border:none"><i class="bi bi-box-arrow-right me-1"></i>เช็คเอาท์</button>
+          </form>
+          <?php endif; ?>
           <?php if ($next['canCheckIn']): ?>
           <form method="post" action="<?= url('student/my-bookings.php') ?>" style="display:inline" data-checkin-confirm>
             <?= Csrf::field() ?>

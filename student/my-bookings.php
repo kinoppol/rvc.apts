@@ -16,6 +16,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             flash_set('err', $result['error'] ?? 'เช็คอินไม่สำเร็จ');
         }
+    } elseif ($action === 'checkout') {
+        $result = Booking::checkOut($user['id'], (int) ($_POST['id'] ?? 0));
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'เช็คเอาท์เรียบร้อย — ช่วงเวลาคืนสู่ระบบแล้ว' : ($result['error'] ?? 'เช็คเอาท์ไม่สำเร็จ'));
     } elseif ($action === 'report') {
         $result = Booking::submitReport($user['id'], (int) ($_POST['id'] ?? 0), $_POST['report_text'] ?? '', $_FILES['report_file'] ?? null);
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'ส่งรายงานการใช้งานเรียบร้อยแล้ว' : ($result['error'] ?? 'ส่งรายงานไม่สำเร็จ'));
@@ -155,6 +158,15 @@ require __DIR__ . '/../includes/header.php';
               <input type="hidden" name="action" value="checkin">
               <input type="hidden" name="id" value="<?= (int) $bk['id'] ?>">
               <button type="submit" class="action-btn-blue"><i class="bi bi-qr-code-scan me-1"></i>เช็คอิน</button>
+            </form>
+            <?php endif; ?>
+
+            <?php if ($bk['canCheckOut']): ?>
+            <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0" data-checkout-confirm>
+              <?= Csrf::field() ?>
+              <input type="hidden" name="action" value="checkout">
+              <input type="hidden" name="id" value="<?= (int) $bk['id'] ?>">
+              <button type="submit" style="background:none;border:1px solid #D97706;color:#D97706;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px"><i class="bi bi-box-arrow-right"></i>เช็คเอาท์</button>
             </form>
             <?php endif; ?>
 

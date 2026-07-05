@@ -291,6 +291,29 @@
     });
   }
 
+  // ── Check-out confirmation modal (intercepts forms with data-checkout-confirm) ──
+  var checkoutModal = document.getElementById("checkoutConfirmModal");
+  var checkoutConfirmBtn = document.getElementById("checkoutConfirmBtn");
+  var pendingCheckoutForm = null;
+  if (checkoutModal && checkoutConfirmBtn) {
+    document.addEventListener("submit", function (e) {
+      var form = e.target;
+      if (form.hasAttribute("data-checkout-confirm") && !form._checkoutOk) {
+        e.preventDefault();
+        pendingCheckoutForm = form;
+        new bootstrap.Modal(checkoutModal).show();
+      }
+    });
+    checkoutConfirmBtn.addEventListener("click", function () {
+      bootstrap.Modal.getInstance(checkoutModal).hide();
+      if (pendingCheckoutForm) {
+        pendingCheckoutForm._checkoutOk = true;
+        pendingCheckoutForm.requestSubmit();
+        pendingCheckoutForm = null;
+      }
+    });
+  }
+
   // ── Clipboard copy helper (used by credential copy buttons) ──
   window.copyText = function (btn, text) {
     var orig = btn.innerHTML;

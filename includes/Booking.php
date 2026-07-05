@@ -13,8 +13,9 @@ final class Booking
         'mine'      => ['label' => 'ของฉัน',         'bg' => '#DBEAFE',    'fg' => '#1D4ED8', 'icon' => 'bi-check-circle-fill'],
         'now'       => ['label' => 'ใช้งานอยู่',     'bg' => '#DCFCE7',    'fg' => '#059669', 'icon' => 'bi-broadcast'],
         'early'     => ['label' => 'ใช้ได้เลย',     'bg' => '#DCFCE7',    'fg' => '#059669', 'icon' => 'bi-lightning-charge-fill'],
-        'no_show'   => ['label' => 'ไม่ได้มา',       'bg' => '#FEF2F2',    'fg' => '#DC2626', 'icon' => 'bi-person-x-fill'],
-        'off'       => ['label' => 'ปิด',            'bg' => 'transparent', 'fg' => '#94A3B8', 'icon' => 'bi-dash-circle'],
+        'no_show'     => ['label' => 'ไม่ได้มา',       'bg' => '#FEF2F2',    'fg' => '#DC2626', 'icon' => 'bi-person-x-fill'],
+        'checked_out' => ['label' => 'เช็คเอาท์แล้ว', 'bg' => '#F0FDF4',    'fg' => '#059669', 'icon' => 'bi-box-arrow-right'],
+        'off'         => ['label' => 'ปิด',           'bg' => 'transparent', 'fg' => '#94A3B8', 'icon' => 'bi-dash-circle'],
     ];
 
     /** Days a student has, after a slot ends, to file the usage report before booking is blocked. */
@@ -68,7 +69,7 @@ final class Booking
         // Week's upcoming bookings in one query -> map[date][slot][accountId] = {uid, ci, sd}
         $booked = [];
         $stmt = Database::pdo()->prepare(
-            "SELECT ai_account_id, booking_date, slot_index, user_id, checked_in_at, start_datetime FROM bookings
+            "SELECT ai_account_id, booking_date, slot_index, user_id, checked_in_at, checked_out_at, start_datetime FROM bookings
              WHERE status = 'upcoming' AND booking_date BETWEEN ? AND ?"
         );
         $stmt->execute([$start->format('Y-m-d'), $end->format('Y-m-d')]);
@@ -76,6 +77,7 @@ final class Booking
             $booked[$r['booking_date']][(int) $r['slot_index']][(int) $r['ai_account_id']] = [
                 'uid' => (int) $r['user_id'],
                 'ci'  => $r['checked_in_at'],
+                'co'  => $r['checked_out_at'],
                 'sd'  => $r['start_datetime'],
             ];
         }
@@ -108,11 +110,14 @@ final class Booking
                     $bkData = $cellBooked[$aid] ?? null;
                     $bkUser = $bkData ? $bkData['uid'] : null;
                     $bkCheckedIn = $bkData && !empty($bkData['ci']);
-                    $bkNoShow = $bkData && !$bkCheckedIn && !empty($bkData['sd'])
+                    $bkCheckedOut = $bkData && !empty($bkData['co']);
+                    $bkNoShow = !$bkCheckedOut && $bkData && !$bkCheckedIn && !empty($bkData['sd'])
                         && $now >= (new DateTimeImmutable($bkData['sd']))->modify('+15 minutes');
                     $isExpired = !empty($ac['expires_at']) && new DateTimeImmutable($ac['expires_at']) <= $now;
                     if ($bkUser === $userId) {
-                        if ($bkNoShow) {
+                        if ($bkCheckedOut) {
+                            $status = 'checked_out'; // my booking, ended early
+                        } elseif ($bkNoShow) {
                             $status = 'no_show';
                         } elseif ($isLiveNow && $bkCheckedIn) {
                             $status = 'now';
@@ -120,23 +125,28 @@ final class Booking
                             $status = 'mine';
                         }
                     } elseif ($bkUser !== null) {
-                        $status = 'busy';
+                        // Another user's booking — if they checked out the pool is free again
+                        if ($bkCheckedOut) {
+                            $status = ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax) ? 'off' : 'available';
+                        } else {
+                            $status = 'busy';
+                        }
                     } elseif ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax || $isLiveNow) {
                         $status = 'off';
                     } else {
                         $status = 'available';
                     }
-                    // Early access: my next slot can start early if the prev slot is effectively empty
-                    // (no booking at all, or a booking whose 15-min no-show grace has expired).
-                    if ($status === 'mine' && $i > 0) {
+                    // Early access: my next slot can start early if prev slot is effectively empty —
+                    // no booking, no-show grace expired, or prev user checked out early.
+                    if ($status === 'mine' && $i > 0 && $now < $slotStart) {
+                        $prevData = $booked[$dateStr][$i - 1][$aid] ?? null;
                         $prevStart = $slotStart->modify('-' . (int) $settings['slot_hours'] . ' hours');
-                        if ($now >= $prevStart->modify('+15 minutes') && $now < $slotStart) {
-                            $prevData = $booked[$dateStr][$i - 1][$aid] ?? null;
-                            $prevNoShow = $prevData && empty($prevData['ci']) && !empty($prevData['sd'])
-                                && $now >= (new DateTimeImmutable($prevData['sd']))->modify('+15 minutes');
-                            if (!$prevData || $prevNoShow) {
-                                $status = 'early';
-                            }
+                        $prevCheckedOut = $prevData && !empty($prevData['co']);
+                        $prevNoShow = $prevData && empty($prevData['ci']) && !empty($prevData['sd'])
+                            && $now >= (new DateTimeImmutable($prevData['sd']))->modify('+15 minutes');
+                        $inNoShowWindow = $now >= $prevStart->modify('+15 minutes');
+                        if ($prevCheckedOut || ($inNoShowWindow && ($prevNoShow || !$prevData))) {
+                            $status = 'early';
                         }
                     }
                     $bookable = $status === 'available' && !$atLimit;
@@ -340,6 +350,9 @@ final class Booking
         if ($now >= $end) {
             return 'completed';
         }
+        if (!empty($booking['checked_out_at'])) {
+            return 'checked_out'; // voluntarily ended early before end_datetime
+        }
         $hasCheckIn = !empty($booking['checked_in_at']);
         if ($now >= $start) {
             if ($hasCheckIn) return 'now';
@@ -359,6 +372,7 @@ final class Booking
             'checked_in'      => 'badge-ok',
             'now'             => 'badge-ok',
             'no_show'         => 'badge-susp',
+            'checked_out'     => 'badge-ok',
             'completed'       => 'badge-ok',
             'cancelled'       => 'badge-susp',
         ];
@@ -368,6 +382,7 @@ final class Booking
             'checked_in'      => 'ยืนยันแล้ว',
             'now'             => 'กำลังใช้งาน',
             'no_show'         => 'ไม่ได้มาใช้งาน',
+            'checked_out'     => 'เช็คเอาท์แล้ว',
             'completed'       => 'เสร็จสิ้น',
             'cancelled'       => 'ยกเลิกแล้ว',
         ];
@@ -380,7 +395,12 @@ final class Booking
             $row['badgeCls'] = $badgeMap[$status] ?? 'badge-up';
             $row['statusLabel'] = $labelMap[$status] ?? $status;
             $row['hasCheckedIn'] = !empty($row['checked_in_at']);
+            $row['hasCheckedOut'] = !empty($row['checked_out_at']);
             $row['canCheckIn'] = $status === 'check_in_ready' && !$row['hasCheckedIn'];
+            $row['canCheckOut'] = $status === 'now'
+                && $row['hasCheckedIn']
+                && !$row['hasCheckedOut']
+                && $now >= (new DateTimeImmutable($row['checked_in_at']))->modify('+30 minutes');
             // Date/time shown on the booking's "business day" using the 30-hour clock, so a slot that
             // runs past midnight (e.g. 25:00–30:00) stays on its start day instead of a next-day date.
             $bookingDate = new DateTimeImmutable($row['booking_date']);
@@ -425,7 +445,7 @@ final class Booking
         if ($filter && $filter !== 'all') {
             if ($filter === 'upcoming') {
                 // "upcoming" tab includes all active/imminent states
-                $rows = array_values(array_filter($rows, fn ($r) => in_array($r['displayStatus'], ['upcoming', 'check_in_ready', 'checked_in', 'now'])));
+                $rows = array_values(array_filter($rows, fn ($r) => in_array($r['displayStatus'], ['upcoming', 'check_in_ready', 'checked_in', 'now', 'checked_out'])));
             } elseif ($filter === 'completed') {
                 // no_show bookings show alongside completed (slot ended, student didn't use it)
                 $rows = array_values(array_filter($rows, fn ($r) => in_array($r['displayStatus'], ['completed', 'no_show'])));
@@ -625,6 +645,7 @@ final class Booking
                     AND prev.booking_date = b.booking_date
                     AND prev.slot_index = b.slot_index - 1
                     AND prev.status = 'upcoming'
+                    AND prev.checked_out_at IS NULL
                     AND (
                         prev.checked_in_at IS NOT NULL
                         OR NOW() < DATE_ADD(prev.start_datetime, INTERVAL 15 MINUTE)
@@ -681,6 +702,7 @@ final class Booking
                 $chk = Database::pdo()->prepare(
                     "SELECT COUNT(*) FROM bookings
                      WHERE ai_account_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming'
+                       AND checked_out_at IS NULL
                        AND (checked_in_at IS NOT NULL OR NOW() < DATE_ADD(start_datetime, INTERVAL 15 MINUTE))"
                 );
                 $chk->execute([$booking['ai_account_id'], $booking['booking_date'], (int) $booking['slot_index'] - 1]);
@@ -697,6 +719,38 @@ final class Booking
         Database::pdo()->prepare('UPDATE bookings SET checked_in_at = NOW() WHERE id = ?')
             ->execute([$bookingId]);
         return ['ok' => true, 'earlyAccess' => $earlyAccess];
+    }
+
+    /**
+     * Records the student's early checkout. Only allowed after 30 min from check-in.
+     * Frees the pool immediately, letting the next slot's booker check in early.
+     * @return array{ok:bool,error?:string}
+     */
+    public static function checkOut(int $userId, int $bookingId): array
+    {
+        $stmt = Database::pdo()->prepare('SELECT * FROM bookings WHERE id = ? AND user_id = ?');
+        $stmt->execute([$bookingId, $userId]);
+        $booking = $stmt->fetch();
+        if (!$booking) return ['ok' => false, 'error' => 'ไม่พบรายการจอง'];
+
+        $status = self::displayStatus($booking);
+        if ($status !== 'now') {
+            return ['ok' => false, 'error' => 'สามารถเช็คเอาท์ได้เฉพาะช่วงเวลาที่กำลังใช้งานอยู่เท่านั้น'];
+        }
+        if (empty($booking['checked_in_at'])) {
+            return ['ok' => false, 'error' => 'กรุณาเช็คอินก่อน'];
+        }
+        if (!empty($booking['checked_out_at'])) {
+            return ['ok' => false, 'error' => 'เช็คเอาท์ไปแล้ว'];
+        }
+        $minCheckout = (new DateTimeImmutable($booking['checked_in_at']))->modify('+30 minutes');
+        if (new DateTimeImmutable() < $minCheckout) {
+            return ['ok' => false, 'error' => 'สามารถเช็คเอาท์ได้หลังจากเช็คอินแล้วอย่างน้อย 30 นาที'];
+        }
+
+        Database::pdo()->prepare('UPDATE bookings SET checked_out_at = NOW() WHERE id = ? AND user_id = ?')
+            ->execute([$bookingId, $userId]);
+        return ['ok' => true];
     }
 
     /** Admin clears a user's pending reports (lifts the temporary block). @return int rows waived */

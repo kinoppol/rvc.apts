@@ -21,6 +21,25 @@
     </div>
   </div>
 
+  <!-- Check-out confirmation modal (shared) -->
+  <div class="modal fade" id="checkoutConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:380px">
+      <div class="modal-content" style="border:none;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.18)">
+        <div class="modal-body" style="padding:32px 28px 20px;text-align:center">
+          <div style="width:60px;height:60px;background:#FEF3C7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px">
+            <i class="bi bi-box-arrow-right" style="font-size:26px;color:#D97706"></i>
+          </div>
+          <h6 style="font-weight:700;font-size:17px;margin:0 0 10px">ยืนยันการเช็คเอาท์</h6>
+          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0;line-height:1.6">ช่วงเวลาจะถูก<strong style="color:var(--bs-body-color)">คืนสู่ระบบทันที</strong><br>ผู้จองช่วงถัดไปสามารถเข้าใช้งานได้ก่อนเวลา</p>
+        </div>
+        <div style="padding:0 28px 28px;display:flex;gap:10px">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="flex:1;font-size:13px;border-radius:10px;padding:9px">ยกเลิก</button>
+          <button type="button" id="checkoutConfirmBtn" style="flex:1;font-size:13px;font-weight:600;border-radius:10px;padding:9px;background:#D97706;color:white;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px"><i class="bi bi-box-arrow-right"></i>ยืนยันเช็คเอาท์</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <?php $__flash = flash_get(); if ($__flash): ?>
     <?php
       $toastClsMap = ['ok' => 'toast-fixed toast-ok', 'warn' => 'toast-fixed toast-warn', 'err' => 'toast-fixed toast-err'];
