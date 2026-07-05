@@ -264,6 +264,10 @@
       modalEl.querySelector("[name=id]").value = btn.dataset.id;
       var meta = document.getElementById("reportModalMeta");
       if (meta) meta.textContent = btn.dataset.meta || "";
+      var textarea = modalEl.querySelector("[name=report_text]");
+      if (textarea) textarea.value = btn.dataset.reportText || "";
+      var fileInput = modalEl.querySelector("[name=report_file]");
+      if (fileInput) fileInput.value = ""; // reset file picker; existing file is kept server-side
       new bootstrap.Modal(modalEl).show();
     });
   });

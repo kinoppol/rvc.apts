@@ -418,7 +418,9 @@ final class Booking
             $effectiveEnd = !empty($row['checked_out_at']) ? new DateTimeImmutable($row['checked_out_at']) : $end;
             $deadline = $effectiveEnd->modify('+' . self::REPORT_DEADLINE_DAYS . ' days');
             $row['reported'] = $reported;
-            $row['needsReport'] = in_array($status, ['completed', 'checked_out']) && !$reported && $row['hasCheckedIn'];
+            // Allow reporting if checked in, OR if a report already exists (legacy rows without check-in).
+            $row['canReport'] = in_array($status, ['completed', 'checked_out']) && ($row['hasCheckedIn'] || $reported);
+            $row['needsReport'] = $row['canReport'] && !$reported;
             $row['reportOverdue'] = $row['needsReport'] && $now > $deadline;
             $row['reportDeadlineLabel'] = self::thaiDate($deadline);
             $daysLeft = (int) (new DateTimeImmutable($now->format('Y-m-d')))->diff(new DateTimeImmutable($deadline->format('Y-m-d')))->format('%r%a');
@@ -450,8 +452,8 @@ final class Booking
                 // "upcoming" tab includes all active/imminent states
                 $rows = array_values(array_filter($rows, fn ($r) => in_array($r['displayStatus'], ['upcoming', 'check_in_ready', 'checked_in', 'now', 'checked_out'])));
             } elseif ($filter === 'completed') {
-                // no_show bookings show alongside completed (slot ended, student didn't use it)
-                $rows = array_values(array_filter($rows, fn ($r) => in_array($r['displayStatus'], ['completed', 'no_show'])));
+                // checked_out bookings show here too (student ended early but slot hasn't finished)
+                $rows = array_values(array_filter($rows, fn ($r) => in_array($r['displayStatus'], ['completed', 'no_show', 'checked_out'])));
             } else {
                 $rows = array_values(array_filter($rows, fn ($r) => $r['displayStatus'] === $filter));
             }
@@ -573,17 +575,14 @@ final class Booking
         if (!$doneEarly && new DateTimeImmutable() < new DateTimeImmutable($b['end_datetime'])) {
             return ['ok' => false, 'error' => 'ยังใช้งานไม่เสร็จ ยังไม่ต้องรายงาน'];
         }
-        if (!empty($b['reported_at'])) {
-            return ['ok' => false, 'error' => 'รายการนี้รายงานไปแล้ว'];
-        }
-
         $text = trim($text);
         $hasFile = $file && isset($file['error']) && $file['error'] === UPLOAD_ERR_OK;
-        if ($text === '' && !$hasFile) {
+        $hasExistingFile = !empty($b['report_file']);
+        if ($text === '' && !$hasFile && !$hasExistingFile) {
             return ['ok' => false, 'error' => 'กรุณากรอกรายละเอียดการใช้งาน หรือแนบไฟล์อย่างน้อยหนึ่งอย่าง'];
         }
 
-        $storedFile = null;
+        $storedFile = $hasExistingFile ? $b['report_file'] : null; // keep existing unless replaced
         if ($hasFile) {
             $res = self::storeReportFile($file, $bookingId);
             if (!$res['ok']) {

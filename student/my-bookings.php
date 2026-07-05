@@ -172,11 +172,18 @@ require __DIR__ . '/../includes/header.php';
             </form>
             <?php endif; ?>
 
-            <?php if ($bk['needsReport']): ?>
-              <span class="<?= $bk['reportOverdue'] ? 'badge-susp' : 'badge-pend' ?>" style="font-size:11px"><?= e($bk['reportStatusText']) ?></span>
-              <button type="button" class="action-btn-blue" data-report-booking data-id="<?= (int) $bk['id'] ?>" data-meta="<?= e($bk['dateLabel'] . ' · ' . $bk['slotLabel']) ?>"><i class="bi bi-journal-text me-1"></i>รายงาน</button>
-            <?php elseif ($bk['reported'] && $bk['displayStatus'] === 'completed'): ?>
-              <span class="badge-ok" style="font-size:11px"><i class="bi bi-check-circle me-1"></i>รายงานแล้ว</span>
+            <?php if ($bk['canReport']): ?>
+              <?php if ($bk['needsReport']): ?>
+                <span class="<?= $bk['reportOverdue'] ? 'badge-susp' : 'badge-pend' ?>" style="font-size:11px"><?= e($bk['reportStatusText']) ?></span>
+              <?php elseif ($bk['reported']): ?>
+                <span class="badge-ok" style="font-size:11px"><i class="bi bi-check-circle me-1"></i>รายงานแล้ว</span>
+              <?php endif; ?>
+              <button type="button" class="action-btn-blue" data-report-booking
+                data-id="<?= (int) $bk['id'] ?>"
+                data-meta="<?= e($bk['dateLabel'] . ' · ' . $bk['slotLabel']) ?>"
+                data-report-text="<?= e($bk['report_text'] ?? '') ?>">
+                <i class="bi bi-journal-text me-1"></i><?= $bk['reported'] ? 'แก้ไขรายงาน' : 'รายงาน' ?>
+              </button>
             <?php endif; ?>
             <?php if ($bk['canCancel']): ?>
               <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0" onsubmit="return confirm('ยืนยันการยกเลิกการจองนี้?')">
