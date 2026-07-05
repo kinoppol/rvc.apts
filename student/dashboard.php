@@ -33,6 +33,7 @@ require __DIR__ . '/../includes/header.php';
   </div>
   <?php if ($ea['hasCheckedIn']): ?>
   <div style="background:white;border-radius:8px;padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13px">
+    <span style="font-size:11px;color:#059669;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0"><i class="bi bi-clock-history"></i>เช็คอินเมื่อ <?= e((new DateTimeImmutable($ea['checked_in_at']))->format('H:i')) ?> น.</span>
     <div style="display:flex;align-items:center;gap:6px">
       <span style="font-size:12px;color:var(--bs-secondary-color)">อีเมล:</span>
       <strong><?= e($ea['ai_email']) ?></strong>
@@ -148,6 +149,7 @@ require __DIR__ . '/../includes/header.php';
           </div>
           <?php if ($next['displayStatus'] === 'now'): ?>
           <div style="margin-top:12px;padding:10px 12px;background:var(--bs-secondary-bg);border-radius:8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13px;border:1px solid var(--bs-border-color)">
+            <?php if (!empty($next['checked_in_at'])): ?><span style="font-size:11px;color:#059669;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0"><i class="bi bi-clock-history"></i>เช็คอินเมื่อ <?= e((new DateTimeImmutable($next['checked_in_at']))->format('H:i')) ?> น.</span><?php endif; ?>
             <span style="display:flex;align-items:center;gap:5px;color:var(--bs-secondary-color)">อีเมล: <strong style="color:var(--bs-body-color)"><?= e($next['ai_email']) ?></strong>
               <button type="button" title="คัดลอกอีเมล" style="background:none;border:1px solid var(--bs-border-color);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--bs-secondary-color);font-size:11px;line-height:1"
                 onclick="copyText(this,<?= e(json_encode($next['ai_email'], JSON_UNESCAPED_UNICODE)) ?>)"><i class="bi bi-clipboard"></i></button>
