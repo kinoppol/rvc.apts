@@ -49,17 +49,17 @@ require __DIR__ . '/../includes/header.php';
 <h5 style="font-weight:700;margin:0 0 20px">การจองของฉัน</h5>
 
 <?php foreach ($earlyAccess as $ea): ?>
-<div style="background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:10px;padding:14px 16px;margin-bottom:12px">
+<div class="ea-banner" style="border-radius:10px;padding:14px 16px;margin-bottom:12px">
   <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
     <i class="bi bi-lightning-charge-fill" style="color:#059669;font-size:17px;margin-top:1px;flex-shrink:0"></i>
     <div style="flex:1;min-width:0">
-      <div style="font-size:14px;font-weight:700;color:#065F46">ใช้งาน <?= e($ea['ai_name']) ?> ได้ล่วงหน้า!</div>
+      <div class="ea-text-title" style="font-size:14px;font-weight:700">ใช้งาน <?= e($ea['ai_name']) ?> ได้ล่วงหน้า!</div>
       <div style="font-size:12px;color:#059669;margin-top:2px">ช่วง <?= e($ea['prevSlotLabel']) ?> ไม่มีผู้ใช้งาน · ใช้ได้จนถึงสิ้นสุด<?= e($ea['slotLabel']) ?></div>
     </div>
     <span class="badge-ok" style="flex-shrink:0">ช่วงก่อนหน้าว่าง</span>
   </div>
   <?php if ($ea['hasCheckedIn']): ?>
-  <div style="background:white;border-radius:8px;padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13px">
+  <div class="ea-cred-box" style="border-radius:8px;padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13px">
     <span style="font-size:11px;color:#059669;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0"><i class="bi bi-clock-history"></i>เช็คอินเมื่อ <?= e((new DateTimeImmutable($ea['checked_in_at']))->format('H:i')) ?> น.</span>
     <div style="display:flex;align-items:center;gap:6px">
       <span style="font-size:12px;color:var(--bs-secondary-color)">อีเมล:</span>
@@ -91,12 +91,12 @@ require __DIR__ . '/../includes/header.php';
 <?php endforeach; ?>
 
 <?php if ($restricted): ?>
-  <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:#991B1B;display:flex;gap:8px;align-items:flex-start">
+  <div class="bk-alert-err" style="border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;display:flex;gap:8px;align-items:flex-start">
     <i class="bi bi-slash-circle-fill" style="flex-shrink:0;margin-top:1px"></i>
     <span><strong>ถูกระงับการจองชั่วคราว</strong> — มีรายงานค้างเกินกำหนด <?= Booking::REPORT_DEADLINE_DAYS ?> วัน กรุณากดปุ่ม "รายงาน" ในรายการด้านล่างให้ครบ ระบบจะปลดล็อกให้จองได้อีกครั้งทันที</span>
   </div>
 <?php elseif ($pendingReports): ?>
-  <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400E;display:flex;gap:8px;align-items:center">
+  <div class="bk-alert-warn" style="border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;display:flex;gap:8px;align-items:center">
     <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0"></i>
     <span>มีการใช้งานที่ยังไม่ได้รายงาน <strong><?= count($pendingReports) ?></strong> รายการ กรุณารายงานภายใน <?= Booking::REPORT_DEADLINE_DAYS ?> วันหลังใช้งาน ไม่เช่นนั้นจะถูกระงับการจอง</span>
   </div>
@@ -117,8 +117,8 @@ require __DIR__ . '/../includes/header.php';
           $showEarlyCheckIn = $ea && !$bk['hasCheckedIn'];
           $isActive = in_array($bk['displayStatus'], ['now', 'checked_in', 'check_in_ready']);
         ?>
-        <div style="display:flex;align-items:<?= ($ea || $showCredentials || $bk['canCheckIn'] || $showEarlyCheckIn) ? 'flex-start' : 'center' ?>;gap:14px;padding:14px;border:1.5px solid <?= $ea ? '#6EE7B7' : ($isActive ? '#BFDBFE' : 'var(--bs-border-color)') ?>;border-radius:10px;<?= $ea ? 'background:#F0FDF4' : ($isActive ? 'background:#EFF6FF' : '') ?>">
-          <div style="width:44px;height:44px;border-radius:10px;background:<?= $ea ? '#DCFCE7' : ($bk['displayStatus'] === 'now' ? '#DCFCE7' : ($isActive ? '#DBEAFE' : '#EFF6FF')) ?>;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:<?= ($ea || $isActive) ? '2px' : '0' ?>">
+        <div class="<?= $ea ? 'bk-row-ea' : ($isActive ? 'bk-row-active' : 'bk-row-default') ?>" style="display:flex;align-items:<?= ($ea || $showCredentials || $bk['canCheckIn'] || $showEarlyCheckIn) ? 'flex-start' : 'center' ?>;gap:14px;padding:14px;border-radius:10px">
+          <div class="<?= $ea ? 'bk-icon-ea' : ($bk['displayStatus'] === 'now' ? 'bk-icon-now' : ($isActive ? 'bk-icon-active' : 'bk-icon-default')) ?>" style="width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:<?= ($ea || $isActive) ? '2px' : '0' ?>">
             <i class="bi <?= $ea ? 'bi-lightning-charge-fill' : ($bk['displayStatus'] === 'now' ? 'bi-broadcast' : ($bk['canCheckIn'] ? 'bi-qr-code-scan' : 'bi-calendar3')) ?>" style="color:<?= $ea ? '#059669' : ($bk['displayStatus'] === 'now' ? '#059669' : ($isActive ? '#2563EB' : '#2563EB')) ?>;font-size:18px"></i>
           </div>
           <div style="flex:1;min-width:0">
@@ -127,8 +127,8 @@ require __DIR__ . '/../includes/header.php';
             <?php if (!empty($bk['purpose'])): ?><div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:2px"><i class="bi bi-bullseye me-1"></i><?= e($bk['purpose']) ?></div><?php endif; ?>
 
             <?php if ($showCredentials): ?>
-            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px;padding:8px 10px;background:<?= $ea ? 'white' : 'var(--bs-secondary-bg)' ?>;border-radius:7px;font-size:12px;border:1px solid <?= $ea ? '#BBF7D0' : 'var(--bs-border-color)' ?>">
-              <?php if ($ea): ?><span style="color:#065F46;font-size:11px"><i class="bi bi-lightning-charge-fill me-1" style="color:#059669"></i>ใช้งานล่วงหน้า</span><?php endif; ?>
+            <div class="<?= $ea ? 'bk-cred-ea' : '' ?>" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px;padding:8px 10px;<?= $ea ? '' : 'background:var(--bs-secondary-bg);border:1px solid var(--bs-border-color);' ?>border-radius:7px;font-size:12px">
+              <?php if ($ea): ?><span class="bk-ea-label" style="font-size:11px"><i class="bi bi-lightning-charge-fill me-1" style="color:#059669"></i>ใช้งานล่วงหน้า</span><?php endif; ?>
               <?php if (!empty($bk['checked_in_at'])): ?><span style="font-size:11px;color:#059669;display:flex;align-items:center;gap:3px;white-space:nowrap;flex-shrink:0"><i class="bi bi-clock-history"></i>เช็คอินเมื่อ <?= e((new DateTimeImmutable($bk['checked_in_at']))->format('H:i')) ?> น.</span><?php endif; ?>
               <span style="display:flex;align-items:center;gap:5px;color:var(--bs-secondary-color)">อีเมล: <strong style="color:var(--bs-body-color)"><?= e($bk['ai_email']) ?></strong>
                 <button type="button" title="คัดลอกอีเมล" style="background:none;border:1px solid var(--bs-border-color);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--bs-secondary-color);font-size:11px;line-height:1"

@@ -77,3 +77,31 @@ html,body{margin:0;padding:0}
 .nav-tab-active{color:#2563EB;border-bottom:2px solid #2563EB;font-weight:600}
 .nav-tab-inactive{color:var(--bs-secondary-color);border-bottom:2px solid transparent}
 html,body{height:100%}
+/* ── my-bookings dark mode helpers ── */
+.ea-banner{background:#ECFDF5;border:1.5px solid #6EE7B7}
+[data-bs-theme="dark"] .ea-banner{background:#052e16;border-color:#166534}
+.ea-text-title{color:#065F46}
+[data-bs-theme="dark"] .ea-text-title{color:#86efac}
+.ea-cred-box{background:white;border-radius:8px}
+[data-bs-theme="dark"] .ea-cred-box{background:#1e293b}
+.bk-alert-err{background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;border-radius:8px}
+[data-bs-theme="dark"] .bk-alert-err{background:#450a0a;border-color:#7f1d1d;color:#fca5a5}
+.bk-alert-warn{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:8px}
+[data-bs-theme="dark"] .bk-alert-warn{background:#451a03;border-color:#78350f;color:#fcd34d}
+.bk-row-ea{border:1.5px solid #6EE7B7;background:#F0FDF4}
+[data-bs-theme="dark"] .bk-row-ea{background:#052e16;border-color:#166534}
+.bk-row-active{border:1.5px solid #BFDBFE;background:#EFF6FF}
+[data-bs-theme="dark"] .bk-row-active{background:#172554;border-color:#1d4ed8}
+.bk-row-default{border:1.5px solid var(--bs-border-color)}
+.bk-icon-ea{background:#DCFCE7}
+[data-bs-theme="dark"] .bk-icon-ea{background:#14532d}
+.bk-icon-now{background:#DCFCE7}
+[data-bs-theme="dark"] .bk-icon-now{background:#14532d}
+.bk-icon-active{background:#DBEAFE}
+[data-bs-theme="dark"] .bk-icon-active{background:#172554}
+.bk-icon-default{background:#EFF6FF}
+[data-bs-theme="dark"] .bk-icon-default{background:#1e293b}
+.bk-cred-ea{background:white;border:1px solid #BBF7D0}
+[data-bs-theme="dark"] .bk-cred-ea{background:#1e293b;border-color:#166534}
+.bk-ea-label{color:#065F46}
+[data-bs-theme="dark"] .bk-ea-label{color:#86efac}
