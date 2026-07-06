@@ -12,4 +12,8 @@ define('DB_USER',    $_localCfg['user']    ?? 'root');
 define('DB_PASS',    $_localCfg['pass']    ?? '');
 define('DB_CHARSET', 'utf8mb4');
 
+// Optional explicit URL base (e.g. '/web'). When set, bootstrap.php skips auto-detection.
+// Needed when Apache/Nginx serves the app via an Alias or symlink that doesn't match __DIR__.
+define('APP_BASE_OVERRIDE', $_localCfg['app_base'] ?? '');
+
 unset($_localCfg);

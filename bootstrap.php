@@ -18,10 +18,16 @@ require_once __DIR__ . '/includes/AiAccount.php';
 require_once __DIR__ . '/includes/Report.php';
 require_once __DIR__ . '/includes/Notification.php';
 
-// URL prefix of the project root, so links work regardless of the WAMP vhost name.
-$docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? '');
-$projectDir = str_replace('\\', '/', __DIR__);
-define('APP_BASE', rtrim(substr($projectDir, strlen($docRoot)), '/'));
+// URL prefix of the project root so all links are portable regardless of server path.
+// config.local.php may set APP_BASE_OVERRIDE when auto-detection is wrong (e.g. Apache Alias).
+if (defined('APP_BASE_OVERRIDE') && APP_BASE_OVERRIDE !== '') {
+    define('APP_BASE', rtrim(APP_BASE_OVERRIDE, '/'));
+} else {
+    $docRoot    = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? '');
+    $projectDir = str_replace('\\', '/', __DIR__);
+    define('APP_BASE', rtrim(substr($projectDir, strlen($docRoot)), '/'));
+}
+unset($docRoot, $projectDir);
 
 function current_user(): ?array
 {
