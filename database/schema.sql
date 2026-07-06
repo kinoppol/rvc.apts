@@ -47,6 +47,8 @@ CREATE TABLE ai_accounts (
     expires_at           DATETIME NULL,                       -- when reached, the account is treated as disabled (derived at read time)
     password_updated_at  DATETIME NULL,                       -- last time the shared password was changed
     password_reminder    ENUM('none','daily','weekly','monthly') NOT NULL DEFAULT 'none',
+    monthly_cost         DECIMAL(10,2) NULL DEFAULT NULL,          -- optional monthly subscription cost
+    cost_per_slot        DECIMAL(10,2) NULL DEFAULT NULL,          -- optional cost charged per booked slot
     created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_ai_accounts_provider FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE SET NULL,
     KEY idx_ai_accounts_expires (expires_at)
@@ -68,6 +70,7 @@ CREATE TABLE slot_settings (
     weekly_quota      TINYINT UNSIGNED NOT NULL DEFAULT 3,
     max_advance_days  SMALLINT UNSIGNED NOT NULL DEFAULT 14,
     day_start_time    TIME NOT NULL DEFAULT '08:00:00',
+    terms_file        VARCHAR(255) NULL DEFAULT NULL,              -- filename of the active terms-of-service PDF (NULL = no terms required)
     CONSTRAINT chk_slot_settings_singleton CHECK (id = 1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -87,6 +90,9 @@ CREATE TABLE bookings (
     report_text    TEXT NULL,                          -- post-use report body
     report_file    VARCHAR(255) NULL,                  -- optional uploaded evidence (image/PDF) filename
     reported_at    DATETIME NULL,                      -- when the usage report was submitted (NULL = not yet reported)
+    token_start_pct TINYINT UNSIGNED NULL DEFAULT NULL, -- token usage % at start of session (0-100)
+    token_end_pct   TINYINT UNSIGNED NULL DEFAULT NULL, -- token usage % at end of session (0-100)
+    token_reset_at  DATETIME NULL DEFAULT NULL,          -- when account tokens were reset during session
     created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     cancelled_at   DATETIME NULL,
     checked_in_at  DATETIME NULL,                        -- when the student pressed check-in (NULL = not yet checked in)
