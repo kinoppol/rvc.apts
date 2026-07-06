@@ -13,5 +13,10 @@ ALTER TABLE bookings
     IF(checked_out_at IS NULL AND status = 'upcoming', slot_index, NULL)
   ) VIRTUAL;
 
+-- The old uniq_account_slot index was also serving as the supporting index for
+-- fk_bookings_ai_account.  Create a plain index on ai_account_id first so the FK
+-- has something to use before we drop the unique key.
+ALTER TABLE bookings ADD INDEX IF NOT EXISTS idx_bookings_ai_account (ai_account_id);
+
 ALTER TABLE bookings DROP INDEX IF EXISTS uniq_account_slot;
 ALTER TABLE bookings ADD UNIQUE KEY uniq_account_slot (ai_account_id, booking_date, slot_uniq_guard);
