@@ -51,9 +51,17 @@ function write_local_cfg(string $host, string $port, string $name, string $user,
 /** Auto-detect APP_BASE the same way bootstrap.php does (for display in the form). */
 function detect_app_base(): string
 {
-    $docRoot    = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? '');
-    $projectDir = str_replace('\\', '/', __DIR__);
-    return rtrim(substr($projectDir, strlen($docRoot)), '/');
+    $projectRoot    = str_replace('\\', '/', __DIR__);
+    $scriptFilename = str_replace('\\', '/', $_SERVER['SCRIPT_FILENAME'] ?? '');
+    $scriptName     = $_SERVER['SCRIPT_NAME'] ?? '';
+    $relScript      = str_starts_with($scriptFilename, $projectRoot . '/')
+                        ? substr($scriptFilename, strlen($projectRoot) + 1)
+                        : '';
+    if ($relScript !== '' && str_ends_with($scriptName, '/' . $relScript)) {
+        return substr($scriptName, 0, -strlen('/' . $relScript));
+    }
+    $docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? '');
+    return rtrim(substr($projectRoot, strlen($docRoot)), '/');
 }
 
 /** New PDO using explicit settings; $withDb selects the app database. */

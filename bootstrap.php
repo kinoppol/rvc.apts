@@ -18,16 +18,31 @@ require_once __DIR__ . '/includes/AiAccount.php';
 require_once __DIR__ . '/includes/Report.php';
 require_once __DIR__ . '/includes/Notification.php';
 
-// URL prefix of the project root so all links are portable regardless of server path.
-// config.local.php may set APP_BASE_OVERRIDE when auto-detection is wrong (e.g. Apache Alias).
+// Compute APP_BASE (URL prefix of the project root) — three-level fallback:
+//   1. Explicit override from config.local.php (set via install.php for edge cases)
+//   2. SCRIPT_NAME vs SCRIPT_FILENAME — reliable even with Apache Alias / symlinks:
+//      strip the script's path-relative-to-project-root from the URL path.
+//   3. DOCUMENT_ROOT comparison — last resort (works on plain WAMP but not with Alias).
 if (defined('APP_BASE_OVERRIDE') && APP_BASE_OVERRIDE !== '') {
     define('APP_BASE', rtrim(APP_BASE_OVERRIDE, '/'));
 } else {
-    $docRoot    = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? '');
-    $projectDir = str_replace('\\', '/', __DIR__);
-    define('APP_BASE', rtrim(substr($projectDir, strlen($docRoot)), '/'));
+    $projectRoot    = str_replace('\\', '/', __DIR__);
+    $scriptFilename = str_replace('\\', '/', $_SERVER['SCRIPT_FILENAME'] ?? '');
+    $scriptName     = $_SERVER['SCRIPT_NAME'] ?? '';
+    $relScript      = str_starts_with($scriptFilename, $projectRoot . '/')
+                        ? substr($scriptFilename, strlen($projectRoot) + 1)
+                        : '';
+
+    if ($relScript !== '' && str_ends_with($scriptName, '/' . $relScript)) {
+        // e.g. SCRIPT_NAME=/web/admin/slots.php, relScript=admin/slots.php → APP_BASE=/web
+        define('APP_BASE', substr($scriptName, 0, -strlen('/' . $relScript)));
+    } else {
+        // Fallback: DOCUMENT_ROOT (unreliable with Alias; kept for WAMP compatibility)
+        $docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? '');
+        define('APP_BASE', rtrim(substr($projectRoot, strlen($docRoot)), '/'));
+    }
+    unset($projectRoot, $scriptFilename, $scriptName, $relScript, $docRoot);
 }
-unset($docRoot, $projectDir);
 
 function current_user(): ?array
 {
