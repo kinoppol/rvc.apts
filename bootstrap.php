@@ -19,29 +19,31 @@ require_once __DIR__ . '/includes/Report.php';
 require_once __DIR__ . '/includes/Notification.php';
 
 // Compute APP_BASE (URL prefix of the project root) — three-level fallback:
-//   1. Explicit override from config.local.php (set via install.php for edge cases)
-//   2. SCRIPT_NAME vs SCRIPT_FILENAME — reliable even with Apache Alias / symlinks:
-//      strip the script's path-relative-to-project-root from the URL path.
-//   3. DOCUMENT_ROOT comparison — last resort (works on plain WAMP but not with Alias).
+//   1. Explicit override from config.local.php (set via install.php for unusual setups)
+//   2. REQUEST_URI vs SCRIPT_FILENAME — most reliable: REQUEST_URI is the URL exactly as
+//      the browser sent it (before any server rewrite/alias), so it always reflects the
+//      real external path even when Apache Alias / RewriteRule hides the internal structure.
+//   3. DOCUMENT_ROOT comparison — last resort (plain WAMP, no alias).
 if (defined('APP_BASE_OVERRIDE') && APP_BASE_OVERRIDE !== '') {
     define('APP_BASE', rtrim(APP_BASE_OVERRIDE, '/'));
 } else {
     $projectRoot    = str_replace('\\', '/', __DIR__);
     $scriptFilename = str_replace('\\', '/', $_SERVER['SCRIPT_FILENAME'] ?? '');
-    $scriptName     = $_SERVER['SCRIPT_NAME'] ?? '';
+    // REQUEST_URI = URL as the browser sent it, e.g. /web/admin/slots.php?x=1
+    $requestPath    = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
     $relScript      = str_starts_with($scriptFilename, $projectRoot . '/')
-                        ? substr($scriptFilename, strlen($projectRoot) + 1)
+                        ? substr($scriptFilename, strlen($projectRoot) + 1)  // e.g. admin/slots.php
                         : '';
 
-    if ($relScript !== '' && str_ends_with($scriptName, '/' . $relScript)) {
-        // e.g. SCRIPT_NAME=/web/admin/slots.php, relScript=admin/slots.php → APP_BASE=/web
-        define('APP_BASE', substr($scriptName, 0, -strlen('/' . $relScript)));
+    if ($relScript !== '' && str_ends_with($requestPath, '/' . $relScript)) {
+        // /web/admin/slots.php ends with /admin/slots.php → APP_BASE = /web
+        define('APP_BASE', substr($requestPath, 0, -strlen('/' . $relScript)));
     } else {
-        // Fallback: DOCUMENT_ROOT (unreliable with Alias; kept for WAMP compatibility)
+        // Fallback: DOCUMENT_ROOT (works on WAMP; unreliable with Alias)
         $docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? '');
         define('APP_BASE', rtrim(substr($projectRoot, strlen($docRoot)), '/'));
     }
-    unset($projectRoot, $scriptFilename, $scriptName, $relScript, $docRoot);
+    unset($projectRoot, $scriptFilename, $requestPath, $relScript, $docRoot);
 }
 
 function current_user(): ?array
