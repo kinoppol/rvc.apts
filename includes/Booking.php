@@ -276,8 +276,9 @@ final class Booking
         $pdo->beginTransaction();
         try {
             // How many pools the user already holds in this slot (max_concurrent cap).
+            // Exclude checked-out rows — the user released those pools and they no longer count.
             $mineStmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM bookings WHERE user_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming' FOR UPDATE"
+                "SELECT COUNT(*) FROM bookings WHERE user_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming' AND checked_out_at IS NULL FOR UPDATE"
             );
             $mineStmt->execute([$userId, $dateStr, $slotIndex]);
             if ((int) $mineStmt->fetchColumn() + count($accountIds) > (int) $settings['max_concurrent']) {
@@ -286,8 +287,9 @@ final class Booking
             }
 
             // Every chosen pool must still be free for this slot.
+            // Checked-out bookings release the pool, so exclude them from the taken check.
             $takenStmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM bookings WHERE ai_account_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming' FOR UPDATE"
+                "SELECT COUNT(*) FROM bookings WHERE ai_account_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming' AND checked_out_at IS NULL FOR UPDATE"
             );
             foreach ($accountIds as $accountId) {
                 $takenStmt->execute([$accountId, $dateStr, $slotIndex]);
