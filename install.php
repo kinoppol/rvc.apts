@@ -53,12 +53,14 @@ function detect_app_base(): string
 {
     $projectRoot    = str_replace('\\', '/', __DIR__);
     $scriptFilename = str_replace('\\', '/', $_SERVER['SCRIPT_FILENAME'] ?? '');
-    $requestPath    = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
     $relScript      = str_starts_with($scriptFilename, $projectRoot . '/')
                         ? substr($scriptFilename, strlen($projectRoot) + 1)
                         : '';
-    if ($relScript !== '' && str_ends_with($requestPath, '/' . $relScript)) {
-        return substr($requestPath, 0, -strlen('/' . $relScript));
+    foreach (array_filter([$_SERVER['REDIRECT_URL'] ?? '', $_SERVER['REQUEST_URI'] ?? '']) as $raw) {
+        $p = parse_url($raw, PHP_URL_PATH) ?? '';
+        if ($relScript !== '' && $p !== '' && str_ends_with($p, '/' . $relScript)) {
+            return substr($p, 0, -strlen('/' . $relScript));
+        }
     }
     $docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? '');
     return rtrim(substr($projectRoot, strlen($docRoot)), '/');
