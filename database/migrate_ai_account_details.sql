@@ -28,10 +28,9 @@ UPDATE ai_accounts a
     SET a.provider_id = p.id
     WHERE a.provider_id IS NULL;
 
--- 4) Index + FK. The index uses IF NOT EXISTS; the FK has no IF NOT EXISTS in MariaDB, so if you
---    re-run this migration and it errors on "Duplicate key name fk_ai_accounts_provider", that FK is
---    already in place and the error is safe to ignore.
+-- 4) Index + FK. Drop FK first so the ADD is idempotent (MariaDB has no IF NOT EXISTS for FK names).
 ALTER TABLE ai_accounts
     ADD KEY IF NOT EXISTS idx_ai_accounts_expires (expires_at);
+ALTER TABLE ai_accounts DROP FOREIGN KEY IF EXISTS fk_ai_accounts_provider;
 ALTER TABLE ai_accounts
     ADD CONSTRAINT fk_ai_accounts_provider FOREIGN KEY (provider_id) REFERENCES ai_providers(id) ON DELETE SET NULL;

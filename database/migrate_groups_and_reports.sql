@@ -24,7 +24,7 @@ ALTER TABLE bookings
     ADD COLUMN IF NOT EXISTS report_file VARCHAR(255) NULL AFTER report_text,
     ADD COLUMN IF NOT EXISTS reported_at DATETIME NULL AFTER report_file;
 
--- 4) FK for users.group_id. No IF NOT EXISTS for constraints in MariaDB, so a
---    "Duplicate key name fk_users_group" error on re-run is safe to ignore.
+-- 4) FK for users.group_id. Drop first so the ADD is idempotent (MariaDB has no IF NOT EXISTS for FK names).
+ALTER TABLE users DROP FOREIGN KEY IF EXISTS fk_users_group;
 ALTER TABLE users
     ADD CONSTRAINT fk_users_group FOREIGN KEY (group_id) REFERENCES user_groups(id) ON DELETE SET NULL;
