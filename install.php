@@ -48,22 +48,26 @@ function write_local_cfg(string $host, string $port, string $name, string $user,
     return (bool) file_put_contents(LOCAL_CFG, $tpl);
 }
 
-/** Auto-detect APP_BASE the same way bootstrap.php does (for display in the form). */
+/** Auto-detect APP_BASE using the same logic as bootstrap.php. */
 function detect_app_base(): string
 {
-    $projectRoot    = str_replace('\\', '/', __DIR__);
-    $scriptFilename = str_replace('\\', '/', $_SERVER['SCRIPT_FILENAME'] ?? '');
-    $relScript      = str_starts_with($scriptFilename, $projectRoot . '/')
-                        ? substr($scriptFilename, strlen($projectRoot) + 1)
-                        : '';
-    foreach (array_filter([$_SERVER['REDIRECT_URL'] ?? '', $_SERVER['REQUEST_URI'] ?? '']) as $raw) {
-        $p = parse_url($raw, PHP_URL_PATH) ?? '';
-        if ($relScript !== '' && $p !== '' && str_ends_with($p, '/' . $relScript)) {
-            return substr($p, 0, -strlen('/' . $relScript));
-        }
+    $docRoot         = rtrim(str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+    $scriptFilename  = str_replace('\\', '/', $_SERVER['SCRIPT_FILENAME'] ?? '');
+    $realProjectRoot = str_replace('\\', '/', __DIR__);
+    $realEntryScript = str_replace('\\', '/', (string) realpath($scriptFilename));
+
+    $relInProject = ($realEntryScript !== '' && str_starts_with($realEntryScript, $realProjectRoot . '/'))
+        ? substr($realEntryScript, strlen($realProjectRoot) + 1) : '';
+    $relFromDocRoot = ($docRoot !== '' && str_starts_with($scriptFilename, $docRoot . '/'))
+        ? substr($scriptFilename, strlen($docRoot) + 1) : '';
+
+    if ($relInProject !== '' && $relFromDocRoot !== '') {
+        $base  = dirname('/' . $relFromDocRoot);
+        $depth = count(array_filter(explode('/', dirname($relInProject)), fn($p) => $p !== '' && $p !== '.'));
+        for ($i = 0; $i < $depth; $i++) { $base = dirname($base); }
+        return $base === '/' ? '' : $base;
     }
-    $docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? '');
-    return rtrim(substr($projectRoot, strlen($docRoot)), '/');
+    return rtrim(substr($realProjectRoot, strlen($docRoot)), '/');
 }
 
 /** New PDO using explicit settings; $withDb selects the app database. */

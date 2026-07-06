@@ -24,44 +24,54 @@ require_once __DIR__ . '/includes/Notification.php';
 //      the browser sent it (before any server rewrite/alias), so it always reflects the
 //      real external path even when Apache Alias / RewriteRule hides the internal structure.
 //   3. DOCUMENT_ROOT comparison — last resort (plain WAMP, no alias).
-// Compute APP_BASE (URL prefix of the project root) — detection order:
-//   1. Explicit override via config.local.php 'app_base' key (most reliable edge-case fix).
-//   2. REDIRECT_URL  — set by Apache mod_rewrite to the *original* pre-rewrite URL.
-//      When a RewriteRule fires it updates REQUEST_URI to the internal path but keeps the
-//      original browser URL in REDIRECT_URL — exactly what we need.
-//   3. REQUEST_URI   — correct when there is no rewrite (plain servers, WAMP).
-//   4. DOCUMENT_ROOT — last resort fallback for WAMP-style setups.
+// Compute APP_BASE (URL prefix of the project root).
+//
+// The server uses a symlink:  /var/www/web -> /var/www/rvc.apts
+// Apache resolves symlinks for SCRIPT_FILENAME → /var/www/web/login.php
+// PHP realpath() resolves them for __DIR__     → /var/www/rvc.apts
+//
+// Strategy:
+//   1. Explicit override from config.local.php (escape hatch for unusual setups).
+//   2. Use SCRIPT_FILENAME (symlink-aware URL path) relative to DOCUMENT_ROOT to get
+//      the URL directory, then ascend the same number of levels the current script sits
+//      below the project root (computed via realpath to match __DIR__).
+//   3. DOCUMENT_ROOT vs __DIR__ fallback (works on plain WAMP with no symlinks).
 if (defined('APP_BASE_OVERRIDE') && APP_BASE_OVERRIDE !== '') {
     define('APP_BASE', rtrim(APP_BASE_OVERRIDE, '/'));
 } else {
-    $projectRoot    = str_replace('\\', '/', __DIR__);
-    $scriptFilename = str_replace('\\', '/', $_SERVER['SCRIPT_FILENAME'] ?? '');
-    $relScript      = str_starts_with($scriptFilename, $projectRoot . '/')
-                        ? substr($scriptFilename, strlen($projectRoot) + 1)
-                        : '';
+    $docRoot         = rtrim(str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+    $scriptFilename  = str_replace('\\', '/', $_SERVER['SCRIPT_FILENAME'] ?? '');
+    $realProjectRoot = str_replace('\\', '/', __DIR__);
 
-    // Prefer REDIRECT_URL (original pre-rewrite URL) over REQUEST_URI (post-rewrite).
-    $candidates = array_filter([
-        $_SERVER['REDIRECT_URL'] ?? '',   // Apache mod_rewrite original URL
-        $_SERVER['REQUEST_URI']  ?? '',   // raw request (no rewrite, or post-rewrite)
-    ]);
+    // realpath() on SCRIPT_FILENAME resolves symlinks → comparable to __DIR__ convention.
+    $realEntryScript = str_replace('\\', '/', (string) realpath($scriptFilename));
 
-    $detected = false;
-    foreach ($candidates as $raw) {
-        $p = parse_url($raw, PHP_URL_PATH) ?? '';
-        if ($relScript !== '' && $p !== '' && str_ends_with($p, '/' . $relScript)) {
-            define('APP_BASE', substr($p, 0, -strlen('/' . $relScript)));
-            $detected = true;
-            break;
+    // Depth of the entry script within the project (e.g. 'admin/slots.php' → depth 1).
+    $relInProject = ($realEntryScript !== '' && str_starts_with($realEntryScript, $realProjectRoot . '/'))
+        ? substr($realEntryScript, strlen($realProjectRoot) + 1)
+        : '';
+
+    // URL-relative path of the entry script from the document root (preserves symlink name).
+    $relFromDocRoot = ($docRoot !== '' && str_starts_with($scriptFilename, $docRoot . '/'))
+        ? substr($scriptFilename, strlen($docRoot) + 1)
+        : '';
+
+    if ($relInProject !== '' && $relFromDocRoot !== '') {
+        // Start from the URL directory of the entry script, e.g. /web/admin.
+        $base = dirname('/' . $relFromDocRoot);
+        // Ascend one level per subdirectory the script is below the project root.
+        $depth = count(array_filter(explode('/', dirname($relInProject)), fn($p) => $p !== '' && $p !== '.'));
+        for ($i = 0; $i < $depth; $i++) {
+            $base = dirname($base);
         }
+        define('APP_BASE', $base === '/' ? '' : $base);
+    } else {
+        // Fallback: direct __DIR__ vs DOCUMENT_ROOT (correct when no symlinks involved).
+        define('APP_BASE', rtrim(substr($realProjectRoot, strlen($docRoot)), '/'));
     }
 
-    if (!$detected) {
-        $docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? '');
-        define('APP_BASE', rtrim(substr($projectRoot, strlen($docRoot)), '/'));
-    }
-
-    unset($projectRoot, $scriptFilename, $relScript, $candidates, $detected, $raw, $p, $docRoot);
+    unset($docRoot, $scriptFilename, $realProjectRoot, $realEntryScript,
+          $relInProject, $relFromDocRoot, $base, $depth, $i);
 }
 
 function current_user(): ?array
