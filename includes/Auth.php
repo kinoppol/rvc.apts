@@ -43,15 +43,17 @@ final class Auth
     /** @return array{ok:bool,error?:string} */
     public static function register(array $data): array
     {
-        $name = trim($data['name'] ?? '');
-        $studentId = trim($data['student_id'] ?? '');
-        $major = trim($data['major'] ?? '');
-        $email = trim($data['email'] ?? '');
-        $phone = trim($data['phone'] ?? '') ?: null;
+        $role     = in_array($data['role'] ?? '', ['student', 'teacher'], true) ? $data['role'] : 'student';
+        $name     = trim($data['name'] ?? '');
+        $staffId  = trim($data['student_id'] ?? '');   // student_id column stores employee ID for teachers too
+        $major    = trim($data['major'] ?? '');         // major column stores department for teachers
+        $email    = trim($data['email'] ?? '');
+        $phone    = trim($data['phone'] ?? '') ?: null;
         $password = $data['password'] ?? '';
         $passwordConfirm = $data['password_confirm'] ?? '';
 
-        if ($name === '' || $studentId === '' || $major === '' || $email === '' || $password === '') {
+        $needsId = $role === 'student';  // teachers may omit the ID field
+        if ($name === '' || ($needsId && $staffId === '') || $major === '' || $email === '' || $password === '') {
             return ['ok' => false, 'error' => 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน'];
         }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -66,18 +68,20 @@ final class Auth
         if (self::findByEmail($email)) {
             return ['ok' => false, 'error' => 'อีเมลนี้ถูกใช้สมัครสมาชิกแล้ว'];
         }
-
-        $stmt = Database::pdo()->prepare('SELECT id FROM users WHERE student_id = ?');
-        $stmt->execute([$studentId]);
-        if ($stmt->fetch()) {
-            return ['ok' => false, 'error' => 'รหัสนักศึกษานี้ถูกใช้สมัครสมาชิกแล้ว'];
+        if ($staffId !== '') {
+            $stmt = Database::pdo()->prepare('SELECT id FROM users WHERE student_id = ?');
+            $stmt->execute([$staffId]);
+            if ($stmt->fetch()) {
+                $label = $role === 'teacher' ? 'รหัสพนักงาน' : 'รหัสนักศึกษา';
+                return ['ok' => false, 'error' => $label . 'นี้ถูกใช้สมัครสมาชิกแล้ว'];
+            }
         }
 
         $stmt = Database::pdo()->prepare(
             'INSERT INTO users (role, name, student_id, major, email, phone, password_hash, status)
-             VALUES (\'student\', ?, ?, ?, ?, ?, ?, \'pending\')'
+             VALUES (?, ?, ?, ?, ?, ?, ?, \'pending\')'
         );
-        $stmt->execute([$name, $studentId, $major, $email, $phone, password_hash($password, PASSWORD_DEFAULT)]);
+        $stmt->execute([$role, $name, $staffId ?: null, $major, $email, $phone, password_hash($password, PASSWORD_DEFAULT)]);
 
         return ['ok' => true];
     }

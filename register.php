@@ -8,12 +8,13 @@ if (current_user()) {
 
 $majors    = ['วิทยาการคอมพิวเตอร์', 'เทคโนโลยีสารสนเทศ', 'วิทยาการข้อมูล', 'วิศวกรรมซอฟต์แวร์'];
 $error     = null;
-$values    = ['name' => '', 'student_id' => '', 'major' => $majors[0], 'phone' => '', 'email' => ''];
+$values    = ['role' => 'student', 'name' => '', 'student_id' => '', 'major' => $majors[0], 'phone' => '', 'email' => ''];
 $termsFile = SlotSettings::getTermsFile();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
     $values = array_merge($values, array_intersect_key($_POST, $values));
+    $values['role'] = in_array($_POST['role'] ?? '', ['student', 'teacher'], true) ? $_POST['role'] : 'student';
     if ($termsFile && empty($_POST['terms_agreed'])) {
         $error = 'กรุณายอมรับข้อตกลงการใช้งานก่อนสมัครสมาชิก';
     } else {
@@ -44,24 +45,38 @@ require __DIR__ . '/includes/guest-header.php';
     <div class="alert alert-danger" style="font-size:13px"><?= e($error) ?></div>
   <?php endif; ?>
 
-  <form method="post">
+  <form method="post" id="regForm">
     <?= Csrf::field() ?>
+    <input type="hidden" name="role" id="roleInput" value="<?= e($values['role']) ?>">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px">
+      <button type="button" id="btnStudent" onclick="setRole('student')"
+        class="btn" style="font-size:13px;font-weight:600;padding:9px;border-radius:8px;border:2px solid transparent;display:flex;align-items:center;justify-content:center;gap:7px">
+        <i class="bi bi-mortarboard-fill"></i>นักศึกษา
+      </button>
+      <button type="button" id="btnTeacher" onclick="setRole('teacher')"
+        class="btn" style="font-size:13px;font-weight:600;padding:9px;border-radius:8px;border:2px solid transparent;display:flex;align-items:center;justify-content:center;gap:7px">
+        <i class="bi bi-person-workspace"></i>ครูผู้สอน
+      </button>
+    </div>
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
       <div>
         <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">ชื่อ-นามสกุล <span style="color:#DC2626">*</span></label>
         <input type="text" name="name" required value="<?= e($values['name']) ?>" class="form-control" placeholder="สมชาย ใจดี" style="font-size:13px">
       </div>
-      <div>
-        <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">รหัสนักศึกษา <span style="color:#DC2626">*</span></label>
-        <input type="text" name="student_id" required value="<?= e($values['student_id']) ?>" class="form-control" placeholder="6501CS001" style="font-size:13px">
+      <div id="idField">
+        <label id="idLabel" style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">รหัสนักศึกษา <span style="color:#DC2626">*</span></label>
+        <input type="text" name="student_id" id="idInput" value="<?= e($values['student_id']) ?>" class="form-control" placeholder="6501CS001" style="font-size:13px">
       </div>
       <div>
-        <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">สาขาวิชา <span style="color:#DC2626">*</span></label>
-        <select name="major" class="form-select" style="font-size:13px">
+        <label id="majorLabel" style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">สาขาวิชา <span style="color:#DC2626">*</span></label>
+        <select name="major" id="majorSelect" class="form-select" style="font-size:13px">
           <?php foreach ($majors as $m): ?>
             <option <?= $values['major'] === $m ? 'selected' : '' ?>><?= e($m) ?></option>
           <?php endforeach; ?>
         </select>
+        <input type="text" name="major_text" id="majorText" value="" class="form-control" placeholder="แผนก/ภาควิชา" style="font-size:13px;display:none">
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">เบอร์โทรศัพท์</label>
@@ -104,4 +119,57 @@ require __DIR__ . '/includes/guest-header.php';
     มีบัญชีแล้ว? <a href="<?= url('login.php') ?>" style="color:#2563EB;font-weight:600;text-decoration:none">เข้าสู่ระบบ</a>
   </p>
 </div>
+<script>
+(function(){
+  var STUDENT_MAJORS = <?= json_encode($majors, JSON_UNESCAPED_UNICODE) ?>;
+  var initial = <?= json_encode($values['role']) ?>;
+
+  function setRole(role) {
+    document.getElementById('roleInput').value = role;
+
+    var isTeacher = role === 'teacher';
+    var btnS = document.getElementById('btnStudent');
+    var btnT = document.getElementById('btnTeacher');
+    var idLabel = document.getElementById('idLabel');
+    var idInput = document.getElementById('idInput');
+    var majorLabel = document.getElementById('majorLabel');
+    var majorSelect = document.getElementById('majorSelect');
+    var majorText = document.getElementById('majorText');
+
+    // Toggle button styles
+    btnS.style.background = isTeacher ? 'var(--bs-secondary-bg)' : '#2563EB';
+    btnS.style.color = isTeacher ? 'var(--bs-secondary-color)' : 'white';
+    btnS.style.borderColor = isTeacher ? 'var(--bs-border-color)' : '#2563EB';
+    btnT.style.background = isTeacher ? '#059669' : 'var(--bs-secondary-bg)';
+    btnT.style.color = isTeacher ? 'white' : 'var(--bs-secondary-color)';
+    btnT.style.borderColor = isTeacher ? '#059669' : 'var(--bs-border-color)';
+
+    // ID field
+    idLabel.innerHTML = (isTeacher ? 'รหัสพนักงาน' : 'รหัสนักศึกษา') + (isTeacher ? '' : ' <span style="color:#DC2626">*</span>');
+    idInput.placeholder = isTeacher ? 'T001' : '6501CS001';
+    idInput.required = !isTeacher;
+
+    // Major vs Department
+    majorLabel.innerHTML = (isTeacher ? 'แผนก/ภาควิชา' : 'สาขาวิชา') + ' <span style="color:#DC2626">*</span>';
+    if (isTeacher) {
+      majorSelect.style.display = 'none';
+      majorSelect.disabled = true;
+      majorText.style.display = '';
+      majorText.required = true;
+      majorText.name = 'major';
+      majorSelect.name = 'major_unused';
+    } else {
+      majorSelect.style.display = '';
+      majorSelect.disabled = false;
+      majorSelect.name = 'major';
+      majorText.style.display = 'none';
+      majorText.required = false;
+      majorText.name = 'major_text';
+    }
+  }
+
+  window.setRole = setRole;
+  setRole(initial);
+})();
+</script>
 <?php require __DIR__ . '/includes/guest-footer.php'; ?>

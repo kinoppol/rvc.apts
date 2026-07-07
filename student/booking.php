@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../bootstrap.php';
-$user = require_role('student');
+$user = require_role(['student', 'teacher']);
 
 $week = isset($_GET['week']) ? (int) $_GET['week'] : 0;
 $week = max(0, min(8, $week));

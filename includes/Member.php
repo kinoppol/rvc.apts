@@ -23,6 +23,8 @@ final class Member
         $row['isPending'] = $row['status'] === 'pending';
         $row['isApproved'] = $row['status'] === 'approved';
         $row['isSuspended'] = $row['status'] === 'suspended';
+        $row['isTeacher'] = $row['role'] === 'teacher';
+        $row['roleLabel'] = $row['role'] === 'teacher' ? 'ครูผู้สอน' : 'นักศึกษา';
         $row['hours'] = self::hoursFor((int) $row['id']);
         $created = new DateTimeImmutable($row['created_at']);
         $row['joinDate'] = Booking::thaiDate($created);
@@ -37,14 +39,14 @@ final class Member
     {
         $pdo = Database::pdo();
 
-        $counts = $pdo->query("SELECT status, COUNT(*) c FROM users WHERE role = 'student' GROUP BY status")->fetchAll();
+        $counts = $pdo->query("SELECT status, COUNT(*) c FROM users WHERE role IN ('student','teacher') GROUP BY status")->fetchAll();
         $countMap = ['approved' => 0, 'pending' => 0, 'suspended' => 0];
         foreach ($counts as $c) {
             $countMap[$c['status']] = (int) $c['c'];
         }
         $totalMembers = array_sum($countMap);
 
-        $where = ["u.role = 'student'"];
+        $where = ["u.role IN ('student','teacher')"];
         $params = [];
         if ($status !== 'all') {
             $where[] = 'u.status = ?';
@@ -82,7 +84,7 @@ final class Member
 
     public static function pendingCount(): int
     {
-        return (int) Database::pdo()->query("SELECT COUNT(*) FROM users WHERE role = 'student' AND status = 'pending'")->fetchColumn();
+        return (int) Database::pdo()->query("SELECT COUNT(*) FROM users WHERE role IN ('student','teacher') AND status = 'pending'")->fetchColumn();
     }
 
     public static function pending(int $limit = 5): array
@@ -90,7 +92,7 @@ final class Member
         $stmt = Database::pdo()->prepare(
             "SELECT u.*, g.name AS group_name FROM users u
              LEFT JOIN user_groups g ON g.id = u.group_id
-             WHERE u.role = 'student' AND u.status = 'pending' ORDER BY u.created_at ASC LIMIT ?"
+             WHERE u.role IN ('student','teacher') AND u.status = 'pending' ORDER BY u.created_at ASC LIMIT ?"
         );
         $stmt->bindValue(1, $limit, PDO::PARAM_INT);
         $stmt->execute();
@@ -102,7 +104,7 @@ final class Member
         $stmt = Database::pdo()->prepare(
             "SELECT u.*, g.name AS group_name FROM users u
              LEFT JOIN user_groups g ON g.id = u.group_id
-             WHERE u.id = ? AND u.role = 'student'"
+             WHERE u.id = ? AND u.role IN ('student','teacher')"
         );
         $stmt->execute([$id]);
         $row = $stmt->fetch();
@@ -115,7 +117,7 @@ final class Member
         if (strlen($newPassword) < 8) {
             return ['ok' => false, 'error' => 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'];
         }
-        $stmt = Database::pdo()->prepare("UPDATE users SET password_hash = ? WHERE id = ? AND role = 'student'");
+        $stmt = Database::pdo()->prepare("UPDATE users SET password_hash = ? WHERE id = ? AND role IN ('student','teacher')");
         $stmt->execute([password_hash($newPassword, PASSWORD_DEFAULT), $id]);
         return ['ok' => true];
     }
@@ -126,29 +128,29 @@ final class Member
         if ($groupId !== null && !UserGroup::find($groupId)) {
             return ['ok' => false, 'error' => 'ไม่พบกลุ่มที่เลือก'];
         }
-        $stmt = Database::pdo()->prepare("UPDATE users SET group_id = ? WHERE id = ? AND role = 'student'");
+        $stmt = Database::pdo()->prepare("UPDATE users SET group_id = ? WHERE id = ? AND role IN ('student','teacher')");
         $stmt->execute([$groupId, $id]);
         return ['ok' => true];
     }
 
     public static function approve(int $id): void
     {
-        Database::pdo()->prepare("UPDATE users SET status = 'approved' WHERE id = ? AND role = 'student'")->execute([$id]);
+        Database::pdo()->prepare("UPDATE users SET status = 'approved' WHERE id = ? AND role IN ('student','teacher')")->execute([$id]);
     }
 
     public static function reject(int $id): void
     {
-        Database::pdo()->prepare("DELETE FROM users WHERE id = ? AND role = 'student' AND status = 'pending'")->execute([$id]);
+        Database::pdo()->prepare("DELETE FROM users WHERE id = ? AND role IN ('student','teacher') AND status = 'pending'")->execute([$id]);
     }
 
     public static function suspend(int $id): void
     {
-        Database::pdo()->prepare("UPDATE users SET status = 'suspended' WHERE id = ? AND role = 'student'")->execute([$id]);
+        Database::pdo()->prepare("UPDATE users SET status = 'suspended' WHERE id = ? AND role IN ('student','teacher')")->execute([$id]);
     }
 
     public static function activate(int $id): void
     {
-        Database::pdo()->prepare("UPDATE users SET status = 'approved' WHERE id = ? AND role = 'student'")->execute([$id]);
+        Database::pdo()->prepare("UPDATE users SET status = 'approved' WHERE id = ? AND role IN ('student','teacher')")->execute([$id]);
     }
 
     /** Only suspended members may be hard-deleted, mirroring the prototype's member table actions. */
@@ -157,7 +159,7 @@ final class Member
         $pdo = Database::pdo();
         $pdo->beginTransaction();
         $pdo->prepare("DELETE FROM bookings WHERE user_id = ?")->execute([$id]);
-        $pdo->prepare("DELETE FROM users WHERE id = ? AND role = 'student' AND status = 'suspended'")->execute([$id]);
+        $pdo->prepare("DELETE FROM users WHERE id = ? AND role IN ('student','teacher') AND status = 'suspended'")->execute([$id]);
         $pdo->commit();
     }
 

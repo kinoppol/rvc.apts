@@ -98,10 +98,11 @@ function require_login(): array
     return $user;
 }
 
-function require_role(string $role): array
+function require_role(string|array $role): array
 {
     $user = require_login();
-    if ($user['role'] !== $role) {
+    $allowed = is_array($role) ? $role : [$role];
+    if (!in_array($user['role'], $allowed, true)) {
         header('Location: ' . APP_BASE . '/index.php');
         exit;
     }

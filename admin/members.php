@@ -186,6 +186,9 @@ require __DIR__ . '/../includes/header.php';
               <div style="font-size:11px;color:var(--bs-secondary-color);margin-top:2px"><?= e($m['major'] ?? '—') ?></div>
             </td>
             <td style="padding:12px 16px">
+              <?php if ($m['isTeacher']): ?>
+                <span class="badge-teach" style="margin-bottom:4px;display:inline-block"><i class="bi bi-person-workspace me-1"></i><?= e($m['roleLabel']) ?></span><br>
+              <?php endif; ?>
               <span class="<?= $m['badgeCls'] ?>"><?= e($m['statusLabel']) ?></span>
               <?php if ($m['restricted']): ?><div><span class="badge-susp" style="margin-top:4px;display:inline-block;font-size:11px" title="มีรายงานการใช้งานค้างเกิน 7 วัน"><i class="bi bi-slash-circle me-1"></i>ระงับการจอง</span></div><?php endif; ?>
             </td>

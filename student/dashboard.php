@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../bootstrap.php';
-$user = require_role('student');
+$user = require_role(['student', 'teacher']);
 
 $settings = Booking::limitsFor($user['id']);
 $next = Booking::nextUpcomingForUser($user['id']);

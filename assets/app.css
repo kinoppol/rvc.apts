@@ -60,10 +60,12 @@ html,body{margin:0;padding:0}
 .badge-pend{background:#FEF3C7;color:#92400E;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
 .badge-susp{background:#FEE2E2;color:#991B1B;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
 .badge-up{background:#DBEAFE;color:#1e40af;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.badge-teach{background:#F3E8FF;color:#6B21A8;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
 [data-bs-theme="dark"] .badge-ok{background:#14532d;color:#86efac}
 [data-bs-theme="dark"] .badge-pend{background:#451a03;color:#fcd34d}
 [data-bs-theme="dark"] .badge-susp{background:#450a0a;color:#fca5a5}
 [data-bs-theme="dark"] .badge-up{background:#172554;color:#93C5FD}
+[data-bs-theme="dark"] .badge-teach{background:#3b0764;color:#d8b4fe}
 .info-box{background:#F0F7FF;border-radius:12px;padding:16px}
 [data-bs-theme="dark"] .info-box{background:#172554}
 .action-btn-ok{background:#DCFCE7;color:#166534;border:none;border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}

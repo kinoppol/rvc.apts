@@ -16,7 +16,7 @@ CREATE TABLE user_groups (
 
 CREATE TABLE users (
     id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    role          ENUM('student','admin') NOT NULL DEFAULT 'student',
+    role          ENUM('student','teacher','admin') NOT NULL DEFAULT 'student',
     name          VARCHAR(150) NOT NULL,
     student_id    VARCHAR(20) NULL UNIQUE,
     major         VARCHAR(100) NULL,
