@@ -6,15 +6,18 @@ if (current_user()) {
     exit;
 }
 
-$majors    = ['วิทยาการคอมพิวเตอร์', 'เทคโนโลยีสารสนเทศ', 'วิทยาการข้อมูล', 'วิศวกรรมซอฟต์แวร์'];
+$majors    = Major::listActive();
+$subjects  = Subject::listActive();
 $error     = null;
-$values    = ['role' => 'student', 'name' => '', 'student_id' => '', 'major' => $majors[0], 'phone' => '', 'email' => ''];
+$values    = ['role' => 'student', 'name' => '', 'student_id' => '', 'major_id' => '', 'subject_id' => '', 'phone' => '', 'email' => ''];
 $termsFile = SlotSettings::getTermsFile();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
     $values = array_merge($values, array_intersect_key($_POST, $values));
-    $values['role'] = in_array($_POST['role'] ?? '', ['student', 'teacher'], true) ? $_POST['role'] : 'student';
+    $values['role']       = in_array($_POST['role'] ?? '', ['student', 'teacher'], true) ? $_POST['role'] : 'student';
+    $values['major_id']   = (int) ($_POST['major_id'] ?? 0);
+    $values['subject_id'] = (int) ($_POST['subject_id'] ?? 0);
     if ($termsFile && empty($_POST['terms_agreed'])) {
         $error = 'กรุณายอมรับข้อตกลงการใช้งานก่อนสมัครสมาชิก';
     } else {
@@ -71,12 +74,18 @@ require __DIR__ . '/includes/guest-header.php';
       </div>
       <div>
         <label id="majorLabel" style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">สาขาวิชา <span style="color:#DC2626">*</span></label>
-        <select name="major" id="majorSelect" class="form-select" style="font-size:13px">
+        <select name="major_id" id="majorSelect" class="form-select" style="font-size:13px" required>
+          <option value="">— เลือกสาขาวิชา —</option>
           <?php foreach ($majors as $m): ?>
-            <option <?= $values['major'] === $m ? 'selected' : '' ?>><?= e($m) ?></option>
+            <option value="<?= (int) $m['id'] ?>" <?= (int) $values['major_id'] === (int) $m['id'] ? 'selected' : '' ?>><?= e($m['name']) ?></option>
           <?php endforeach; ?>
         </select>
-        <input type="text" name="major_text" id="majorText" value="" class="form-control" placeholder="แผนก/ภาควิชา" style="font-size:13px;display:none">
+        <select name="subject_id" id="subjectSelect" class="form-select" style="font-size:13px;display:none">
+          <option value="">— เลือกวิชาสอน —</option>
+          <?php foreach ($subjects as $s): ?>
+            <option value="<?= (int) $s['id'] ?>" <?= (int) $values['subject_id'] === (int) $s['id'] ? 'selected' : '' ?>><?= e($s['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">เบอร์โทรศัพท์</label>
@@ -121,7 +130,6 @@ require __DIR__ . '/includes/guest-header.php';
 </div>
 <script>
 (function(){
-  var STUDENT_MAJORS = <?= json_encode($majors, JSON_UNESCAPED_UNICODE) ?>;
   var initial = <?= json_encode($values['role']) ?>;
 
   function setRole(role) {
@@ -134,38 +142,29 @@ require __DIR__ . '/includes/guest-header.php';
     var idInput = document.getElementById('idInput');
     var majorLabel = document.getElementById('majorLabel');
     var majorSelect = document.getElementById('majorSelect');
-    var majorText = document.getElementById('majorText');
+    var subjectSelect = document.getElementById('subjectSelect');
 
     // Toggle button styles
-    btnS.style.background = isTeacher ? 'var(--bs-secondary-bg)' : '#2563EB';
-    btnS.style.color = isTeacher ? 'var(--bs-secondary-color)' : 'white';
-    btnS.style.borderColor = isTeacher ? 'var(--bs-border-color)' : '#2563EB';
-    btnT.style.background = isTeacher ? '#059669' : 'var(--bs-secondary-bg)';
-    btnT.style.color = isTeacher ? 'white' : 'var(--bs-secondary-color)';
-    btnT.style.borderColor = isTeacher ? '#059669' : 'var(--bs-border-color)';
+    btnS.style.background    = isTeacher ? 'var(--bs-secondary-bg)' : '#2563EB';
+    btnS.style.color         = isTeacher ? 'var(--bs-secondary-color)' : 'white';
+    btnS.style.borderColor   = isTeacher ? 'var(--bs-border-color)' : '#2563EB';
+    btnT.style.background    = isTeacher ? '#059669' : 'var(--bs-secondary-bg)';
+    btnT.style.color         = isTeacher ? 'white' : 'var(--bs-secondary-color)';
+    btnT.style.borderColor   = isTeacher ? '#059669' : 'var(--bs-border-color)';
 
     // ID field
-    idLabel.innerHTML = (isTeacher ? 'รหัสพนักงาน' : 'รหัสนักศึกษา') + (isTeacher ? '' : ' <span style="color:#DC2626">*</span>');
+    idLabel.innerHTML  = (isTeacher ? 'รหัสพนักงาน' : 'รหัสนักศึกษา') + (isTeacher ? '' : ' <span style="color:#DC2626">*</span>');
     idInput.placeholder = isTeacher ? 'T001' : '6501CS001';
-    idInput.required = !isTeacher;
+    idInput.required   = !isTeacher;
 
-    // Major vs Department
-    majorLabel.innerHTML = (isTeacher ? 'แผนก/ภาควิชา' : 'สาขาวิชา') + ' <span style="color:#DC2626">*</span>';
-    if (isTeacher) {
-      majorSelect.style.display = 'none';
-      majorSelect.disabled = true;
-      majorText.style.display = '';
-      majorText.required = true;
-      majorText.name = 'major';
-      majorSelect.name = 'major_unused';
-    } else {
-      majorSelect.style.display = '';
-      majorSelect.disabled = false;
-      majorSelect.name = 'major';
-      majorText.style.display = 'none';
-      majorText.required = false;
-      majorText.name = 'major_text';
-    }
+    // Major (student) vs Subject (teacher)
+    majorLabel.innerHTML = (isTeacher ? 'วิชาสอน' : 'สาขาวิชา') + ' <span style="color:#DC2626">*</span>';
+    majorSelect.style.display   = isTeacher ? 'none' : '';
+    majorSelect.disabled        = isTeacher;
+    majorSelect.required        = !isTeacher;
+    subjectSelect.style.display = isTeacher ? '' : 'none';
+    subjectSelect.disabled      = !isTeacher;
+    subjectSelect.required      = isTeacher;
   }
 
   window.setRole = setRole;

@@ -25,6 +25,12 @@ final class Member
         $row['isSuspended'] = $row['status'] === 'suspended';
         $row['isTeacher'] = $row['role'] === 'teacher';
         $row['roleLabel'] = $row['role'] === 'teacher' ? 'ครูผู้สอน' : 'นักศึกษา';
+        // Prefer the FK-joined name; fall back to the legacy varchar column for old rows
+        if ($row['isTeacher']) {
+            $row['displayMajor'] = $row['subject_name_db'] ?? $row['major'] ?? '—';
+        } else {
+            $row['displayMajor'] = $row['major_name_db'] ?? $row['major'] ?? '—';
+        }
         $row['hours'] = self::hoursFor((int) $row['id']);
         $created = new DateTimeImmutable($row['created_at']);
         $row['joinDate'] = Booking::thaiDate($created);
@@ -65,8 +71,10 @@ final class Member
 
         $offset = max(0, ($page - 1) * $perPage);
         $stmt = $pdo->prepare(
-            "SELECT u.*, g.name AS group_name FROM users u
-             LEFT JOIN user_groups g ON g.id = u.group_id
+            "SELECT u.*, g.name AS group_name, mj.name AS major_name_db, sj.name AS subject_name_db FROM users u
+             LEFT JOIN user_groups g  ON g.id  = u.group_id
+             LEFT JOIN majors     mj  ON mj.id = u.major_id
+             LEFT JOIN subjects   sj  ON sj.id = u.subject_id
              WHERE {$whereSql} ORDER BY u.created_at DESC LIMIT {$perPage} OFFSET {$offset}"
         );
         $stmt->execute($params);
@@ -90,8 +98,10 @@ final class Member
     public static function pending(int $limit = 5): array
     {
         $stmt = Database::pdo()->prepare(
-            "SELECT u.*, g.name AS group_name FROM users u
-             LEFT JOIN user_groups g ON g.id = u.group_id
+            "SELECT u.*, g.name AS group_name, mj.name AS major_name_db, sj.name AS subject_name_db FROM users u
+             LEFT JOIN user_groups g  ON g.id  = u.group_id
+             LEFT JOIN majors     mj  ON mj.id = u.major_id
+             LEFT JOIN subjects   sj  ON sj.id = u.subject_id
              WHERE u.role IN ('student','teacher') AND u.status = 'pending' ORDER BY u.created_at ASC LIMIT ?"
         );
         $stmt->bindValue(1, $limit, PDO::PARAM_INT);
@@ -102,8 +112,10 @@ final class Member
     public static function find(int $id): ?array
     {
         $stmt = Database::pdo()->prepare(
-            "SELECT u.*, g.name AS group_name FROM users u
-             LEFT JOIN user_groups g ON g.id = u.group_id
+            "SELECT u.*, g.name AS group_name, mj.name AS major_name_db, sj.name AS subject_name_db FROM users u
+             LEFT JOIN user_groups g  ON g.id  = u.group_id
+             LEFT JOIN majors     mj  ON mj.id = u.major_id
+             LEFT JOIN subjects   sj  ON sj.id = u.subject_id
              WHERE u.id = ? AND u.role IN ('student','teacher')"
         );
         $stmt->execute([$id]);
@@ -163,18 +175,22 @@ final class Member
         $pdo->commit();
     }
 
-    /** @return array{ok:bool,error?:string} */
+    /** @return array{ok:bool,error?:string} Admin adds a student directly (approved immediately). */
     public static function add(array $data): array
     {
-        $name = trim($data['name'] ?? '');
+        $name      = trim($data['name'] ?? '');
         $studentId = trim($data['student_id'] ?? '');
-        $major = trim($data['major'] ?? '');
-        $email = trim($data['email'] ?? '');
-        $phone = trim($data['phone'] ?? '') ?: null;
-        $password = $data['password'] ?? '';
+        $majorId   = (int) ($data['major_id'] ?? 0);
+        $email     = trim($data['email'] ?? '');
+        $phone     = trim($data['phone'] ?? '') ?: null;
+        $password  = $data['password'] ?? '';
 
-        if ($name === '' || $studentId === '' || $major === '' || $email === '' || $password === '') {
+        if ($name === '' || $studentId === '' || $majorId === 0 || $email === '' || $password === '') {
             return ['ok' => false, 'error' => 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน'];
+        }
+        $majorRow = Major::find($majorId);
+        if (!$majorRow) {
+            return ['ok' => false, 'error' => 'สาขาวิชาไม่ถูกต้อง'];
         }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return ['ok' => false, 'error' => 'รูปแบบอีเมลไม่ถูกต้อง'];
@@ -185,7 +201,6 @@ final class Member
         if (Auth::findByEmail($email)) {
             return ['ok' => false, 'error' => 'อีเมลนี้ถูกใช้งานแล้ว'];
         }
-
         $stmt = Database::pdo()->prepare('SELECT id FROM users WHERE student_id = ?');
         $stmt->execute([$studentId]);
         if ($stmt->fetch()) {
@@ -193,10 +208,10 @@ final class Member
         }
 
         $stmt = Database::pdo()->prepare(
-            "INSERT INTO users (role, name, student_id, major, email, phone, password_hash, status)
-             VALUES ('student', ?, ?, ?, ?, ?, ?, 'approved')"
+            "INSERT INTO users (role, name, student_id, major, major_id, email, phone, password_hash, status)
+             VALUES ('student', ?, ?, ?, ?, ?, ?, ?, 'approved')"
         );
-        $stmt->execute([$name, $studentId, $major, $email, $phone, password_hash($password, PASSWORD_DEFAULT)]);
+        $stmt->execute([$name, $studentId, $majorRow['name'], $majorId, $email, $phone, password_hash($password, PASSWORD_DEFAULT)]);
 
         return ['ok' => true];
     }

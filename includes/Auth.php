@@ -45,16 +45,23 @@ final class Auth
     {
         $role     = in_array($data['role'] ?? '', ['student', 'teacher'], true) ? $data['role'] : 'student';
         $name     = trim($data['name'] ?? '');
-        $staffId  = trim($data['student_id'] ?? '');   // student_id column stores employee ID for teachers too
-        $major    = trim($data['major'] ?? '');         // major column stores department for teachers
+        $staffId  = trim($data['student_id'] ?? '');
         $email    = trim($data['email'] ?? '');
         $phone    = trim($data['phone'] ?? '') ?: null;
         $password = $data['password'] ?? '';
         $passwordConfirm = $data['password_confirm'] ?? '';
+        $majorId   = (int) ($data['major_id'] ?? 0);
+        $subjectId = (int) ($data['subject_id'] ?? 0);
 
-        $needsId = $role === 'student';  // teachers may omit the ID field
-        if ($name === '' || ($needsId && $staffId === '') || $major === '' || $email === '' || $password === '') {
+        $needsId = $role === 'student';
+        if ($name === '' || ($needsId && $staffId === '') || $email === '' || $password === '') {
             return ['ok' => false, 'error' => 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน'];
+        }
+        if ($role === 'student' && $majorId === 0) {
+            return ['ok' => false, 'error' => 'กรุณาเลือกสาขาวิชา'];
+        }
+        if ($role === 'teacher' && $subjectId === 0) {
+            return ['ok' => false, 'error' => 'กรุณาเลือกวิชาสอน'];
         }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return ['ok' => false, 'error' => 'รูปแบบอีเมลไม่ถูกต้อง'];
@@ -77,12 +84,54 @@ final class Auth
             }
         }
 
-        $stmt = Database::pdo()->prepare(
-            'INSERT INTO users (role, name, student_id, major, email, phone, password_hash, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, \'pending\')'
-        );
-        $stmt->execute([$role, $name, $staffId ?: null, $major, $email, $phone, password_hash($password, PASSWORD_DEFAULT)]);
+        // Resolve display name and validate FK is active
+        if ($role === 'student') {
+            $majorRow = Major::find($majorId);
+            if (!$majorRow || !$majorRow['is_active']) {
+                return ['ok' => false, 'error' => 'สาขาวิชาที่เลือกไม่ถูกต้องหรือปิดใช้งานแล้ว'];
+            }
+            $majorName = $majorRow['name'];
+            $subjectId = null;
+        } else {
+            $subjectRow = Subject::find($subjectId);
+            if (!$subjectRow || !$subjectRow['is_active']) {
+                return ['ok' => false, 'error' => 'วิชาสอนที่เลือกไม่ถูกต้องหรือปิดใช้งานแล้ว'];
+            }
+            $majorName  = $subjectRow['name'];   // keep major column in sync for backward compat
+            $majorId    = null;
+        }
 
+        $stmt = Database::pdo()->prepare(
+            'INSERT INTO users (role, name, student_id, major, major_id, subject_id, email, phone, password_hash, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, \'pending\')'
+        );
+        $stmt->execute([
+            $role, $name, $staffId ?: null, $majorName,
+            $majorId, $subjectId,
+            $email, $phone, password_hash($password, PASSWORD_DEFAULT),
+        ]);
+
+        return ['ok' => true];
+    }
+
+    /** Update major (student) or subject (teacher) from profile page. @return array{ok:bool,error?:string} */
+    public static function updateMajorOrSubject(int $userId, string $role, int $itemId): array
+    {
+        if ($role === 'student') {
+            $row = Major::find($itemId);
+            if (!$row || !$row['is_active']) {
+                return ['ok' => false, 'error' => 'สาขาวิชาไม่ถูกต้อง'];
+            }
+            Database::pdo()->prepare("UPDATE users SET major_id = ?, major = ? WHERE id = ?")
+                ->execute([$itemId, $row['name'], $userId]);
+        } else {
+            $row = Subject::find($itemId);
+            if (!$row || !$row['is_active']) {
+                return ['ok' => false, 'error' => 'วิชาสอนไม่ถูกต้อง'];
+            }
+            Database::pdo()->prepare("UPDATE users SET subject_id = ?, major = ? WHERE id = ?")
+                ->execute([$itemId, $row['name'], $userId]);
+        }
         return ['ok' => true];
     }
 

@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../bootstrap.php';
 $user = require_role('admin');
 
-$majors = ['วิทยาการคอมพิวเตอร์', 'เทคโนโลยีสารสนเทศ', 'วิทยาการข้อมูล', 'วิศวกรรมซอฟต์แวร์'];
+$allMajors = Major::listAll();
 $perPage = 8;
 
 /** Rebuilds the current list URL so redirects land back on the same filter/page. */
@@ -183,7 +183,7 @@ require __DIR__ . '/../includes/header.php';
             </td>
             <td style="padding:12px 16px">
               <div style="font-family:monospace;font-size:12px;font-weight:600"><?= e($m['student_id'] ?? '—') ?></div>
-              <div style="font-size:11px;color:var(--bs-secondary-color);margin-top:2px"><?= e($m['major'] ?? '—') ?></div>
+              <div style="font-size:11px;color:var(--bs-secondary-color);margin-top:2px"><?= e($m['displayMajor']) ?></div>
             </td>
             <td style="padding:12px 16px">
               <?php if ($m['isTeacher']): ?>
@@ -269,8 +269,11 @@ require __DIR__ . '/../includes/header.php';
           <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ชื่อ-นามสกุล *</label><input name="name" required class="form-control" style="font-size:13px"></div>
           <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">รหัสนักศึกษา *</label><input name="student_id" required class="form-control" style="font-size:13px"></div>
           <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">สาขาวิชา *</label>
-            <select name="major" class="form-select" style="font-size:13px">
-              <?php foreach ($majors as $mj): ?><option><?= e($mj) ?></option><?php endforeach; ?>
+            <select name="major_id" required class="form-select" style="font-size:13px">
+              <option value="">— เลือก —</option>
+              <?php foreach ($allMajors as $mj): ?>
+                <?php if ($mj['is_active']): ?><option value="<?= (int) $mj['id'] ?>"><?= e($mj['name']) ?></option><?php endif; ?>
+              <?php endforeach; ?>
             </select>
           </div>
           <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">เบอร์โทร</label><input name="phone" class="form-control" style="font-size:13px"></div>

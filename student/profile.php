@@ -8,6 +8,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'profile') {
         $result = Auth::updateProfile($user['id'], $_POST['name'] ?? '', $_POST['email'] ?? '', $_POST['phone'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
+    } elseif ($action === 'major') {
+        $itemId = (int) ($_POST['item_id'] ?? 0);
+        $result = Auth::updateMajorOrSubject($user['id'], $user['role'], $itemId);
+        $label  = $user['role'] === 'teacher' ? 'วิชาสอน' : 'สาขาวิชา';
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? "อัปเดต{$label}เรียบร้อยแล้ว" : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
     } elseif ($action === 'password') {
         $result = Auth::changePassword($user['id'], $_POST['current'] ?? '', $_POST['new'] ?? '', $_POST['new_confirm'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว' : ($result['error'] ?? 'เปลี่ยนรหัสผ่านไม่สำเร็จ'));
@@ -16,6 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+$majors   = Major::listActive();
+$subjects = Subject::listActive();
 $statusMap = [
     'approved' => ['อนุมัติแล้ว', 'badge-ok'],
     'pending' => ['รออนุมัติ', 'badge-up'],
@@ -34,6 +41,7 @@ require __DIR__ . '/../includes/header.php';
       <div>
         <div style="font-size:20px;font-weight:700"><?= e($user['name']) ?></div>
         <div style="color:var(--bs-secondary-color);font-size:13px"><?= e($user['student_id'] ?? '—') ?> · <?= e($user['major'] ?? '—') ?></div>
+        <?php if ($user['role'] === 'teacher'): ?><div style="margin-top:2px"><span class="badge-teach" style="font-size:11px"><i class="bi bi-person-workspace me-1"></i>ครูผู้สอน</span></div><?php endif; ?>
         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
           <span class="<?= $statusBadge ?>"><?= e($statusLabel) ?></span>
           <span class="badge-up"><i class="bi bi-diagram-3 me-1"></i>กลุ่ม: <?= e($user['group_name'] ?? 'ทั่วไป (ค่าเริ่มต้น)') ?></span>
@@ -51,6 +59,30 @@ require __DIR__ . '/../includes/header.php';
         <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">อีเมล</label><input type="email" name="email" required class="form-control" value="<?= e($user['email']) ?>" style="font-size:13px"></div>
         <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">เบอร์โทร</label><input name="phone" class="form-control" value="<?= e($user['phone'] ?? '') ?>" placeholder="08X-XXX-XXXX" style="font-size:13px"></div>
         <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px">บันทึกข้อมูล</button>
+      </form>
+    </div>
+  </div>
+  <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+    <div class="card-body" style="padding:20px">
+      <h6 style="font-weight:700;margin:0 0 14px"><?= $user['role'] === 'teacher' ? 'วิชาสอน' : 'สาขาวิชา' ?></h6>
+      <form method="post" style="display:flex;flex-direction:column;gap:12px">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="major">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">
+            <?= $user['role'] === 'teacher' ? 'วิชาสอนปัจจุบัน' : 'สาขาวิชาปัจจุบัน' ?>
+          </label>
+          <select name="item_id" class="form-select" style="font-size:13px">
+            <?php $items = $user['role'] === 'teacher' ? $subjects : $majors;
+            $currentId = $user['role'] === 'teacher' ? ($user['subject_id'] ?? 0) : ($user['major_id'] ?? 0);
+            foreach ($items as $item): ?>
+              <option value="<?= (int) $item['id'] ?>" <?= (int) $currentId === (int) $item['id'] ? 'selected' : '' ?>><?= e($item['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-outline-primary" style="font-size:13px">
+          <i class="bi bi-arrow-repeat me-1"></i>บันทึก<?= $user['role'] === 'teacher' ? 'วิชาสอน' : 'สาขาวิชา' ?>
+        </button>
       </form>
     </div>
   </div>
