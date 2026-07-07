@@ -112,6 +112,8 @@ CREATE TABLE bookings (
     report_text    TEXT NULL,                          -- post-use report body
     report_file    VARCHAR(255) NULL,                  -- optional uploaded evidence (image/PDF) filename
     reported_at    DATETIME NULL,                      -- when the usage report was submitted (NULL = not yet reported)
+    issue_text     TEXT NULL,                          -- problem the student encountered during the slot (NULL = no issue)
+    issue_at       DATETIME NULL,                      -- when the issue was reported
     token_start_pct TINYINT UNSIGNED NULL DEFAULT NULL, -- token usage % at start of session (0-100)
     token_end_pct   TINYINT UNSIGNED NULL DEFAULT NULL, -- token usage % at end of session (0-100)
     token_reset_at  DATETIME NULL DEFAULT NULL,          -- when account tokens were reset during session

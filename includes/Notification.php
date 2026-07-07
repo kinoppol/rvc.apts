@@ -45,6 +45,17 @@ final class Notification
             ];
         }
 
+        $issueCount = (int) Database::pdo()->query("SELECT COUNT(*) FROM bookings WHERE issue_text IS NOT NULL")->fetchColumn();
+        if ($issueCount > 0) {
+            $items[] = [
+                'level' => 'warn',
+                'icon' => 'bi-bug',
+                'title' => "มีการแจ้งปัญหาการใช้งาน {$issueCount} รายการ",
+                'detail' => 'ผู้ใช้งานพบปัญหาระหว่างใช้ AI · ตรวจสอบในจัดการการจอง',
+                'url' => url('admin/bookings.php'),
+            ];
+        }
+
         $aiUrl = url('admin/ai-accounts.php');
         foreach (AiAccount::listWithUsage() as $ac) {
             if ($ac['isExpired']) {

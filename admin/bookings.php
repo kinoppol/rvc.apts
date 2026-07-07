@@ -56,6 +56,7 @@ $overdueStmt = $pdo->prepare(
 );
 $overdueStmt->execute([Booking::REPORT_DEADLINE_DAYS]);
 $overdueCount = (int) $overdueStmt->fetchColumn();
+$issueCount = (int) $pdo->query("SELECT COUNT(*) FROM bookings WHERE issue_text IS NOT NULL")->fetchColumn();
 
 function bkgs_link(array $overrides = []): string
 {
@@ -123,6 +124,12 @@ require __DIR__ . '/../includes/header.php';
     <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:10px 18px;text-align:center;min-width:80px">
       <div style="font-size:20px;font-weight:700;color:#DC2626"><?= $overdueCount ?></div>
       <div style="font-size:11px;color:#DC2626;margin-top:2px">ค้างรายงาน</div>
+    </div>
+    <?php endif; ?>
+    <?php if ($issueCount > 0): ?>
+    <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 18px;text-align:center;min-width:80px">
+      <div style="font-size:20px;font-weight:700;color:#D97706"><?= $issueCount ?></div>
+      <div style="font-size:11px;color:#D97706;margin-top:2px">แจ้งปัญหา</div>
     </div>
     <?php endif; ?>
   </div>
@@ -235,7 +242,10 @@ require __DIR__ . '/../includes/header.php';
                   <?php if (!empty($bk['token_reset_at'])): ?><span style="font-size:10px;background:var(--bs-secondary-bg);border-radius:4px;padding:2px 5px;color:var(--bs-secondary-color);white-space:nowrap"><i class="bi bi-arrow-clockwise me-1"></i>รีเซ็ต <?= e((new DateTimeImmutable($bk['token_reset_at']))->format('d/m H:i')) ?></span><?php endif; ?>
                 </div>
               <?php endif; ?>
-              <?php if (empty($bk['purpose']) && empty($bk['report_text']) && empty($bk['report_file']) && $bk['token_start_pct'] === null): ?>
+              <?php if (!empty($bk['issue_text'])): ?>
+                <div style="margin-top:4px;padding:5px 8px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;font-size:11px;color:#92400E"><i class="bi bi-bug me-1"></i><?= e(mb_strimwidth($bk['issue_text'], 0, 80, '…')) ?></div>
+              <?php endif; ?>
+              <?php if (empty($bk['purpose']) && empty($bk['report_text']) && empty($bk['report_file']) && $bk['token_start_pct'] === null && empty($bk['issue_text'])): ?>
                 <span style="font-size:12px;color:var(--bs-tertiary-color)">—</span>
               <?php endif; ?>
             </td>

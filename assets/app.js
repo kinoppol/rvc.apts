@@ -280,6 +280,20 @@
     });
   });
 
+  // ── Issue / problem report modal (student/my-bookings.php) ──
+  document.querySelectorAll("[data-issue-booking]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var modalEl = document.getElementById("issueModal");
+      if (!modalEl) return;
+      document.getElementById("issueBookingId").value = btn.dataset.id;
+      var meta = document.getElementById("issueModalMeta");
+      if (meta) meta.textContent = btn.dataset.meta || "";
+      var textarea = document.getElementById("issueText");
+      if (textarea) textarea.value = btn.dataset.issueText || "";
+      new bootstrap.Modal(modalEl).show();
+    });
+  });
+
   // ── Check-in confirmation modal (intercepts forms with data-checkin-confirm) ──
   var checkinModal = document.getElementById("checkinConfirmModal");
   var checkinConfirmBtn = document.getElementById("checkinConfirmBtn");

@@ -420,6 +420,9 @@ final class Booking
             $effectiveEnd = !empty($row['checked_out_at']) ? new DateTimeImmutable($row['checked_out_at']) : $end;
             $deadline = $effectiveEnd->modify('+' . self::REPORT_DEADLINE_DAYS . ' days');
             $row['reported'] = $reported;
+            $row['hasIssue'] = !empty($row['issue_text']);
+            // Problem report: visible during active slot (now/check_in_ready/checked_in) or any time an issue was already filed.
+            $row['canReportIssue'] = in_array($status, ['now', 'check_in_ready', 'checked_in']) || $row['hasIssue'];
             // Allow reporting if checked in, OR if a report already exists (legacy rows without check-in).
             $row['canReport'] = in_array($status, ['completed', 'checked_out']) && ($row['hasCheckedIn'] || $reported);
             $row['needsReport'] = $row['canReport'] && !$reported;
@@ -882,6 +885,31 @@ final class Booking
         Database::pdo()->prepare(
             "UPDATE bookings SET reported_at = NOW(), report_text = COALESCE(report_text, 'ยกเว้นโดยผู้ดูแลระบบ') WHERE id = ?"
         )->execute([$bookingId]);
+        return ['ok' => true];
+    }
+
+    /**
+     * Student reports a problem they encountered during (or immediately after) a booking slot.
+     * Overwrites any previous issue text so the student can correct their report.
+     * @return array{ok:bool,error?:string}
+     */
+    public static function reportIssue(int $userId, int $bookingId, string $text): array
+    {
+        $stmt = Database::pdo()->prepare('SELECT * FROM bookings WHERE id = ? AND user_id = ?');
+        $stmt->execute([$bookingId, $userId]);
+        $b = $stmt->fetch();
+        if (!$b) {
+            return ['ok' => false, 'error' => 'ไม่พบรายการจอง'];
+        }
+        if ($b['status'] === 'cancelled') {
+            return ['ok' => false, 'error' => 'รายการนี้ถูกยกเลิกแล้ว'];
+        }
+        $text = trim($text);
+        if ($text === '') {
+            return ['ok' => false, 'error' => 'กรุณาอธิบายปัญหาที่พบ'];
+        }
+        Database::pdo()->prepare('UPDATE bookings SET issue_text = ?, issue_at = NOW() WHERE id = ?')
+            ->execute([mb_substr($text, 0, 1000), $bookingId]);
         return ['ok' => true];
     }
 

@@ -27,6 +27,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
         $result = Booking::submitReport($user['id'], (int) ($_POST['id'] ?? 0), $_POST['report_text'] ?? '', $_FILES['report_file'] ?? null, $extra);
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'ส่งรายงานการใช้งานเรียบร้อยแล้ว' : ($result['error'] ?? 'ส่งรายงานไม่สำเร็จ'));
+    } elseif ($action === 'issue') {
+        $result = Booking::reportIssue($user['id'], (int) ($_POST['id'] ?? 0), $_POST['issue_text'] ?? '');
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'ส่งรายงานปัญหาเรียบร้อยแล้ว ผู้ดูแลระบบจะได้รับแจ้ง' : ($result['error'] ?? 'ส่งรายงานปัญหาไม่สำเร็จ'));
     }
     header('Location: ' . url('student/my-bookings.php') . (($_GET['filter'] ?? '') !== '' ? '?filter=' . urlencode($_GET['filter']) : ''));
     exit;
@@ -193,6 +196,17 @@ require __DIR__ . '/../includes/header.php';
                 <i class="bi bi-journal-text me-1"></i><?= $bk['reported'] ? 'แก้ไขรายงาน' : 'รายงาน' ?>
               </button>
             <?php endif; ?>
+            <?php if ($bk['canReportIssue']): ?>
+              <?php if ($bk['hasIssue']): ?>
+                <span class="badge-pend" style="font-size:11px"><i class="bi bi-exclamation-triangle-fill me-1"></i>แจ้งปัญหาแล้ว</span>
+              <?php endif; ?>
+              <button type="button" class="action-btn-warn" data-issue-booking
+                data-id="<?= (int) $bk['id'] ?>"
+                data-meta="<?= e($bk['dateLabel'] . ' · ' . $bk['slotLabel']) ?>"
+                data-issue-text="<?= e($bk['issue_text'] ?? '') ?>">
+                <i class="bi bi-bug me-1"></i><?= $bk['hasIssue'] ? 'แก้ไขปัญหา' : 'รายงานปัญหา' ?>
+              </button>
+            <?php endif; ?>
             <?php if ($bk['canCancel']): ?>
               <form method="post" action="<?= url('student/my-bookings.php') ?>" style="margin:0" onsubmit="return confirm('ยืนยันการยกเลิกการจองนี้?')">
                 <?= Csrf::field() ?>
@@ -266,6 +280,37 @@ require __DIR__ . '/../includes/header.php';
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
           <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
           <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none"><i class="bi bi-send me-1"></i>ส่งรายงาน</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<!-- Issue / problem report modal -->
+<div class="modal fade" id="issueModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post" action="<?= url('student/my-bookings.php') ?>?filter=<?= e($filter) ?>">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="issue">
+        <input type="hidden" name="id" id="issueBookingId">
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-bug me-2" style="color:#D97706"></i>รายงานปัญหาการใช้งาน</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+        </div>
+        <div class="modal-body" style="padding:20px">
+          <p style="font-size:12px;color:var(--bs-secondary-color);margin:0 0 4px" id="issueModalMeta">—</p>
+          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">กรอกรายละเอียดปัญหาที่ทำให้ไม่สามารถใช้งาน AI ได้ ผู้ดูแลระบบจะได้รับแจ้งและช่วยแก้ไข</p>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">อธิบายปัญหาที่พบ <span style="color:#EF4444">*</span></label>
+            <textarea id="issueText" name="issue_text" rows="5" maxlength="1000" required class="form-control"
+              placeholder="เช่น เข้าระบบไม่ได้ / รหัสผ่านไม่ถูกต้อง / เว็บไซต์ล่ม / บัญชีถูกล็อก ..."
+              style="font-size:13px"></textarea>
+            <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">สูงสุด 1,000 ตัวอักษร</div>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-sm" style="background:#D97706;color:white;border:none"><i class="bi bi-send me-1"></i>ส่งรายงานปัญหา</button>
         </div>
       </form>
     </div>
