@@ -2,6 +2,46 @@
 require_once __DIR__ . '/../bootstrap.php';
 $user = require_role('admin');
 
+// ── Google Workspace CSV export (GET, read-only, no CSRF needed) ──
+if (($_GET['export'] ?? '') === 'gws') {
+    $all = AiAccount::listWithUsage();
+    $rows = array_values(array_filter($all, fn ($ac) => !empty($ac['email']) && !empty($ac['account_password'])));
+
+    $filename = 'ai-pool-gws-' . date('Ymd-His') . '.csv';
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+
+    $out = fopen('php://output', 'w');
+    // UTF-8 BOM so Excel opens Thai correctly
+    fwrite($out, "\xEF\xBB\xBF");
+
+    fputcsv($out, [
+        'First Name [Required]', 'Last Name [Required]', 'Email Address [Required]',
+        'Password [Required]', 'Password Hash Function [UPLOAD ONLY]',
+        'Org Unit Path [Required]', 'New Primary Email [UPLOAD ONLY]',
+        'Recovery Email', 'Home Secondary Email', 'Work Secondary Email',
+        'Recovery Phone [MUST BE IN THE E.164 FORMAT]', 'Work Phone', 'Home Phone',
+        'Mobile Phone', 'Work Address', 'Home Address', 'Employee ID',
+        'Employee Type', 'Employee Title', 'Manager Email', 'Department',
+        'Cost Center', 'Building ID', 'Floor Name', 'Floor Section',
+        'Change Password at Next Sign-In', 'New Status [UPLOAD ONLY]',
+        'Advanced Protection Program enrollment',
+    ]);
+
+    $empty22 = array_fill(0, 22, '');
+    foreach ($rows as $ac) {
+        fputcsv($out, array_merge(
+            [$ac['name'], $ac['provider'], $ac['email'], $ac['account_password'], '', '/Students'],
+            $empty22
+        ));
+    }
+
+    fclose($out);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
     $action = $_POST['action'] ?? '';
@@ -59,6 +99,14 @@ require __DIR__ . '/../includes/header.php';
   <h5 style="font-weight:700;margin:0">บัญชี AI Account Pool</h5>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button type="button" class="btn btn-outline-secondary" style="font-size:13px" data-bs-toggle="modal" data-bs-target="#manageTypesModal"><i class="bi bi-tags me-1"></i>จัดการประเภท</button>
+    <?php
+    $gwsExportCount = count(array_filter($accounts, fn ($ac) => !empty($ac['email']) && !empty($ac['account_password'])));
+    if ($gwsExportCount > 0): ?>
+    <a href="<?= url('admin/ai-accounts.php') ?>?export=gws" class="btn btn-outline-success" style="font-size:13px">
+      <i class="bi bi-cloud-download me-1"></i>Google Workspace CSV
+      <span style="font-size:11px;opacity:.75">(<?= $gwsExportCount ?>)</span>
+    </a>
+    <?php endif; ?>
     <?php if ($accounts): ?>
     <button type="button" id="bulkResetPwBtn" class="btn btn-outline-warning" style="font-size:13px"
             data-accounts='<?= e(json_encode(array_map(fn ($ac) => ['id' => (int) $ac['id'], 'name' => $ac['name']], $accounts), JSON_UNESCAPED_UNICODE)) ?>'>
