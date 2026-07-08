@@ -146,6 +146,9 @@ function nav_cls(string $key, ?string $active): string
           <a class="<?= nav_cls('reports', $activeNav ?? null) ?>" href="<?= url('admin/reports.php') ?>">
             <i class="bi bi-file-earmark-bar-graph" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">รายงานสถิติ</span>
           </a>
+          <a class="<?= nav_cls('migrations', $activeNav ?? null) ?>" href="<?= url('admin/migrations.php') ?>">
+            <i class="bi bi-database-gear" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">DB Migrations</span>
+          </a>
           <a class="<?= nav_cls('admin-profile', $activeNav ?? null) ?>" href="<?= url('admin/profile.php') ?>">
             <i class="bi bi-person-circle" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">โปรไฟล์</span>
           </a>
