@@ -9,7 +9,7 @@ if (current_user()) {
 $majors    = Major::listActive();
 $subjects  = Subject::listActive();
 $error     = null;
-$values    = ['role' => 'student', 'name' => '', 'student_id' => '', 'major_id' => '', 'subject_id' => '', 'phone' => '', 'email' => ''];
+$values    = ['role' => 'student', 'name' => '', 'student_id' => '', 'major_id' => '', 'subject_id' => '', 'phone' => '', 'school_name' => '', 'province' => '', 'email' => ''];
 $termsFile = SlotSettings::getTermsFile();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -92,6 +92,19 @@ require __DIR__ . '/includes/guest-header.php';
       <div>
         <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">เบอร์โทรศัพท์</label>
         <input type="tel" name="phone" value="<?= e($values['phone']) ?>" class="form-control" placeholder="08X-XXX-XXXX" style="font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">ชื่อสถานศึกษา</label>
+        <input type="text" name="school_name" value="<?= e($values['school_name']) ?>" class="form-control" placeholder="โรงเรียน / วิทยาลัย RVC" style="font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">จังหวัด</label>
+        <input type="text" name="province" list="provinceList" value="<?= e($values['province']) ?>" autocomplete="off" class="form-control" placeholder="เลือกหรือพิมพ์จังหวัด" style="font-size:13px">
+        <datalist id="provinceList">
+          <?php foreach (['กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'] as $pv): ?>
+            <option value="<?= e($pv) ?>">
+          <?php endforeach; ?>
+        </datalist>
       </div>
       <div style="grid-column:span 2">
         <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">อีเมล <span style="color:#DC2626">*</span></label>
@@ -218,8 +231,8 @@ require __DIR__ . '/includes/guest-header.php';
 
     var idLabel = document.getElementById('idLabel');
     var idInput = document.getElementById('idInput');
-    idLabel.innerHTML   = (isTeacher ? 'รหัสพนักงาน' : 'รหัสนักศึกษา') + (isTeacher ? '' : ' <span style="color:#DC2626">*</span>');
-    idInput.placeholder = isTeacher ? 'T001' : '6501CS001';
+    idLabel.innerHTML   = (isTeacher ? 'เลขตำแหน่ง' : 'รหัสนักศึกษา') + (isTeacher ? '' : ' <span style="color:#DC2626">*</span>');
+    idInput.placeholder = isTeacher ? 'ไม่บังคับ' : '6501CS001';
     idInput.required    = !isTeacher;
 
     document.getElementById('majorLabel').innerHTML = (isTeacher ? 'วิชาสอน' : 'สาขาวิชา') + ' <span style="color:#DC2626">*</span>';

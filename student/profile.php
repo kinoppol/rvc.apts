@@ -6,7 +6,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
     $action = $_POST['action'] ?? '';
     if ($action === 'profile') {
-        $result = Auth::updateProfile($user['id'], $_POST['name'] ?? '', $_POST['email'] ?? '', $_POST['phone'] ?? '');
+        $result = Auth::updateProfile($user['id'], $_POST['name'] ?? '', $_POST['email'] ?? '', $_POST['phone'] ?? '', $_POST['school_name'] ?? '', $_POST['province'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
     } elseif ($action === 'major') {
         $itemId = (int) ($_POST['item_id'] ?? 0);
@@ -41,6 +41,9 @@ require __DIR__ . '/../includes/header.php';
       <div>
         <div style="font-size:20px;font-weight:700"><?= e($user['name']) ?></div>
         <div style="color:var(--bs-secondary-color);font-size:13px"><?= e($user['student_id'] ?? '—') ?> · <?= e($user['major'] ?? '—') ?></div>
+        <?php if (!empty($user['school_name']) || !empty($user['province'])): ?>
+        <div style="color:var(--bs-tertiary-color);font-size:12px;margin-top:2px"><i class="bi bi-building me-1"></i><?= e(implode(' · ', array_filter([$user['school_name'] ?? null, $user['province'] ?? null]))) ?></div>
+        <?php endif; ?>
         <?php if ($user['role'] === 'teacher'): ?><div style="margin-top:2px"><span class="badge-teach" style="font-size:11px"><i class="bi bi-person-workspace me-1"></i>ครูผู้สอน</span></div><?php endif; ?>
         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
           <span class="<?= $statusBadge ?>"><?= e($statusLabel) ?></span>
@@ -58,6 +61,16 @@ require __DIR__ . '/../includes/header.php';
         <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ชื่อ-นามสกุล</label><input name="name" required class="form-control" value="<?= e($user['name']) ?>" style="font-size:13px"></div>
         <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">อีเมล</label><input type="email" name="email" required class="form-control" value="<?= e($user['email']) ?>" style="font-size:13px"></div>
         <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">เบอร์โทร</label><input name="phone" class="form-control" value="<?= e($user['phone'] ?? '') ?>" placeholder="08X-XXX-XXXX" style="font-size:13px"></div>
+        <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ชื่อสถานศึกษา</label><input name="school_name" class="form-control" value="<?= e($user['school_name'] ?? '') ?>" placeholder="โรงเรียน / วิทยาลัย" style="font-size:13px"></div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">จังหวัด</label>
+          <input name="province" list="provinceListProfile" autocomplete="off" class="form-control" value="<?= e($user['province'] ?? '') ?>" placeholder="เลือกหรือพิมพ์จังหวัด" style="font-size:13px">
+          <datalist id="provinceListProfile">
+            <?php foreach (['กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'] as $pv): ?>
+              <option value="<?= e($pv) ?>">
+            <?php endforeach; ?>
+          </datalist>
+        </div>
         <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px">บันทึกข้อมูล</button>
       </form>
     </div>

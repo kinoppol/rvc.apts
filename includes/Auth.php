@@ -43,12 +43,14 @@ final class Auth
     /** @return array{ok:bool,error?:string} */
     public static function register(array $data): array
     {
-        $role     = in_array($data['role'] ?? '', ['student', 'teacher'], true) ? $data['role'] : 'student';
-        $name     = trim($data['name'] ?? '');
-        $staffId  = trim($data['student_id'] ?? '');
-        $email    = trim($data['email'] ?? '');
-        $phone    = trim($data['phone'] ?? '') ?: null;
-        $password = $data['password'] ?? '';
+        $role       = in_array($data['role'] ?? '', ['student', 'teacher'], true) ? $data['role'] : 'student';
+        $name       = trim($data['name'] ?? '');
+        $staffId    = trim($data['student_id'] ?? '');
+        $email      = trim($data['email'] ?? '');
+        $phone      = trim($data['phone'] ?? '') ?: null;
+        $schoolName = trim($data['school_name'] ?? '') ?: null;
+        $province   = trim($data['province'] ?? '') ?: null;
+        $password   = $data['password'] ?? '';
         $passwordConfirm = $data['password_confirm'] ?? '';
         $majorId   = (int) ($data['major_id'] ?? 0);
         $subjectId = (int) ($data['subject_id'] ?? 0);
@@ -79,7 +81,7 @@ final class Auth
             $stmt = Database::pdo()->prepare('SELECT id FROM users WHERE student_id = ?');
             $stmt->execute([$staffId]);
             if ($stmt->fetch()) {
-                $label = $role === 'teacher' ? 'รหัสพนักงาน' : 'รหัสนักศึกษา';
+                $label = $role === 'teacher' ? 'เลขตำแหน่ง' : 'รหัสนักศึกษา';
                 return ['ok' => false, 'error' => $label . 'นี้ถูกใช้สมัครสมาชิกแล้ว'];
             }
         }
@@ -102,13 +104,14 @@ final class Auth
         }
 
         $stmt = Database::pdo()->prepare(
-            'INSERT INTO users (role, name, student_id, major, major_id, subject_id, email, phone, password_hash, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, \'pending\')'
+            'INSERT INTO users (role, name, student_id, major, major_id, subject_id, email, phone, school_name, province, password_hash, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'pending\')'
         );
         $stmt->execute([
             $role, $name, $staffId ?: null, $majorName,
             $majorId, $subjectId,
-            $email, $phone, password_hash($password, PASSWORD_DEFAULT),
+            $email, $phone, $schoolName, $province,
+            password_hash($password, PASSWORD_DEFAULT),
         ]);
 
         return ['ok' => true];
@@ -136,11 +139,13 @@ final class Auth
     }
 
     /** @return array{ok:bool,error?:string} */
-    public static function updateProfile(int $userId, string $name, string $email, ?string $phone): array
+    public static function updateProfile(int $userId, string $name, string $email, ?string $phone, ?string $schoolName = null, ?string $province = null): array
     {
-        $name = trim($name);
-        $email = trim($email);
-        $phone = $phone !== null ? trim($phone) : null;
+        $name       = trim($name);
+        $email      = trim($email);
+        $phone      = $phone !== null ? (trim($phone) ?: null) : null;
+        $schoolName = $schoolName !== null ? (trim($schoolName) ?: null) : null;
+        $province   = $province !== null ? (trim($province) ?: null) : null;
 
         if ($name === '' || $email === '') {
             return ['ok' => false, 'error' => 'กรุณากรอกชื่อและอีเมล'];
@@ -155,8 +160,8 @@ final class Auth
             return ['ok' => false, 'error' => 'อีเมลนี้ถูกใช้งานโดยบัญชีอื่นแล้ว'];
         }
 
-        $stmt = Database::pdo()->prepare('UPDATE users SET name = ?, email = ?, phone = ? WHERE id = ?');
-        $stmt->execute([$name, $email, $phone ?: null, $userId]);
+        $stmt = Database::pdo()->prepare('UPDATE users SET name = ?, email = ?, phone = ?, school_name = ?, province = ? WHERE id = ?');
+        $stmt->execute([$name, $email, $phone, $schoolName, $province, $userId]);
 
         return ['ok' => true];
     }
