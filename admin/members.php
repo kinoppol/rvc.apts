@@ -100,7 +100,11 @@ if (!in_array($status, ['all', 'approved', 'pending', 'suspended'], true)) {
 }
 $page = max(1, (int) ($_GET['page'] ?? 1));
 
-$data = Member::list($search, $status, $page, $perPage);
+$allowedSorts = ['name', 'student_id', 'status', 'created_at'];
+$sort = in_array($_GET['sort'] ?? '', $allowedSorts, true) ? $_GET['sort'] : 'created_at';
+$dir  = ($_GET['dir'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+
+$data = Member::list($search, $status, $page, $perPage, $sort, $dir);
 $allGroups = UserGroup::all();
 $totalPages = max(1, (int) ceil($data['total'] / $perPage));
 $page = min($page, $totalPages);
@@ -111,13 +115,41 @@ $historyId = isset($_GET['history']) ? (int) $_GET['history'] : 0;
 $historyMember = $historyId ? Member::find($historyId) : null;
 $historyBookings = $historyMember ? Booking::listForUser($historyId) : [];
 
-/** Preserves search/status when building filter + pagination links. */
+/** Preserves search/status/sort when building filter + pagination links. */
 function members_link(array $overrides = []): string
 {
-    global $search, $status, $page;
-    $params = array_filter(['search' => $search, 'status' => $status, 'page' => $page] + [], fn ($v) => $v !== '' && $v !== null);
+    global $search, $status, $page, $sort, $dir;
+    $params = array_filter(['search' => $search, 'status' => $status, 'page' => $page, 'sort' => $sort, 'dir' => $dir], fn ($v) => $v !== '' && $v !== null);
     $params = array_merge($params, $overrides);
     return url('admin/members.php') . '?' . http_build_query($params);
+}
+
+/** Renders a sortable <th> cell. Non-sortable columns pass $col = null. */
+function sort_th(string $label, ?string $col, string $extraStyle = '', bool $centerAlign = false): string
+{
+    global $sort, $dir;
+    $align = $centerAlign ? 'center' : 'left';
+    $base  = "padding:12px 14px;font-weight:600;white-space:nowrap;text-align:{$align};border-right:1px solid var(--bs-border-color);{$extraStyle}";
+    if ($col === null) {
+        return '<th style="' . $base . 'color:var(--bs-secondary-color)">' . e($label) . '</th>';
+    }
+    $isActive = $sort === $col;
+    $nextDir  = ($isActive && $dir === 'asc') ? 'desc' : 'asc';
+    $url      = members_link(['sort' => $col, 'dir' => $nextDir, 'page' => 1]);
+    if ($isActive) {
+        $icon  = $dir === 'asc'
+            ? '<i class="bi bi-chevron-up" style="font-size:11px;margin-left:4px"></i>'
+            : '<i class="bi bi-chevron-down" style="font-size:11px;margin-left:4px"></i>';
+        $color = '#2563EB';
+        $bg    = 'background:rgba(37,99,235,.06);';
+    } else {
+        $icon  = '<i class="bi bi-arrow-down-up" style="font-size:10px;margin-left:4px;opacity:.35"></i>';
+        $color = 'var(--bs-secondary-color)';
+        $bg    = '';
+    }
+    return '<th style="' . $base . $bg . '">'
+        . '<a href="' . $url . '" style="text-decoration:none;color:' . $color . ';display:inline-flex;align-items:center">'
+        . e($label) . $icon . '</a></th>';
 }
 
 $activeNav = 'member-management';
@@ -162,14 +194,14 @@ require __DIR__ . '/../includes/header.php';
   <div class="card-body" style="padding:0;overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>
-        <tr style="border-bottom:2px solid var(--bs-border-color);background:var(--bs-secondary-bg)">
-          <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">สมาชิก</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">รหัส / สาขา</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">สถานะ</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">กลุ่ม</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">ชม.สะสม</th>
-          <th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--bs-secondary-color);white-space:nowrap">วันสมัคร</th>
-          <th style="padding:12px 16px;text-align:center;font-weight:600;color:var(--bs-secondary-color)">การดำเนินการ</th>
+        <tr style="background:var(--bs-secondary-bg);border-top:1px solid var(--bs-border-color);border-bottom:2px solid var(--bs-border-color)">
+          <?= sort_th('สมาชิก',       'name') ?>
+          <?= sort_th('รหัส / สาขา',  'student_id') ?>
+          <?= sort_th('สถานะ',        'status') ?>
+          <?= sort_th('กลุ่ม',        null) ?>
+          <?= sort_th('ชม.สะสม',     null) ?>
+          <?= sort_th('วันสมัคร',     'created_at') ?>
+          <?= sort_th('การดำเนินการ', null, 'border-right:none;', true) ?>
         </tr>
       </thead>
       <tbody>

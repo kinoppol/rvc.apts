@@ -41,8 +41,17 @@ final class Member
     }
 
     /** @return array{rows:array,total:int,totalMembers:int,approvedCount:int,pendingCount:int,suspendedCount:int} */
-    public static function list(string $search, string $status, int $page, int $perPage): array
+    public static function list(string $search, string $status, int $page, int $perPage, string $sort = 'created_at', string $dir = 'desc'): array
     {
+        $sortMap = [
+            'name'       => 'u.name',
+            'student_id' => 'u.student_id',
+            'status'     => 'u.status',
+            'created_at' => 'u.created_at',
+        ];
+        $orderCol = $sortMap[$sort] ?? 'u.created_at';
+        $orderDir = $dir === 'asc' ? 'ASC' : 'DESC';
+
         $pdo = Database::pdo();
 
         $counts = $pdo->query("SELECT status, COUNT(*) c FROM users WHERE role IN ('student','teacher') GROUP BY status")->fetchAll();
@@ -75,7 +84,7 @@ final class Member
              LEFT JOIN user_groups g  ON g.id  = u.group_id
              LEFT JOIN majors     mj  ON mj.id = u.major_id
              LEFT JOIN subjects   sj  ON sj.id = u.subject_id
-             WHERE {$whereSql} ORDER BY u.created_at DESC LIMIT {$perPage} OFFSET {$offset}"
+             WHERE {$whereSql} ORDER BY {$orderCol} {$orderDir} LIMIT {$perPage} OFFSET {$offset}"
         );
         $stmt->execute($params);
         $rows = array_map([self::class, 'decorate'], $stmt->fetchAll());
