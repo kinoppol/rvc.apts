@@ -66,6 +66,7 @@ CREATE TABLE ai_accounts (
     email                VARCHAR(190) NULL,                   -- shared login email for the AI account
     account_password     VARCHAR(255) NULL,                   -- shared login password, stored readable so admins can share it
     status               ENUM('active','maintenance') NOT NULL DEFAULT 'active',
+    capacity             TINYINT UNSIGNED NOT NULL DEFAULT 1, -- max concurrent users per slot (≥ 1)
     expires_at           DATETIME NULL,                       -- when reached, the account is treated as disabled (derived at read time)
     password_updated_at  DATETIME NULL,                       -- last time the shared password was changed
     password_reminder    ENUM('none','daily','weekly','monthly') NOT NULL DEFAULT 'none',
@@ -121,12 +122,8 @@ CREATE TABLE bookings (
     cancelled_at   DATETIME NULL,
     checked_in_at  DATETIME NULL,                        -- when the student pressed check-in (NULL = not yet checked in)
     checked_out_at DATETIME NULL,                        -- early checkout (NULL = no checkout); frees the pool before end_datetime
-    slot_uniq_guard TINYINT UNSIGNED AS (
-        IF(checked_out_at IS NULL AND status = 'upcoming', slot_index, NULL)
-    ) VIRTUAL,                                           -- NULL for checked-out/cancelled rows so the unique key below ignores them
     CONSTRAINT fk_bookings_user FOREIGN KEY (user_id) REFERENCES users(id),
     CONSTRAINT fk_bookings_ai_account FOREIGN KEY (ai_account_id) REFERENCES ai_accounts(id),
-    UNIQUE KEY uniq_account_slot (ai_account_id, booking_date, slot_uniq_guard),
     KEY idx_bookings_ai_account (ai_account_id),
     KEY idx_user_date (user_id, booking_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

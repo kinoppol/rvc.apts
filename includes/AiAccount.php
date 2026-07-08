@@ -115,6 +115,13 @@ final class AiAccount
         )->fetchAll();
     }
 
+    /** Validate and normalise the capacity field (integer ≥ 1). */
+    private static function validateCapacity(mixed $raw): int
+    {
+        $v = (int) $raw;
+        return max(1, $v);
+    }
+
     /** @return array{ok:bool,error?:string} */
     public static function add(array $d): array
     {
@@ -124,15 +131,16 @@ final class AiAccount
         }
 
         $password = (string) ($d['account_password'] ?? '');
+        $capacity = self::validateCapacity($d['capacity'] ?? 1);
         $stmt = Database::pdo()->prepare(
             'INSERT INTO ai_accounts
-                (name, provider_id, provider, email, account_password, status, expires_at, password_updated_at, password_reminder, monthly_cost, cost_per_slot)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                (name, provider_id, provider, email, account_password, status, capacity, expires_at, password_updated_at, password_reminder, monthly_cost, cost_per_slot)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $fields['name'], $fields['provider_id'], $fields['provider'], $fields['email'],
             $password !== '' ? $password : null,
-            $fields['status'], $fields['expires_at'],
+            $fields['status'], $capacity, $fields['expires_at'],
             $password !== '' ? date('Y-m-d H:i:s') : null,
             $fields['password_reminder'],
             $fields['monthly_cost'], $fields['cost_per_slot'],
@@ -162,19 +170,45 @@ final class AiAccount
             $passwordUpdatedAt = $existing['password_updated_at'];
         }
 
+        $capacity = self::validateCapacity($d['capacity'] ?? $existing['capacity'] ?? 1);
         $stmt = Database::pdo()->prepare(
             'UPDATE ai_accounts SET
                 name = ?, provider_id = ?, provider = ?, email = ?, account_password = ?,
-                status = ?, expires_at = ?, password_updated_at = ?, password_reminder = ?,
+                status = ?, capacity = ?, expires_at = ?, password_updated_at = ?, password_reminder = ?,
                 monthly_cost = ?, cost_per_slot = ?
              WHERE id = ?'
         );
         $stmt->execute([
             $fields['name'], $fields['provider_id'], $fields['provider'], $fields['email'], $password,
-            $fields['status'], $fields['expires_at'], $passwordUpdatedAt, $fields['password_reminder'],
+            $fields['status'], $capacity, $fields['expires_at'], $passwordUpdatedAt, $fields['password_reminder'],
             $fields['monthly_cost'], $fields['cost_per_slot'], $id,
         ]);
         return ['ok' => true];
+    }
+
+    /**
+     * Reset shared passwords for every supplied account in one go.
+     * $passwords is keyed by account id; any blank value is skipped.
+     * @return array{ok:bool,count?:int,error?:string}
+     */
+    public static function bulkResetPasswords(array $passwords): array
+    {
+        if (empty($passwords)) {
+            return ['ok' => false, 'error' => 'ไม่มีบัญชีที่ต้องการรีเซ็ต'];
+        }
+        $stmt = Database::pdo()->prepare(
+            'UPDATE ai_accounts SET account_password = ?, password_updated_at = NOW() WHERE id = ?'
+        );
+        $count = 0;
+        foreach ($passwords as $id => $pw) {
+            $pw = trim((string) $pw);
+            if ($pw === '' || (int) $id <= 0) {
+                continue;
+            }
+            $stmt->execute([$pw, (int) $id]);
+            $count++;
+        }
+        return ['ok' => true, 'count' => $count];
     }
 
     /** Sets a new shared login password and resets the password-reminder clock. @return array{ok:bool,error?:string} */

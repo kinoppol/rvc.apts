@@ -204,9 +204,60 @@
       set("password_reminder", btn.dataset.reminder);
       set("monthly_cost", btn.dataset.monthlyCost);
       set("cost_per_slot", btn.dataset.costPerSlot);
+      set("capacity", btn.dataset.capacity || "1");
       new bootstrap.Modal(modalEl).show();
     });
   });
+
+  // ── Bulk reset all AI-account passwords (admin/ai-accounts.php) ──
+  var bulkResetBtn = document.getElementById("bulkResetPwBtn");
+  if (bulkResetBtn) {
+    var bulkAccounts = JSON.parse(bulkResetBtn.dataset.accounts || "[]");
+
+    function escHtml(str) {
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function buildBulkResetTable() {
+      var tableEl = document.getElementById("bulkResetPwTable");
+      if (!tableEl) return;
+      var html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+      html += '<thead><tr>'
+        + '<th style="padding:6px 8px;border-bottom:2px solid var(--bs-border-color);text-align:left;font-size:11px;color:var(--bs-secondary-color)">บัญชี</th>'
+        + '<th style="padding:6px 8px;border-bottom:2px solid var(--bs-border-color);text-align:left;font-size:11px;color:var(--bs-secondary-color)">รหัสผ่านใหม่</th>'
+        + '<th style="width:38px;border-bottom:2px solid var(--bs-border-color)"></th>'
+        + '</tr></thead><tbody>';
+      bulkAccounts.forEach(function (ac) {
+        var pw = generateSecurePassword(12);
+        html += '<tr data-bulk-id="' + ac.id + '">'
+          + '<td style="padding:7px 8px;border-bottom:1px solid var(--bs-border-color);font-weight:600">' + escHtml(ac.name)
+          + '<input type="hidden" name="passwords[' + ac.id + ']" value="' + escHtml(pw) + '"></td>'
+          + '<td style="padding:7px 8px;border-bottom:1px solid var(--bs-border-color)"><code class="bulk-pw-val" style="font-size:13px;letter-spacing:.3px;word-break:break-all">' + escHtml(pw) + '</code></td>'
+          + '<td style="padding:7px 4px;border-bottom:1px solid var(--bs-border-color)"><button type="button" class="btn btn-sm btn-outline-secondary bulk-regen-one" title="สุ่มใหม่"><i class="bi bi-arrow-clockwise"></i></button></td>'
+          + '</tr>';
+      });
+      html += '</tbody></table>';
+      tableEl.innerHTML = html;
+      tableEl.querySelectorAll(".bulk-regen-one").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var row = btn.closest("tr");
+          var newPw = generateSecurePassword(12);
+          row.querySelector("input[type=hidden]").value = newPw;
+          row.querySelector(".bulk-pw-val").textContent = newPw;
+        });
+      });
+    }
+
+    bulkResetBtn.addEventListener("click", function () {
+      buildBulkResetTable();
+      new bootstrap.Modal(document.getElementById("bulkResetPwModal")).show();
+    });
+
+    var regenAllBtn = document.getElementById("bulkResetRegenAll");
+    if (regenAllBtn) {
+      regenAllBtn.addEventListener("click", buildBulkResetTable);
+    }
+  }
 
   // ── Shared-password reveal toggles (admin/ai-accounts.php) ──
   document.querySelectorAll(".pw-toggle").forEach(function (btn) {

@@ -66,7 +66,8 @@ final class Booking
         $now = new DateTimeImmutable();
         $maxDate = $today->modify('+' . $settings['max_advance_days'] . ' days');
 
-        // Week's upcoming bookings in one query -> map[date][slot][accountId] = {uid, ci, sd}
+        // Week's upcoming bookings in one query -> map[date][slot][accountId][] = {uid,ci,co,sd}
+        // Multiple rows per account are now possible when capacity > 1.
         $booked = [];
         $stmt = Database::pdo()->prepare(
             "SELECT ai_account_id, booking_date, slot_index, user_id, checked_in_at, checked_out_at, start_datetime FROM bookings
@@ -74,7 +75,7 @@ final class Booking
         );
         $stmt->execute([$start->format('Y-m-d'), $end->format('Y-m-d')]);
         foreach ($stmt->fetchAll() as $r) {
-            $booked[$r['booking_date']][(int) $r['slot_index']][(int) $r['ai_account_id']] = [
+            $booked[$r['booking_date']][(int) $r['slot_index']][(int) $r['ai_account_id']][] = [
                 'uid' => (int) $r['user_id'],
                 'ci'  => $r['checked_in_at'],
                 'co'  => $r['checked_out_at'],
@@ -95,71 +96,95 @@ final class Booking
                 $beyondMax = $date > $maxDate;
                 $cellBooked = $booked[$dateStr][$i] ?? [];
 
+                // How many pools the user already holds in this slot (for max_concurrent cap).
                 $mineCount = 0;
                 foreach ($allowed as $ac) {
-                    $entry = $cellBooked[(int) $ac['id']] ?? null;
-                    if ($entry && $entry['uid'] === $userId) {
-                        $mineCount++;
+                    $rows = $cellBooked[(int) $ac['id']] ?? [];
+                    foreach ($rows as $r) {
+                        if ($r['uid'] === $userId && empty($r['co'])) { $mineCount++; break; }
                     }
                 }
                 $atLimit = $mineCount >= $maxConcurrent;
 
                 $pools = [];
                 foreach ($allowed as $ac) {
-                    $aid = (int) $ac['id'];
-                    $bkData = $cellBooked[$aid] ?? null;
-                    $bkUser = $bkData ? $bkData['uid'] : null;
-                    $bkCheckedIn = $bkData && !empty($bkData['ci']);
-                    $bkCheckedOut = $bkData && !empty($bkData['co']);
-                    $bkNoShow = !$bkCheckedOut && $bkData && !$bkCheckedIn && !empty($bkData['sd'])
-                        && $now >= (new DateTimeImmutable($bkData['sd']))->modify('+15 minutes');
+                    $aid      = (int) $ac['id'];
+                    $capacity = max(1, (int) $ac['capacity']);
+                    $bkRows   = $cellBooked[$aid] ?? [];
                     $isExpired = !empty($ac['expires_at']) && new DateTimeImmutable($ac['expires_at']) <= $now;
-                    if ($bkUser === $userId) {
-                        if ($bkCheckedOut) {
-                            $status = 'checked_out'; // my booking, ended early
-                        } elseif ($bkNoShow) {
+
+                    // Find current user's booking for this pool (if any).
+                    $myRow = null;
+                    foreach ($bkRows as $r) {
+                        if ($r['uid'] === $userId) { $myRow = $r; break; }
+                    }
+
+                    // Occupancy = non-checked-out active bookings (slots still "in use").
+                    $occupancy = count(array_filter($bkRows, fn ($r) => empty($r['co'])));
+                    $remaining = max(0, $capacity - $occupancy);
+
+                    if ($myRow !== null) {
+                        $myCheckedOut = !empty($myRow['co']);
+                        $myCheckedIn  = !empty($myRow['ci']);
+                        $myNoShow     = !$myCheckedOut && !$myCheckedIn && !empty($myRow['sd'])
+                            && $now >= (new DateTimeImmutable($myRow['sd']))->modify('+15 minutes');
+                        if ($myCheckedOut) {
+                            $status = 'checked_out';
+                        } elseif ($myNoShow) {
                             $status = 'no_show';
-                        } elseif ($isLiveNow && $bkCheckedIn) {
+                        } elseif ($isLiveNow && $myCheckedIn) {
                             $status = 'now';
                         } else {
                             $status = 'mine';
                         }
-                    } elseif ($bkUser !== null) {
-                        // Another user's booking — if they checked out the pool is free again
-                        if ($bkCheckedOut) {
-                            $status = ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax) ? 'off' : 'available';
-                        } else {
-                            $status = 'busy';
-                        }
+                    } elseif ($occupancy >= $capacity) {
+                        // At capacity — pool is fully booked for this slot.
+                        $status = ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax) ? 'off' : 'busy';
                     } elseif ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax || $isLiveNow) {
                         $status = 'off';
                     } else {
                         $status = 'available';
                     }
-                    // Early access: my next slot can start early if prev slot is effectively empty —
-                    // no booking, no-show grace expired, or prev user checked out early.
+
+                    // Early access: my slot can start early if the prev slot on this pool is
+                    // effectively empty — all non-checked-out bookings are no-shows (grace expired).
                     if ($status === 'mine' && $i > 0 && $now < $slotStart) {
-                        $prevData = $booked[$dateStr][$i - 1][$aid] ?? null;
+                        $prevRows  = $booked[$dateStr][$i - 1][$aid] ?? [];
                         $prevStart = $slotStart->modify('-' . (int) $settings['slot_hours'] . ' hours');
-                        $prevCheckedOut = $prevData && !empty($prevData['co']);
-                        $prevNoShow = $prevData && empty($prevData['ci']) && !empty($prevData['sd'])
-                            && $now >= (new DateTimeImmutable($prevData['sd']))->modify('+15 minutes');
                         $inNoShowWindow = $now >= $prevStart->modify('+15 minutes');
-                        if ($prevCheckedOut || ($inNoShowWindow && ($prevNoShow || !$prevData))) {
+                        // Active prev bookings: not checked out.
+                        $prevActive = array_filter($prevRows, fn ($r) => empty($r['co']));
+                        // "Effectively occupied" if any active booking is either checked-in or still in grace period.
+                        $prevOccupied = !empty(array_filter($prevActive, fn ($r) => !empty($r['ci']) || !$inNoShowWindow));
+                        if (!$prevOccupied) {
                             $status = 'early';
                         }
                     }
+
                     $bookable = $status === 'available' && !$atLimit;
                     $meta = self::POOL_MAP[$status];
+
+                    if ($status === 'available' && $atLimit) {
+                        $statusText = 'เต็มช่วงนี้';
+                    } elseif ($status === 'available' && $capacity > 1) {
+                        $statusText = 'ว่าง ' . $remaining . '/' . $capacity . ' ที่';
+                    } elseif ($status === 'busy' && $capacity > 1) {
+                        $statusText = 'เต็ม ' . $capacity . '/' . $capacity . ' ที่';
+                    } else {
+                        $statusText = $meta['label'];
+                    }
+
                     $pools[] = [
                         'accountId' => $aid,
-                        'name' => $ac['name'],
-                        'status' => $status,
-                        'statusText' => ($status === 'available' && $atLimit) ? 'เต็มช่วงนี้' : $meta['label'],
-                        'bg' => $meta['bg'],
-                        'fg' => $meta['fg'],
-                        'icon' => $meta['icon'],
-                        'bookable' => $bookable,
+                        'name'      => $ac['name'],
+                        'status'    => $status,
+                        'statusText' => $statusText,
+                        'bg'        => $meta['bg'],
+                        'fg'        => $meta['fg'],
+                        'icon'      => $meta['icon'],
+                        'bookable'  => $bookable,
+                        'capacity'  => $capacity,
+                        'remaining' => $remaining,
                     ];
                 }
 
@@ -286,16 +311,29 @@ final class Booking
                 return ['ok' => false, 'error' => 'คุณจองครบจำนวน Pool สูงสุดต่อช่วงเวลาแล้ว (' . (int) $settings['max_concurrent'] . ' Pool)'];
             }
 
-            // Every chosen pool must still be free for this slot.
-            // Checked-out bookings release the pool, so exclude them from the taken check.
-            $takenStmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM bookings WHERE ai_account_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming' AND checked_out_at IS NULL FOR UPDATE"
+            // Every chosen pool must not be at capacity, and the user must not already hold it.
+            // Checked-out bookings release the pool so they're excluded from the occupancy count.
+            $capStmt = $pdo->prepare(
+                "SELECT a.capacity,
+                        (SELECT COUNT(*) FROM bookings b2
+                         WHERE b2.ai_account_id = a.id AND b2.booking_date = ? AND b2.slot_index = ?
+                           AND b2.status = 'upcoming' AND b2.checked_out_at IS NULL) AS occupied
+                 FROM ai_accounts a WHERE a.id = ? FOR UPDATE"
+            );
+            $dupStmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM bookings WHERE user_id = ? AND ai_account_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming'"
             );
             foreach ($accountIds as $accountId) {
-                $takenStmt->execute([$accountId, $dateStr, $slotIndex]);
-                if ((int) $takenStmt->fetchColumn() > 0) {
+                $capStmt->execute([$dateStr, $slotIndex, $accountId]);
+                $cap = $capStmt->fetch();
+                if (!$cap || (int) $cap['occupied'] >= max(1, (int) $cap['capacity'])) {
                     $pdo->rollBack();
-                    return ['ok' => false, 'error' => 'มี Pool ที่เลือกถูกจองในช่วงเวลานี้ไปแล้ว กรุณาเลือกใหม่'];
+                    return ['ok' => false, 'error' => 'มี Pool ที่เลือกเต็มแล้วในช่วงเวลานี้ กรุณาเลือกใหม่'];
+                }
+                $dupStmt->execute([$userId, $accountId, $dateStr, $slotIndex]);
+                if ((int) $dupStmt->fetchColumn() > 0) {
+                    $pdo->rollBack();
+                    return ['ok' => false, 'error' => 'คุณมีการจอง Pool นี้ในช่วงเวลานี้อยู่แล้ว'];
                 }
             }
 
@@ -523,7 +561,7 @@ final class Booking
     public static function allowedAccountsFor(int $userId): array
     {
         $stmt = Database::pdo()->prepare(
-            'SELECT a.id, a.name, a.provider, a.status, a.expires_at
+            'SELECT a.id, a.name, a.provider, a.status, a.expires_at, a.capacity
              FROM users u
              JOIN group_ai_accounts ga ON ga.group_id = u.group_id
              JOIN ai_accounts a ON a.id = ga.ai_account_id

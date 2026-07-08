@@ -18,6 +18,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'change_password') {
         $r = AiAccount::updatePassword((int) ($_POST['id'] ?? 0), $_POST['new_password'] ?? '');
         flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? 'เปลี่ยนรหัสผ่านบัญชี AI เรียบร้อยแล้ว' : ($r['error'] ?? 'เปลี่ยนรหัสผ่านไม่สำเร็จ'));
+    } elseif ($action === 'bulk_reset_passwords') {
+        $r = AiAccount::bulkResetPasswords($_POST['passwords'] ?? []);
+        flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? "รีเซ็ตรหัสผ่านทั้งหมด {$r['count']} บัญชีเรียบร้อยแล้ว" : ($r['error'] ?? 'รีเซ็ตไม่สำเร็จ'));
     } elseif ($action === 'type_add') {
         $r = AiProvider::add($_POST['type_name'] ?? '');
         flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? 'เพิ่มประเภทเรียบร้อยแล้ว' : ($r['error'] ?? 'เพิ่มประเภทไม่สำเร็จ'));
@@ -54,8 +57,14 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
   <h5 style="font-weight:700;margin:0">บัญชี AI Account Pool</h5>
-  <div style="display:flex;gap:8px">
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button type="button" class="btn btn-outline-secondary" style="font-size:13px" data-bs-toggle="modal" data-bs-target="#manageTypesModal"><i class="bi bi-tags me-1"></i>จัดการประเภท</button>
+    <?php if ($accounts): ?>
+    <button type="button" id="bulkResetPwBtn" class="btn btn-outline-warning" style="font-size:13px"
+            data-accounts='<?= e(json_encode(array_map(fn ($ac) => ['id' => (int) $ac['id'], 'name' => $ac['name']], $accounts), JSON_UNESCAPED_UNICODE)) ?>'>
+      <i class="bi bi-arrow-clockwise me-1"></i>รีเซ็ตรหัสผ่านทั้งหมด
+    </button>
+    <?php endif; ?>
     <button type="button" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px" data-bs-toggle="modal" data-bs-target="#addAccountModal"><i class="bi bi-plus-lg me-1"></i>เพิ่มบัญชี AI</button>
   </div>
 </div>
@@ -94,7 +103,10 @@ require __DIR__ . '/../includes/header.php';
           </div>
         </div>
 
-        <!-- Usage today -->
+        <!-- Capacity + Usage today -->
+        <?php if ((int) $ac['capacity'] > 1): ?>
+          <div style="font-size:12px;color:var(--bs-secondary-color);margin-bottom:4px"><i class="bi bi-people me-1"></i>รองรับ: <strong><?= (int) $ac['capacity'] ?></strong> ผู้ใช้/slot</div>
+        <?php endif; ?>
         <div style="font-size:12px;color:var(--bs-secondary-color);margin-bottom:6px">ใช้วันนี้: <?= (int) $ac['usedToday'] ?>/<?= (int) $ac['totalSlots'] ?> slots</div>
         <div style="background:var(--bs-border-color);border-radius:4px;height:6px;overflow:hidden;margin-bottom:12px">
           <div style="background:#2563EB;width:<?= e($ac['usagePct']) ?>;height:100%;border-radius:4px"></div>
@@ -147,7 +159,8 @@ require __DIR__ . '/../includes/header.php';
                   data-expires="<?= e($expiresInput) ?>"
                   data-reminder="<?= e($ac['password_reminder']) ?>"
                   data-monthly-cost="<?= $ac['monthly_cost'] !== null ? (float)$ac['monthly_cost'] : '' ?>"
-                  data-cost-per-slot="<?= $ac['cost_per_slot'] !== null ? (float)$ac['cost_per_slot'] : '' ?>"><i class="bi bi-pencil me-1"></i>แก้ไข</button>
+                  data-cost-per-slot="<?= $ac['cost_per_slot'] !== null ? (float)$ac['cost_per_slot'] : '' ?>"
+                  data-capacity="<?= (int) ($ac['capacity'] ?? 1) ?>"><i class="bi bi-pencil me-1"></i>แก้ไข</button>
           <form method="post" style="margin:0" onsubmit="return confirm('ลบบัญชี AI นี้?')">
             <?= Csrf::field() ?>
             <input type="hidden" name="action" value="delete">
@@ -188,6 +201,10 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
       <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">วันเวลาหมดอายุ</label><input type="datetime-local" name="expires_at" class="form-control" style="font-size:13px"></div>
       <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">สถานะ</label>
         <select name="status" class="form-select" style="font-size:13px"><option value="active">ใช้งานได้</option><option value="maintenance">บำรุงรักษา</option></select>
+      </div>
+      <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px"><i class="bi bi-people me-1"></i>จำนวนผู้ใช้พร้อมกันสูงสุดต่อ 1 slot</label>
+        <input type="number" name="capacity" min="1" value="1" required class="form-control" style="font-size:13px;max-width:160px" placeholder="1">
+        <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">ผู้ใช้หลายคนสามารถจอง slot เดียวกันได้พร้อมกัน ค่าต่ำสุดคือ 1</div>
       </div>
       <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">แจ้งเตือนให้เปลี่ยนรหัสผ่าน</label>
         <select name="password_reminder" class="form-select" style="font-size:13px">
@@ -317,6 +334,32 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
           <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
           <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none"><i class="bi bi-save me-1"></i>บันทึกรหัสผ่านนี้</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<!-- Bulk reset passwords modal -->
+<div class="modal fade" id="bulkResetPwModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post" id="bulkResetPwForm">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="bulk_reset_passwords">
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-arrow-clockwise me-2" style="color:#D97706"></i>รีเซ็ตรหัสผ่านทุกบัญชีพร้อมกัน</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+        </div>
+        <div class="modal-body" style="padding:20px">
+          <div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400E;margin-bottom:16px">
+            <i class="bi bi-exclamation-triangle me-2"></i>ระบบสุ่มรหัสผ่านใหม่ให้ทุกบัญชีพร้อมกัน กรุณาคัดลอกและแจ้งผู้ใช้ก่อนกด "บันทึกทั้งหมด"
+          </div>
+          <div id="bulkResetPwTable"></div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color);gap:8px">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" id="bulkResetRegenAll" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>สุ่มใหม่ทั้งหมด</button>
+          <button type="submit" class="btn btn-warning btn-sm" style="font-weight:600" onclick="return confirm('ยืนยันรีเซ็ตรหัสผ่านทุกบัญชีพร้อมกัน?')"><i class="bi bi-save me-1"></i>บันทึกทั้งหมด</button>
         </div>
       </form>
     </div>
