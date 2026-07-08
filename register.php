@@ -74,18 +74,20 @@ require __DIR__ . '/includes/guest-header.php';
       </div>
       <div>
         <label id="majorLabel" style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">สาขาวิชา <span style="color:#DC2626">*</span></label>
-        <select name="major_id" id="majorSelect" class="form-select" style="font-size:13px" required>
-          <option value="">— เลือกสาขาวิชา —</option>
-          <?php foreach ($majors as $m): ?>
-            <option value="<?= (int) $m['id'] ?>" <?= (int) $values['major_id'] === (int) $m['id'] ? 'selected' : '' ?>><?= e($m['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-        <select name="subject_id" id="subjectSelect" class="form-select" style="font-size:13px;display:none">
-          <option value="">— เลือกวิชาสอน —</option>
-          <?php foreach ($subjects as $s): ?>
-            <option value="<?= (int) $s['id'] ?>" <?= (int) $values['subject_id'] === (int) $s['id'] ? 'selected' : '' ?>><?= e($s['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
+        <!-- major autocomplete -->
+        <div id="majorAutoWrap" style="position:relative">
+          <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--bs-tertiary-color);font-size:13px;pointer-events:none"><i class="bi bi-search"></i></span>
+          <input type="text" id="majorText" autocomplete="off" class="form-control" placeholder="พิมพ์เพื่อค้นหาสาขาวิชา..." style="font-size:13px;padding-left:33px">
+          <input type="hidden" name="major_id" id="majorId" data-selected="<?= (int) $values['major_id'] ?>">
+          <div id="majorDrop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);z-index:1050;max-height:220px;overflow-y:auto"></div>
+        </div>
+        <!-- subject autocomplete -->
+        <div id="subjectAutoWrap" style="position:relative;display:none">
+          <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--bs-tertiary-color);font-size:13px;pointer-events:none"><i class="bi bi-search"></i></span>
+          <input type="text" id="subjectText" autocomplete="off" class="form-control" placeholder="พิมพ์เพื่อค้นหาวิชาสอน..." style="font-size:13px;padding-left:33px">
+          <input type="hidden" name="subject_id" id="subjectId" data-selected="<?= (int) $values['subject_id'] ?>">
+          <div id="subjectDrop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);z-index:1050;max-height:220px;overflow-y:auto"></div>
+        </div>
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px">เบอร์โทรศัพท์</label>
@@ -130,45 +132,123 @@ require __DIR__ . '/includes/guest-header.php';
 </div>
 <script>
 (function(){
+  var majorsData   = <?= json_encode(array_values(array_map(fn($m) => ['id' => (int)$m['id'], 'name' => $m['name']], $majors))) ?>;
+  var subjectsData = <?= json_encode(array_values(array_map(fn($s) => ['id' => (int)$s['id'], 'name' => $s['name']], $subjects))) ?>;
+
+  /* ── Autocomplete widget ─────────────────────────────────── */
+  function initAutocomplete(textId, dropId, hiddenId, data) {
+    var textEl   = document.getElementById(textId);
+    var dropEl   = document.getElementById(dropId);
+    var hiddenEl = document.getElementById(hiddenId);
+    var selectedId = parseInt(hiddenEl.dataset.selected || '0', 10);
+
+    // Pre-fill text on page re-render (POST with error)
+    if (selectedId) {
+      var pre = data.find(function(d) { return d.id === selectedId; });
+      if (pre) { textEl.value = pre.name; hiddenEl.value = pre.id; }
+    }
+
+    function renderDrop(items) {
+      dropEl.innerHTML = '';
+      if (!items.length) { dropEl.style.display = 'none'; return; }
+      items.forEach(function(item) {
+        var div = document.createElement('div');
+        div.textContent = item.name;
+        div.style.cssText = 'padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--bs-border-color)';
+        div.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          textEl.value    = item.name;
+          hiddenEl.value  = item.id;
+          dropEl.style.display = 'none';
+          textEl.setCustomValidity('');
+        });
+        div.addEventListener('mouseenter', function() { div.style.background = '#EFF6FF'; div.style.color = '#2563EB'; });
+        div.addEventListener('mouseleave', function() { div.style.background = ''; div.style.color = ''; });
+        dropEl.appendChild(div);
+      });
+      dropEl.style.display = 'block';
+    }
+
+    function filter() {
+      var q = textEl.value.trim().toLowerCase();
+      renderDrop(q ? data.filter(function(d) { return d.name.toLowerCase().indexOf(q) !== -1; }) : data);
+    }
+
+    textEl.addEventListener('focus', filter);
+    textEl.addEventListener('input', function() { hiddenEl.value = ''; filter(); });
+    textEl.addEventListener('blur', function() {
+      setTimeout(function() {
+        dropEl.style.display = 'none';
+        // If user typed but didn't pick, clear
+        if (!hiddenEl.value) { textEl.value = ''; }
+      }, 180);
+    });
+    textEl.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') { dropEl.style.display = 'none'; }
+    });
+
+    return {
+      clear: function() { textEl.value = ''; hiddenEl.value = ''; dropEl.style.display = 'none'; },
+      setRequired: function(r) {
+        textEl.required = r;
+        if (!r) textEl.setCustomValidity('');
+      }
+    };
+  }
+
+  /* ── Init both widgets ───────────────────────────────────── */
+  var majorAC   = initAutocomplete('majorText',   'majorDrop',   'majorId',   majorsData);
+  var subjectAC = initAutocomplete('subjectText', 'subjectDrop', 'subjectId', subjectsData);
+
+  /* ── Role switching ──────────────────────────────────────── */
   var initial = <?= json_encode($values['role']) ?>;
 
   function setRole(role) {
     document.getElementById('roleInput').value = role;
-
     var isTeacher = role === 'teacher';
+
     var btnS = document.getElementById('btnStudent');
     var btnT = document.getElementById('btnTeacher');
+    btnS.style.background  = isTeacher ? 'var(--bs-secondary-bg)' : '#2563EB';
+    btnS.style.color       = isTeacher ? 'var(--bs-secondary-color)' : 'white';
+    btnS.style.borderColor = isTeacher ? 'var(--bs-border-color)' : '#2563EB';
+    btnT.style.background  = isTeacher ? '#059669' : 'var(--bs-secondary-bg)';
+    btnT.style.color       = isTeacher ? 'white' : 'var(--bs-secondary-color)';
+    btnT.style.borderColor = isTeacher ? '#059669' : 'var(--bs-border-color)';
+
     var idLabel = document.getElementById('idLabel');
     var idInput = document.getElementById('idInput');
-    var majorLabel = document.getElementById('majorLabel');
-    var majorSelect = document.getElementById('majorSelect');
-    var subjectSelect = document.getElementById('subjectSelect');
-
-    // Toggle button styles
-    btnS.style.background    = isTeacher ? 'var(--bs-secondary-bg)' : '#2563EB';
-    btnS.style.color         = isTeacher ? 'var(--bs-secondary-color)' : 'white';
-    btnS.style.borderColor   = isTeacher ? 'var(--bs-border-color)' : '#2563EB';
-    btnT.style.background    = isTeacher ? '#059669' : 'var(--bs-secondary-bg)';
-    btnT.style.color         = isTeacher ? 'white' : 'var(--bs-secondary-color)';
-    btnT.style.borderColor   = isTeacher ? '#059669' : 'var(--bs-border-color)';
-
-    // ID field
-    idLabel.innerHTML  = (isTeacher ? 'รหัสพนักงาน' : 'รหัสนักศึกษา') + (isTeacher ? '' : ' <span style="color:#DC2626">*</span>');
+    idLabel.innerHTML   = (isTeacher ? 'รหัสพนักงาน' : 'รหัสนักศึกษา') + (isTeacher ? '' : ' <span style="color:#DC2626">*</span>');
     idInput.placeholder = isTeacher ? 'T001' : '6501CS001';
-    idInput.required   = !isTeacher;
+    idInput.required    = !isTeacher;
 
-    // Major (student) vs Subject (teacher)
-    majorLabel.innerHTML = (isTeacher ? 'วิชาสอน' : 'สาขาวิชา') + ' <span style="color:#DC2626">*</span>';
-    majorSelect.style.display   = isTeacher ? 'none' : '';
-    majorSelect.disabled        = isTeacher;
-    majorSelect.required        = !isTeacher;
-    subjectSelect.style.display = isTeacher ? '' : 'none';
-    subjectSelect.disabled      = !isTeacher;
-    subjectSelect.required      = isTeacher;
+    document.getElementById('majorLabel').innerHTML = (isTeacher ? 'วิชาสอน' : 'สาขาวิชา') + ' <span style="color:#DC2626">*</span>';
+    document.getElementById('majorAutoWrap').style.display   = isTeacher ? 'none' : '';
+    document.getElementById('subjectAutoWrap').style.display = isTeacher ? '' : 'none';
+    majorAC.setRequired(!isTeacher);
+    subjectAC.setRequired(isTeacher);
   }
 
   window.setRole = setRole;
   setRole(initial);
+
+  /* ── Submit guard: ensure a valid pick was made ──────────── */
+  document.getElementById('regForm').addEventListener('submit', function(e) {
+    var isTeacher = document.getElementById('roleInput').value === 'teacher';
+    if (isTeacher) {
+      if (!document.getElementById('subjectId').value) {
+        document.getElementById('subjectText').setCustomValidity('กรุณาเลือกวิชาสอนจากรายการ');
+        document.getElementById('subjectText').reportValidity();
+        e.preventDefault();
+      }
+    } else {
+      if (!document.getElementById('majorId').value) {
+        document.getElementById('majorText').setCustomValidity('กรุณาเลือกสาขาวิชาจากรายการ');
+        document.getElementById('majorText').reportValidity();
+        e.preventDefault();
+      }
+    }
+  });
 })();
 </script>
 <?php require __DIR__ . '/includes/guest-footer.php'; ?>
