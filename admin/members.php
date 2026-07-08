@@ -64,6 +64,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'delete') {
         Member::delete($id);
         flash_set('warn', 'ลบสมาชิกเรียบร้อยแล้ว');
+    } elseif ($action === 'update_credentials') {
+        $result = Member::updateCredentials($id, $_POST['new_email'] ?? '', $_POST['new_password'] ?? '');
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'อัปเดตข้อมูลบัญชีเรียบร้อยแล้ว' : ($result['error'] ?? 'อัปเดตไม่สำเร็จ'));
     } elseif ($action === 'reset_password') {
         $result = Member::resetPassword($id, $_POST['new_password'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'รีเซตรหัสผ่านเรียบร้อยแล้ว' : ($result['error'] ?? 'รีเซตไม่สำเร็จ'));
@@ -221,11 +224,11 @@ require __DIR__ . '/../includes/header.php';
                   <?php endif; ?>
                   <?= member_action_form($m['id'], 'impersonate', 'action-btn-blue', 'bi-person-badge', 'สวมสิทธิ์', ['title' => 'สวมสิทธิ์', 'msg' => 'ดูระบบในมุมมองของ ' . $m['name'] . ' (นักศึกษา) — กด "คืนสิทธิ์ Admin" บนแถบแจ้งเตือนเพื่อออก', 'icon' => 'bi-person-badge', 'color' => '#2563EB', 'btn' => 'สวมสิทธิ์', 'btnCls' => 'btn-primary']) ?>
                   <?= member_action_form($m['id'], 'suspend', 'action-btn-warn', 'bi-slash-circle', 'ระงับ', ['title' => 'ระงับสิทธิ์', 'msg' => 'ระงับสิทธิ์ของ ' . $m['name'] . ' — ผู้ใช้จะไม่สามารถเข้าสู่ระบบและจองได้จนกว่าจะเปิดใช้งาน', 'icon' => 'bi-slash-circle', 'color' => '#D97706', 'btn' => 'ระงับ', 'btnCls' => 'btn-warning']) ?>
-                  <button type="button" class="action-btn-blue" data-reset-pw data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>"><i class="bi bi-key me-1"></i>รีเซตรหัส</button>
+                  <button type="button" class="action-btn-blue" data-edit-cred data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>" data-email="<?= e($m['email']) ?>"><i class="bi bi-pencil-square me-1"></i>แก้ไขบัญชี</button>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
                 <?php elseif ($m['isSuspended']): ?>
                   <?= member_action_form($m['id'], 'activate', 'action-btn-ok', 'bi-check-circle', 'เปิดใช้') ?>
-                  <button type="button" class="action-btn-blue" data-reset-pw data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>"><i class="bi bi-key me-1"></i>รีเซตรหัส</button>
+                  <button type="button" class="action-btn-blue" data-edit-cred data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>" data-email="<?= e($m['email']) ?>"><i class="bi bi-pencil-square me-1"></i>แก้ไขบัญชี</button>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
                   <?= member_action_form($m['id'], 'delete', 'action-btn-err', 'bi-trash', 'ลบ', ['title' => 'ลบสมาชิก', 'msg' => 'ลบ ' . $m['name'] . ' ออกจากระบบอย่างถาวร พร้อมประวัติการจองทั้งหมด ไม่สามารถเรียกคืนได้', 'icon' => 'bi-trash', 'color' => '#DC2626', 'btn' => 'ลบถาวร', 'btnCls' => 'btn-danger']) ?>
                 <?php endif; ?>
@@ -312,6 +315,40 @@ require __DIR__ . '/../includes/header.php';
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
           <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
           <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none">ตั้งรหัสผ่านใหม่</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit credentials modal (populated by app.js via data-edit-cred buttons) -->
+<div class="modal fade" id="editCredModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="update_credentials">
+        <input type="hidden" name="id" id="editCredId">
+        <input type="hidden" name="search" value="<?= e($search) ?>">
+        <input type="hidden" name="status" value="<?= e($status) ?>">
+        <input type="hidden" name="page" value="<?= (int) $page ?>">
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-pencil-square me-2" style="color:#2563EB"></i>แก้ไขบัญชีผู้ใช้ — <span id="editCredName"></span></h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+        </div>
+        <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">อีเมล *</label>
+            <input type="email" name="new_email" id="editCredEmail" required class="form-control" style="font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">รหัสผ่านใหม่ <span style="font-weight:400;color:var(--bs-tertiary-color)">(เว้นว่างไว้ถ้าไม่ต้องการเปลี่ยน)</span></label>
+            <input type="password" name="new_password" id="editCredPw" minlength="8" class="form-control" placeholder="อย่างน้อย 8 ตัวอักษร" style="font-size:13px">
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none">บันทึก</button>
         </div>
       </form>
     </div>

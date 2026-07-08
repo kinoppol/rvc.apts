@@ -309,6 +309,19 @@
     });
   });
 
+  // ── Edit-credentials modal (admin/members.php) ──
+  document.querySelectorAll("[data-edit-cred]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var modalEl = document.getElementById("editCredModal");
+      if (!modalEl) return;
+      document.getElementById("editCredId").value = btn.dataset.id;
+      document.getElementById("editCredName").textContent = btn.dataset.name || "สมาชิก";
+      document.getElementById("editCredEmail").value = btn.dataset.email || "";
+      document.getElementById("editCredPw").value = "";
+      new bootstrap.Modal(modalEl).show();
+    });
+  });
+
   // ── Report submission modal (student/my-bookings.php) ──
   document.querySelectorAll("[data-report-booking]").forEach(function (btn) {
     btn.addEventListener("click", function () {

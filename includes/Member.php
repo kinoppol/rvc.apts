@@ -123,6 +123,33 @@ final class Member
         return $row ? self::decorate($row) : null;
     }
 
+    /** @return array{ok:bool,error?:string} Admin updates a member's email and/or password. Password is optional (empty = no change). */
+    public static function updateCredentials(int $id, string $email, string $newPassword): array
+    {
+        $email = trim($email);
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'error' => 'รูปแบบอีเมลไม่ถูกต้อง'];
+        }
+        // Uniqueness check — exclude the target user themselves
+        $check = Database::pdo()->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+        $check->execute([$email, $id]);
+        if ($check->fetch()) {
+            return ['ok' => false, 'error' => 'อีเมลนี้ถูกใช้งานโดยผู้ใช้อื่นแล้ว'];
+        }
+
+        if ($newPassword !== '') {
+            if (strlen($newPassword) < 8) {
+                return ['ok' => false, 'error' => 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'];
+            }
+            $stmt = Database::pdo()->prepare("UPDATE users SET email = ?, password_hash = ? WHERE id = ? AND role IN ('student','teacher')");
+            $stmt->execute([$email, password_hash($newPassword, PASSWORD_DEFAULT), $id]);
+        } else {
+            $stmt = Database::pdo()->prepare("UPDATE users SET email = ? WHERE id = ? AND role IN ('student','teacher')");
+            $stmt->execute([$email, $id]);
+        }
+        return ['ok' => true];
+    }
+
     /** @return array{ok:bool,error?:string} Admin sets a new password for a member. */
     public static function resetPassword(int $id, string $newPassword): array
     {
