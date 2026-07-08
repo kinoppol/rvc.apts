@@ -204,7 +204,7 @@ require __DIR__ . '/../includes/header.php';
                 data-id="<?= (int) $bk['id'] ?>"
                 data-meta="<?= e($bk['dateLabel'] . ' · ' . $bk['slotLabel']) ?>"
                 data-issue-text="<?= e($bk['issue_text'] ?? '') ?>"
-                data-issue-file="<?= e($bk['issue_file'] ?? '') ?>">
+                data-issue-files="<?= e(json_encode(array_map(fn($f) => ['filename' => $f['filename'], 'original_name' => $f['original_name'] ?? $f['filename']], $bk['issue_files'] ?? []))) ?>">
                 <i class="bi bi-bug me-1"></i><?= $bk['hasIssue'] ? 'แก้ไขปัญหา' : 'รายงานปัญหา' ?>
               </button>
             <?php endif; ?>
@@ -309,14 +309,17 @@ require __DIR__ . '/../includes/header.php';
           </div>
           <div>
             <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">แนบรูปภาพหรือ PDF <span style="font-weight:400;color:var(--bs-tertiary-color)">(ไม่บังคับ)</span></label>
-            <!-- Existing file indicator — shown when re-editing -->
-            <div id="issueExistingFile" style="display:none;margin-bottom:8px;padding:8px 12px;background:var(--bs-secondary-bg);border-radius:7px;font-size:12px;display:none;align-items:center;gap:8px">
-              <i class="bi bi-paperclip" style="color:#D97706;flex-shrink:0"></i>
-              <a id="issueExistingFileLink" href="#" target="_blank" style="color:#2563EB;text-decoration:none;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></a>
-              <span style="font-size:11px;color:var(--bs-tertiary-color);flex-shrink:0">อัปโหลดไฟล์ใหม่เพื่อแทนที่</span>
+            <!-- Existing files list — shown when re-editing -->
+            <div id="issueExistingFiles" style="display:none;margin-bottom:8px;padding:8px 12px;background:var(--bs-secondary-bg);border-radius:7px;font-size:12px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                <i class="bi bi-paperclip" style="color:#D97706;flex-shrink:0"></i>
+                <span style="font-weight:600;color:var(--bs-secondary-color)">ไฟล์ที่แนบไว้</span>
+                <span style="font-size:11px;color:var(--bs-tertiary-color);margin-left:auto">อัปโหลดไฟล์ใหม่เพื่อแทนที่ทั้งหมด</span>
+              </div>
+              <div id="issueExistingFilesList" style="display:flex;flex-direction:column;gap:4px"></div>
             </div>
-            <input type="file" name="issue_file" id="issueFileInput" accept="image/*,application/pdf" class="form-control" style="font-size:13px">
-            <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">รองรับรูปภาพ (JPG/PNG/GIF/WEBP) หรือ PDF ขนาดไม่เกิน 5 MB</div>
+            <input type="file" name="issue_file[]" id="issueFileInput" accept="image/*,application/pdf" class="form-control" style="font-size:13px" multiple>
+            <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">รองรับรูปภาพ (JPG/PNG/GIF/WEBP) หรือ PDF ขนาดไม่เกิน 5 MB ต่อไฟล์ (เลือกได้หลายไฟล์)</div>
           </div>
         </div>
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">

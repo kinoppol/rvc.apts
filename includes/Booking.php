@@ -490,6 +490,12 @@ final class Booking
         $stmt->execute([$userId]);
         $rows = self::attachDisplay($stmt->fetchAll());
 
+        // Batch-load issue file attachments and attach to each row
+        if ($rows) {
+            $ids = array_column($rows, 'id');
+            $rows = self::attachIssueFiles($rows, $ids);
+        }
+
         if ($filter && $filter !== 'all') {
             if ($filter === 'upcoming') {
                 // "upcoming" tab includes all active/imminent states
@@ -501,6 +507,40 @@ final class Booking
                 $rows = array_values(array_filter($rows, fn ($r) => $r['displayStatus'] === $filter));
             }
         }
+        return $rows;
+    }
+
+    /**
+     * Batch-load booking_issue_files for the given booking IDs and attach as $row['issue_files'].
+     * Also re-derives hasIssue / canReportIssue to include file-only issues.
+     * @param array<int> $bookingIds
+     * @return array
+     */
+    private static function attachIssueFiles(array $rows, array $bookingIds): array
+    {
+        if (!$bookingIds) {
+            foreach ($rows as &$r) {
+                $r['issue_files'] = [];
+            }
+            return $rows;
+        }
+        $in   = implode(',', array_fill(0, count($bookingIds), '?'));
+        $stmt = Database::pdo()->prepare(
+            "SELECT booking_id, filename, original_name FROM booking_issue_files WHERE booking_id IN ({$in}) ORDER BY uploaded_at ASC"
+        );
+        $stmt->execute($bookingIds);
+        $filesByBooking = [];
+        foreach ($stmt->fetchAll() as $f) {
+            $filesByBooking[(int) $f['booking_id']][] = $f;
+        }
+        foreach ($rows as &$row) {
+            $files = $filesByBooking[(int) $row['id']] ?? [];
+            $row['issue_files'] = $files;
+            // Re-derive: hasIssue is true when text OR files exist
+            $row['hasIssue']       = !empty($row['issue_text']) || !empty($files);
+            $row['canReportIssue'] = $row['canReportIssue'] || !empty($files);
+        }
+        unset($row);
         return $rows;
     }
 
@@ -928,11 +968,12 @@ final class Booking
 
     /**
      * Student reports a problem encountered during a booking slot.
-     * Accepts optional image/PDF attachment. Re-submission overwrites the previous report.
-     * @param array|null $file  $_FILES entry for the attachment (null or error=4 = no file)
+     * Accepts multiple image/PDF attachments via $_FILES['issue_file'] (multi-file input).
+     * New files replace all previous attachments; submitting with no files keeps existing ones.
+     * @param array|null $filesRaw  Raw $_FILES['issue_file'] entry (multi-file array-of-arrays form)
      * @return array{ok:bool,error?:string}
      */
-    public static function reportIssue(int $userId, int $bookingId, string $text, ?array $file = null): array
+    public static function reportIssue(int $userId, int $bookingId, string $text, ?array $filesRaw = null): array
     {
         $stmt = Database::pdo()->prepare('SELECT * FROM bookings WHERE id = ? AND user_id = ?');
         $stmt->execute([$bookingId, $userId]);
@@ -948,20 +989,48 @@ final class Booking
             return ['ok' => false, 'error' => 'กรุณาอธิบายปัญหาที่พบ'];
         }
 
-        // Handle file upload — keep existing file if no new one is provided
-        $issueFile = $b['issue_file'] ?? null;
-        $hasUpload = $file && ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
-        if ($hasUpload) {
-            $stored = self::storeReportFile($file, $bookingId, 'issue');
+        // Normalize multi-file $_FILES structure into a flat list of uploadable files
+        $uploads = [];
+        if ($filesRaw && isset($filesRaw['name']) && is_array($filesRaw['name'])) {
+            // <input name="issue_file[]" multiple> — PHP gives arrays per property
+            foreach ($filesRaw['name'] as $i => $name) {
+                if (($filesRaw['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                    $uploads[] = [
+                        'name'     => $name,
+                        'tmp_name' => $filesRaw['tmp_name'][$i],
+                        'error'    => UPLOAD_ERR_OK,
+                        'size'     => $filesRaw['size'][$i],
+                    ];
+                }
+            }
+        } elseif ($filesRaw && ($filesRaw['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            // Fallback: single-file format
+            $uploads[] = $filesRaw;
+        }
+
+        // Store any new files (validates each one)
+        $newFiles = [];
+        foreach ($uploads as $upload) {
+            $stored = self::storeReportFile($upload, $bookingId, 'issue');
             if (!$stored['ok']) {
                 return $stored;
             }
-            $issueFile = $stored['file'];
+            $newFiles[] = ['filename' => $stored['file'], 'original_name' => $upload['name']];
         }
 
-        Database::pdo()->prepare(
-            'UPDATE bookings SET issue_text = ?, issue_file = ?, issue_at = NOW() WHERE id = ?'
-        )->execute([mb_substr($text, 0, 1000), $issueFile, $bookingId]);
+        $pdo = Database::pdo();
+
+        // Replace existing file attachments only when new files were actually uploaded
+        if ($newFiles) {
+            $pdo->prepare('DELETE FROM booking_issue_files WHERE booking_id = ?')->execute([$bookingId]);
+            $ins = $pdo->prepare('INSERT INTO booking_issue_files (booking_id, filename, original_name) VALUES (?, ?, ?)');
+            foreach ($newFiles as $nf) {
+                $ins->execute([$bookingId, $nf['filename'], $nf['original_name']]);
+            }
+        }
+
+        $pdo->prepare('UPDATE bookings SET issue_text = ?, issue_at = NOW() WHERE id = ?')
+            ->execute([mb_substr($text, 0, 1000), $bookingId]);
 
         return ['ok' => true];
     }

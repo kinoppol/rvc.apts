@@ -28,6 +28,7 @@ final class Migration
         'migrate_school_info.sql',
         'migrate_ai_avatar.sql',
         'migrate_issue_file.sql',
+        'migrate_issue_files_table.sql',
     ];
 
     /** Create the tracking table if it doesn't exist yet. */

@@ -383,15 +383,25 @@
       // Reset file input so previous selection doesn't carry over
       var fileInput = document.getElementById("issueFileInput");
       if (fileInput) fileInput.value = "";
-      // Show existing-file indicator when re-editing a submitted issue
-      var existingWrap = document.getElementById("issueExistingFile");
-      var existingLink = document.getElementById("issueExistingFileLink");
-      if (existingWrap && existingLink) {
-        var f = btn.dataset.issueFile || "";
-        if (f) {
-          existingLink.textContent = f;
-          existingLink.href = (modalEl.dataset.reportsBase || "") + f;
-          existingWrap.style.display = "flex";
+      // Show existing-files list when re-editing a submitted issue
+      var existingWrap = document.getElementById("issueExistingFiles");
+      var existingList = document.getElementById("issueExistingFilesList");
+      if (existingWrap && existingList) {
+        var filesJson = btn.dataset.issueFiles || "[]";
+        var files = [];
+        try { files = JSON.parse(filesJson); } catch (e) {}
+        if (files.length) {
+          existingList.innerHTML = "";
+          var base = modalEl.dataset.reportsBase || "";
+          files.forEach(function (f) {
+            var a = document.createElement("a");
+            a.href = base + f.filename;
+            a.target = "_blank";
+            a.textContent = f.original_name || f.filename;
+            a.style.cssText = "color:#2563EB;text-decoration:none;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block";
+            existingList.appendChild(a);
+          });
+          existingWrap.style.display = "block";
         } else {
           existingWrap.style.display = "none";
         }
