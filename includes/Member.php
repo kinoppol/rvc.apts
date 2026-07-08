@@ -132,6 +132,94 @@ final class Member
         return $row ? self::decorate($row) : null;
     }
 
+    /**
+     * Admin updates every editable field for a member, including role, major/subject, and optional password.
+     * @return array{ok:bool,error?:string}
+     */
+    public static function updateAll(int $id, array $data): array
+    {
+        if (!self::find($id)) {
+            return ['ok' => false, 'error' => 'ไม่พบสมาชิก'];
+        }
+        $name    = trim($data['name'] ?? '');
+        $staffId = trim($data['student_id'] ?? '') ?: null;
+        $role    = in_array($data['role'] ?? '', ['student', 'teacher'], true) ? $data['role'] : 'student';
+        $email   = trim($data['email'] ?? '');
+        $phone   = trim($data['phone'] ?? '') ?: null;
+        $schoolName     = trim($data['school_name'] ?? '') ?: null;
+        $province       = trim($data['province'] ?? '') ?: null;
+        $newPassword    = $data['new_password'] ?? '';
+        $subjectNewName = trim($data['subject_new_name'] ?? '') ?: null;
+
+        if ($name === '' || $email === '') {
+            return ['ok' => false, 'error' => 'กรุณากรอกชื่อและอีเมล'];
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'error' => 'รูปแบบอีเมลไม่ถูกต้อง'];
+        }
+        $pdo = Database::pdo();
+        $chk = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+        $chk->execute([$email, $id]);
+        if ($chk->fetch()) {
+            return ['ok' => false, 'error' => 'อีเมลนี้ถูกใช้งานโดยผู้ใช้อื่นแล้ว'];
+        }
+        if ($staffId !== null) {
+            $chk2 = $pdo->prepare("SELECT id FROM users WHERE student_id = ? AND id != ?");
+            $chk2->execute([$staffId, $id]);
+            if ($chk2->fetch()) {
+                $lbl = $role === 'teacher' ? 'เลขตำแหน่ง' : 'รหัสนักศึกษา';
+                return ['ok' => false, 'error' => $lbl . 'นี้ถูกใช้งานโดยผู้ใช้อื่นแล้ว'];
+            }
+        }
+        if ($newPassword !== '' && strlen($newPassword) < 8) {
+            return ['ok' => false, 'error' => 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'];
+        }
+
+        // Resolve major / subject FK
+        $majorId   = null;
+        $subjectId = null;
+        $majorName = null;
+        if ($role === 'student') {
+            $majorId = (int) ($data['major_id'] ?? 0);
+            if ($majorId === 0) {
+                return ['ok' => false, 'error' => 'กรุณาเลือกสาขาวิชา'];
+            }
+            $majorRow = Major::find($majorId);
+            if (!$majorRow) {
+                return ['ok' => false, 'error' => 'สาขาวิชาไม่ถูกต้อง'];
+            }
+            $majorName = $majorRow['name'];
+        } else {
+            $subjectId = (int) ($data['subject_id'] ?? 0);
+            if ($subjectId === 0 && $subjectNewName !== null) {
+                $subjectId = Subject::addAndGetId($subjectNewName);
+            }
+            if ($subjectId === 0) {
+                return ['ok' => false, 'error' => 'กรุณาเลือกวิชาสอน'];
+            }
+            $subjectRow = Subject::find($subjectId);
+            if (!$subjectRow) {
+                return ['ok' => false, 'error' => 'วิชาสอนไม่ถูกต้อง'];
+            }
+            $majorName = $subjectRow['name'];
+        }
+
+        $pwExtra  = $newPassword !== '' ? ', password_hash = ?' : '';
+        $params   = [$role, $name, $staffId, $email, $phone, $majorName, $majorId, $subjectId, $schoolName, $province];
+        if ($newPassword !== '') {
+            $params[] = password_hash($newPassword, PASSWORD_DEFAULT);
+        }
+        $params[] = $id;
+
+        $pdo->prepare(
+            "UPDATE users SET role = ?, name = ?, student_id = ?, email = ?, phone = ?,
+             major = ?, major_id = ?, subject_id = ?, school_name = ?, province = ? {$pwExtra}
+             WHERE id = ? AND role IN ('student','teacher')"
+        )->execute($params);
+
+        return ['ok' => true];
+    }
+
     /** @return array{ok:bool,error?:string} Admin updates a member's email and/or password. Password is optional (empty = no change). */
     public static function updateCredentials(int $id, string $email, string $newPassword): array
     {

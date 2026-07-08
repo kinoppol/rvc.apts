@@ -2,7 +2,8 @@
 require_once __DIR__ . '/../bootstrap.php';
 $user = require_role('admin');
 
-$allMajors = Major::listAll();
+$allMajors    = Major::listAll();
+$allSubjects  = Subject::listActive();
 $perPage = 8;
 
 /** Rebuilds the current list URL so redirects land back on the same filter/page. */
@@ -64,6 +65,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'delete') {
         Member::delete($id);
         flash_set('warn', 'ลบสมาชิกเรียบร้อยแล้ว');
+    } elseif ($action === 'update_member') {
+        $result = Member::updateAll($id, $_POST);
+        if (!$result['ok']) {
+            // Redirect back to the edit modal with the error
+            flash_set('err', $result['error'] ?? 'แก้ไขข้อมูลไม่สำเร็จ');
+            header('Location: ' . url('admin/members.php') . '?' . http_build_query([
+                'edit'   => $id,
+                'search' => $_POST['search'] ?? '',
+                'status' => $_POST['status'] ?? 'all',
+                'page'   => (int) ($_POST['page'] ?? 1),
+            ]));
+            exit;
+        }
+        flash_set('ok', 'แก้ไขข้อมูลสมาชิกเรียบร้อยแล้ว');
     } elseif ($action === 'update_credentials') {
         $result = Member::updateCredentials($id, $_POST['new_email'] ?? '', $_POST['new_password'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'อัปเดตข้อมูลบัญชีเรียบร้อยแล้ว' : ($result['error'] ?? 'อัปเดตไม่สำเร็จ'));
@@ -110,6 +125,9 @@ $totalPages = max(1, (int) ceil($data['total'] / $perPage));
 $page = min($page, $totalPages);
 $shownFrom = $data['total'] > 0 ? ($page - 1) * $perPage + 1 : 0;
 $shownTo = min($page * $perPage, $data['total']);
+
+$editId     = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;
+$editMember = $editId ? Member::find($editId) : null;
 
 $historyId = isset($_GET['history']) ? (int) $_GET['history'] : 0;
 $historyMember = $historyId ? Member::find($historyId) : null;
@@ -256,11 +274,11 @@ require __DIR__ . '/../includes/header.php';
                   <?php endif; ?>
                   <?= member_action_form($m['id'], 'impersonate', 'action-btn-blue', 'bi-person-badge', 'สวมสิทธิ์', ['title' => 'สวมสิทธิ์', 'msg' => 'ดูระบบในมุมมองของ ' . $m['name'] . ' (นักศึกษา) — กด "คืนสิทธิ์ Admin" บนแถบแจ้งเตือนเพื่อออก', 'icon' => 'bi-person-badge', 'color' => '#2563EB', 'btn' => 'สวมสิทธิ์', 'btnCls' => 'btn-primary']) ?>
                   <?= member_action_form($m['id'], 'suspend', 'action-btn-warn', 'bi-slash-circle', 'ระงับ', ['title' => 'ระงับสิทธิ์', 'msg' => 'ระงับสิทธิ์ของ ' . $m['name'] . ' — ผู้ใช้จะไม่สามารถเข้าสู่ระบบและจองได้จนกว่าจะเปิดใช้งาน', 'icon' => 'bi-slash-circle', 'color' => '#D97706', 'btn' => 'ระงับ', 'btnCls' => 'btn-warning']) ?>
-                  <button type="button" class="action-btn-blue" data-edit-cred data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>" data-email="<?= e($m['email']) ?>"><i class="bi bi-pencil-square me-1"></i>แก้ไขบัญชี</button>
+                  <a href="<?= members_link(['edit' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-pencil-square me-1"></i>แก้ไขข้อมูล</a>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
                 <?php elseif ($m['isSuspended']): ?>
                   <?= member_action_form($m['id'], 'activate', 'action-btn-ok', 'bi-check-circle', 'เปิดใช้') ?>
-                  <button type="button" class="action-btn-blue" data-edit-cred data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>" data-email="<?= e($m['email']) ?>"><i class="bi bi-pencil-square me-1"></i>แก้ไขบัญชี</button>
+                  <a href="<?= members_link(['edit' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-pencil-square me-1"></i>แก้ไขข้อมูล</a>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
                   <?= member_action_form($m['id'], 'delete', 'action-btn-err', 'bi-trash', 'ลบ', ['title' => 'ลบสมาชิก', 'msg' => 'ลบ ' . $m['name'] . ' ออกจากระบบอย่างถาวร พร้อมประวัติการจองทั้งหมด ไม่สามารถเรียกคืนได้', 'icon' => 'bi-trash', 'color' => '#DC2626', 'btn' => 'ลบถาวร', 'btnCls' => 'btn-danger']) ?>
                 <?php endif; ?>
@@ -403,6 +421,137 @@ require __DIR__ . '/../includes/header.php';
     </div>
   </div>
 </div>
+
+<?php if ($editMember): ?>
+<!-- Edit member modal (server-side pre-filled, auto-opened) -->
+<div class="modal fade" id="editMemberModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="update_member">
+        <input type="hidden" name="id" value="<?= (int) $editMember['id'] ?>">
+        <input type="hidden" name="search" value="<?= e($search) ?>">
+        <input type="hidden" name="status" value="<?= e($status) ?>">
+        <input type="hidden" name="page" value="<?= (int) $page ?>">
+        <input type="hidden" name="role" id="editRoleInput" value="<?= e($editMember['role']) ?>">
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-person-gear me-2" style="color:#2563EB"></i>แก้ไขข้อมูลสมาชิก — <?= e($editMember['name']) ?></h6>
+          <a href="<?= members_link() ?>" class="btn-close" aria-label="ปิด"></a>
+        </div>
+        <div class="modal-body" style="padding:20px">
+          <!-- Role toggle -->
+          <div style="margin-bottom:18px">
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:6px">ประเภทผู้ใช้</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <button type="button" id="editBtnStudent" onclick="editSetRole('student')" class="btn" style="font-size:13px;font-weight:600;padding:9px;border-radius:8px;border:2px solid transparent;display:flex;align-items:center;justify-content:center;gap:7px">
+                <i class="bi bi-mortarboard-fill"></i>นักศึกษา
+              </button>
+              <button type="button" id="editBtnTeacher" onclick="editSetRole('teacher')" class="btn" style="font-size:13px;font-weight:600;padding:9px;border-radius:8px;border:2px solid transparent;display:flex;align-items:center;justify-content:center;gap:7px">
+                <i class="bi bi-person-workspace"></i>ครูผู้สอน
+              </button>
+            </div>
+          </div>
+          <!-- Fields grid -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ชื่อ-นามสกุล <span style="color:#DC2626">*</span></label>
+              <input type="text" name="name" required value="<?= e($editMember['name']) ?>" class="form-control" style="font-size:13px">
+            </div>
+            <div>
+              <label id="editIdLabel" style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">รหัสนักศึกษา</label>
+              <input type="text" name="student_id" value="<?= e($editMember['student_id'] ?? '') ?>" class="form-control" placeholder="ไม่บังคับ" style="font-size:13px">
+            </div>
+            <!-- Major (student) -->
+            <div id="editMajorWrap">
+              <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">สาขาวิชา <span style="color:#DC2626">*</span></label>
+              <select name="major_id" id="editMajorId" class="form-select" style="font-size:13px">
+                <option value="">— เลือกสาขาวิชา —</option>
+                <?php foreach ($allMajors as $mj): ?><?php if ($mj['is_active']): ?>
+                  <option value="<?= (int) $mj['id'] ?>" <?= (int) ($editMember['major_id'] ?? 0) === (int) $mj['id'] ? 'selected' : '' ?>><?= e($mj['name']) ?></option>
+                <?php endif; ?><?php endforeach; ?>
+              </select>
+            </div>
+            <!-- Subject (teacher) -->
+            <div id="editSubjectWrap">
+              <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">วิชาสอน <span style="color:#DC2626">*</span></label>
+              <select name="subject_id" id="editSubjectId" class="form-select" style="font-size:13px" onchange="editSubjectChange(this)">
+                <option value="">— เลือกวิชาสอน —</option>
+                <?php foreach ($allSubjects as $sj): ?>
+                  <option value="<?= (int) $sj['id'] ?>" <?= (int) ($editMember['subject_id'] ?? 0) === (int) $sj['id'] ? 'selected' : '' ?>><?= e($sj['name']) ?></option>
+                <?php endforeach; ?>
+                <option value="__new__" style="color:#059669;font-style:italic">+ เพิ่มวิชาสอนใหม่...</option>
+              </select>
+              <div id="editSubjectNewWrap" style="display:none;margin-top:6px">
+                <input type="text" name="subject_new_name" id="editSubjectNewName" class="form-control" placeholder="พิมพ์ชื่อวิชาสอนใหม่" style="font-size:13px">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">เบอร์โทรศัพท์</label>
+              <input type="tel" name="phone" value="<?= e($editMember['phone'] ?? '') ?>" class="form-control" placeholder="08X-XXX-XXXX" style="font-size:13px">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ชื่อสถานศึกษา</label>
+              <input type="text" name="school_name" value="<?= e($editMember['school_name'] ?? '') ?>" class="form-control" style="font-size:13px">
+            </div>
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">จังหวัด</label>
+              <input type="text" name="province" list="editProvinceList" value="<?= e($editMember['province'] ?? '') ?>" autocomplete="off" class="form-control" placeholder="เลือกหรือพิมพ์จังหวัด" style="font-size:13px">
+              <datalist id="editProvinceList">
+                <?php foreach (['กรุงเทพมหานคร','กระบี่','กาญจนบุรี','กาฬสินธุ์','กำแพงเพชร','ขอนแก่น','จันทบุรี','ฉะเชิงเทรา','ชลบุรี','ชัยนาท','ชัยภูมิ','ชุมพร','เชียงราย','เชียงใหม่','ตรัง','ตราด','ตาก','นครนายก','นครปฐม','นครพนม','นครราชสีมา','นครศรีธรรมราช','นครสวรรค์','นนทบุรี','นราธิวาส','น่าน','บึงกาฬ','บุรีรัมย์','ปทุมธานี','ประจวบคีรีขันธ์','ปราจีนบุรี','ปัตตานี','พระนครศรีอยุธยา','พะเยา','พังงา','พัทลุง','พิจิตร','พิษณุโลก','เพชรบุรี','เพชรบูรณ์','แพร่','ภูเก็ต','มหาสารคาม','มุกดาหาร','แม่ฮ่องสอน','ยโสธร','ยะลา','ร้อยเอ็ด','ระนอง','ระยอง','ราชบุรี','ลพบุรี','ลำปาง','ลำพูน','เลย','ศรีสะเกษ','สกลนคร','สงขลา','สตูล','สมุทรปราการ','สมุทรสงคราม','สมุทรสาคร','สระแก้ว','สระบุรี','สิงห์บุรี','สุโขทัย','สุพรรณบุรี','สุราษฎร์ธานี','สุรินทร์','หนองคาย','หนองบัวลำภู','อ่างทอง','อำนาจเจริญ','อุดรธานี','อุตรดิตถ์','อุทัยธานี','อุบลราชธานี'] as $pv): ?>
+                  <option value="<?= e($pv) ?>">
+                <?php endforeach; ?>
+              </datalist>
+            </div>
+            <div style="grid-column:span 2">
+              <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">อีเมล <span style="color:#DC2626">*</span></label>
+              <input type="email" name="email" required value="<?= e($editMember['email']) ?>" class="form-control" style="font-size:13px">
+            </div>
+            <div style="grid-column:span 2">
+              <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">รหัสผ่านใหม่ <span style="font-weight:400;color:var(--bs-tertiary-color)">(เว้นว่างไว้ถ้าไม่ต้องการเปลี่ยน)</span></label>
+              <input type="password" name="new_password" minlength="8" class="form-control" placeholder="อย่างน้อย 8 ตัวอักษร" style="font-size:13px">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+          <a href="<?= members_link() ?>" class="btn btn-outline-secondary btn-sm">ยกเลิก</a>
+          <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none"><i class="bi bi-check-lg me-1"></i>บันทึกการเปลี่ยนแปลง</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  function editSetRole(role) {
+    document.getElementById('editRoleInput').value = role;
+    var isTeacher = role === 'teacher';
+    var btnS = document.getElementById('editBtnStudent');
+    var btnT = document.getElementById('editBtnTeacher');
+    btnS.style.background  = isTeacher ? 'var(--bs-secondary-bg)' : '#2563EB';
+    btnS.style.color       = isTeacher ? 'var(--bs-secondary-color)' : 'white';
+    btnS.style.borderColor = isTeacher ? 'var(--bs-border-color)' : '#2563EB';
+    btnT.style.background  = isTeacher ? '#059669' : 'var(--bs-secondary-bg)';
+    btnT.style.color       = isTeacher ? 'white' : 'var(--bs-secondary-color)';
+    btnT.style.borderColor = isTeacher ? '#059669' : 'var(--bs-border-color)';
+    document.getElementById('editIdLabel').textContent = isTeacher ? 'เลขตำแหน่ง' : 'รหัสนักศึกษา';
+    document.getElementById('editMajorWrap').style.display   = isTeacher ? 'none' : '';
+    document.getElementById('editSubjectWrap').style.display = isTeacher ? '' : 'none';
+    document.getElementById('editMajorId').required = !isTeacher;
+  }
+  function editSubjectChange(sel) {
+    var wrap = document.getElementById('editSubjectNewWrap');
+    wrap.style.display = sel.value === '__new__' ? '' : 'none';
+    if (sel.value !== '__new__') document.getElementById('editSubjectNewName').value = '';
+  }
+  window.editSetRole      = editSetRole;
+  window.editSubjectChange = editSubjectChange;
+  editSetRole(<?= json_encode($editMember['role']) ?>);
+  var el = document.getElementById('editMemberModal');
+  if (el) new bootstrap.Modal(el).show();
+})();
+</script>
+<?php endif; ?>
 
 <?php if ($historyMember): ?>
 <!-- History modal (auto-opened) -->
