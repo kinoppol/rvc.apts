@@ -19,6 +19,7 @@ require_once __DIR__ . '/includes/Report.php';
 require_once __DIR__ . '/includes/Notification.php';
 require_once __DIR__ . '/includes/Major.php';
 require_once __DIR__ . '/includes/Subject.php';
+require_once __DIR__ . '/includes/Migration.php';
 
 // Compute APP_BASE (URL prefix of the project root) — three-level fallback:
 //   1. Explicit override from config.local.php (set via install.php for unusual setups)
