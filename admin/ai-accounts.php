@@ -124,7 +124,11 @@ require __DIR__ . '/../includes/header.php';
       <div class="card-body" style="padding:18px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="stat-icon" style="background:#EFF6FF;width:40px;height:40px"><i class="bi bi-robot" style="color:#2563EB;font-size:17px"></i></div>
+            <?php if (!empty($ac['avatar_emoji'])): ?>
+              <div class="stat-icon" style="background:var(--bs-secondary-bg);width:40px;height:40px;font-size:22px;border:1px solid var(--bs-border-color)"><?= e($ac['avatar_emoji']) ?></div>
+            <?php else: ?>
+              <div class="stat-icon" style="background:#EFF6FF;width:40px;height:40px"><i class="bi bi-robot" style="color:#2563EB;font-size:17px"></i></div>
+            <?php endif; ?>
             <div>
               <div style="font-weight:700;font-size:14px"><?= e($ac['name']) ?></div>
               <div style="font-size:11px;color:var(--bs-secondary-color)"><?= e($ac['provider']) ?></div>
@@ -208,7 +212,8 @@ require __DIR__ . '/../includes/header.php';
                   data-reminder="<?= e($ac['password_reminder']) ?>"
                   data-monthly-cost="<?= $ac['monthly_cost'] !== null ? (float)$ac['monthly_cost'] : '' ?>"
                   data-cost-per-slot="<?= $ac['cost_per_slot'] !== null ? (float)$ac['cost_per_slot'] : '' ?>"
-                  data-capacity="<?= (int) ($ac['capacity'] ?? 1) ?>"><i class="bi bi-pencil me-1"></i>แก้ไข</button>
+                  data-capacity="<?= (int) ($ac['capacity'] ?? 1) ?>"
+                  data-avatar="<?= e($ac['avatar_emoji'] ?? '') ?>"><i class="bi bi-pencil me-1"></i>แก้ไข</button>
           <form method="post" style="margin:0" onsubmit="return confirm('ลบบัญชี AI นี้?')">
             <?= Csrf::field() ?>
             <input type="hidden" name="action" value="delete">
@@ -229,7 +234,29 @@ require __DIR__ . '/../includes/header.php';
 function account_form_fields(array $providers, array $reminderOpts, string $prefix): void
 {
     ?>
+    <?php
+    $avatarEmojis = ['🤖','🧠','💡','⚡','🔮','🎯','💬','✨','🌟','🚀','🔬','📚','🎨','💻','🌐','🦾','🔥','💎','🛡️','🌊','🎭','🦋','🏆','🔋','📡','🧬','🌀','🎪'];
+    ?>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <!-- Avatar picker -->
+      <div style="grid-column:span 2">
+        <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:6px">Avatar</label>
+        <input type="hidden" name="avatar_emoji" id="<?= e($prefix) ?>_avatar_emoji">
+        <div class="avatar-emoji-picker" data-input="<?= e($prefix) ?>_avatar_emoji"
+             style="display:flex;flex-wrap:wrap;gap:5px;padding:10px;background:var(--bs-secondary-bg);border:1px solid var(--bs-border-color);border-radius:10px">
+          <?php foreach ($avatarEmojis as $em): ?>
+          <button type="button" class="avatar-emoji-btn" data-emoji="<?= e($em) ?>"
+            style="width:38px;height:38px;font-size:20px;border:2px solid transparent;border-radius:8px;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:border-color .12s,background .12s">
+            <?= $em ?>
+          </button>
+          <?php endforeach; ?>
+          <button type="button" class="avatar-emoji-btn avatar-emoji-clear" data-emoji=""
+            style="width:38px;height:38px;font-size:11px;border:2px solid transparent;border-radius:8px;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--bs-tertiary-color);flex-direction:column;gap:1px">
+            <i class="bi bi-x-lg" style="font-size:14px"></i>
+          </button>
+        </div>
+        <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:5px">คลิก Emoji เพื่อเลือก · กด ✕ เพื่อใช้ไอคอนเริ่มต้น</div>
+      </div>
       <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ชื่อบัญชี *</label><input name="name" required class="form-control" placeholder="เช่น Claude Pro #3" style="font-size:13px"></div>
       <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ประเภท *</label>
         <select name="provider_id" required class="form-select" style="font-size:13px">

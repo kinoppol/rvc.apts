@@ -26,6 +26,7 @@ final class Migration
         'migrate_slot_rebooking.sql',
         'migrate_ai_account_capacity.sql',
         'migrate_school_info.sql',
+        'migrate_ai_avatar.sql',
     ];
 
     /** Create the tracking table if it doesn't exist yet. */

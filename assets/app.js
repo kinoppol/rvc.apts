@@ -186,6 +186,28 @@
     }
   });
 
+  // ── Avatar emoji picker (admin/ai-accounts.php) ──
+  function applyAvatarSelection(container, selectedEmoji) {
+    container.querySelectorAll(".avatar-emoji-btn").forEach(function (b) {
+      var match = b.dataset.emoji === selectedEmoji && selectedEmoji !== "";
+      b.style.borderColor = match ? "#2563EB" : "transparent";
+      b.style.background  = match ? "#EFF6FF" : "";
+    });
+  }
+
+  document.querySelectorAll(".avatar-emoji-picker").forEach(function (picker) {
+    picker.querySelectorAll(".avatar-emoji-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var inputId = picker.dataset.input;
+        var inputEl = document.getElementById(inputId);
+        if (!inputEl) return;
+        var emoji = btn.dataset.emoji; // "" for the clear button
+        inputEl.value = emoji;
+        applyAvatarSelection(picker.closest(".modal-body") || picker.parentElement, emoji);
+      });
+    });
+  });
+
   // ── AI account edit modal (admin/ai-accounts.php) ──
   document.querySelectorAll("[data-edit-account]").forEach(function (btn) {
     btn.addEventListener("click", function () {
@@ -205,6 +227,10 @@
       set("monthly_cost", btn.dataset.monthlyCost);
       set("cost_per_slot", btn.dataset.costPerSlot);
       set("capacity", btn.dataset.capacity || "1");
+      // Avatar picker
+      var avatarVal = btn.dataset.avatar || "";
+      set("avatar_emoji", avatarVal);
+      applyAvatarSelection(modalEl, avatarVal);
       new bootstrap.Modal(modalEl).show();
     });
   });

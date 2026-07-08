@@ -122,6 +122,15 @@ final class AiAccount
         return max(1, $v);
     }
 
+    /** Strip anything that isn't a graphic Unicode char; cap at 8 bytes to fit one emoji. */
+    private static function sanitizeEmoji(mixed $raw): string
+    {
+        $s = trim((string) $raw);
+        // Keep only the first "grapheme cluster" (handles multi-codepoint emoji like 🏳️‍🌈)
+        $first = grapheme_substr($s, 0, 1);
+        return $first !== false && $first !== '' ? $first : '';
+    }
+
     /** @return array{ok:bool,error?:string} */
     public static function add(array $d): array
     {
@@ -130,15 +139,17 @@ final class AiAccount
             return ['ok' => false, 'error' => $fields['error']];
         }
 
-        $password = (string) ($d['account_password'] ?? '');
-        $capacity = self::validateCapacity($d['capacity'] ?? 1);
+        $password    = (string) ($d['account_password'] ?? '');
+        $capacity    = self::validateCapacity($d['capacity'] ?? 1);
+        $avatarEmoji = self::sanitizeEmoji($d['avatar_emoji'] ?? '');
         $stmt = Database::pdo()->prepare(
             'INSERT INTO ai_accounts
-                (name, provider_id, provider, email, account_password, status, capacity, expires_at, password_updated_at, password_reminder, monthly_cost, cost_per_slot)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                (name, avatar_emoji, provider_id, provider, email, account_password, status, capacity, expires_at, password_updated_at, password_reminder, monthly_cost, cost_per_slot)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
-            $fields['name'], $fields['provider_id'], $fields['provider'], $fields['email'],
+            $fields['name'], $avatarEmoji ?: null,
+            $fields['provider_id'], $fields['provider'], $fields['email'],
             $password !== '' ? $password : null,
             $fields['status'], $capacity, $fields['expires_at'],
             $password !== '' ? date('Y-m-d H:i:s') : null,
@@ -170,16 +181,18 @@ final class AiAccount
             $passwordUpdatedAt = $existing['password_updated_at'];
         }
 
-        $capacity = self::validateCapacity($d['capacity'] ?? $existing['capacity'] ?? 1);
+        $capacity    = self::validateCapacity($d['capacity'] ?? $existing['capacity'] ?? 1);
+        $avatarEmoji = self::sanitizeEmoji($d['avatar_emoji'] ?? '');
         $stmt = Database::pdo()->prepare(
             'UPDATE ai_accounts SET
-                name = ?, provider_id = ?, provider = ?, email = ?, account_password = ?,
+                name = ?, avatar_emoji = ?, provider_id = ?, provider = ?, email = ?, account_password = ?,
                 status = ?, capacity = ?, expires_at = ?, password_updated_at = ?, password_reminder = ?,
                 monthly_cost = ?, cost_per_slot = ?
              WHERE id = ?'
         );
         $stmt->execute([
-            $fields['name'], $fields['provider_id'], $fields['provider'], $fields['email'], $password,
+            $fields['name'], $avatarEmoji ?: null,
+            $fields['provider_id'], $fields['provider'], $fields['email'], $password,
             $fields['status'], $capacity, $fields['expires_at'], $passwordUpdatedAt, $fields['password_reminder'],
             $fields['monthly_cost'], $fields['cost_per_slot'], $id,
         ]);
