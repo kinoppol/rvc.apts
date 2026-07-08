@@ -664,8 +664,8 @@ final class Booking
         return ['ok' => true];
     }
 
-    /** Validates and moves an uploaded report file into uploads/reports/. @return array{ok:bool,error?:string,file?:string} */
-    private static function storeReportFile(array $file, int $bookingId): array
+    /** Validates and moves an uploaded report/issue file into uploads/reports/. @return array{ok:bool,error?:string,file?:string} */
+    private static function storeReportFile(array $file, int $bookingId, string $prefix = 'report'): array
     {
         if (($file['size'] ?? 0) > 5 * 1024 * 1024) {
             return ['ok' => false, 'error' => 'ไฟล์มีขนาดใหญ่เกิน 5 MB'];
@@ -682,7 +682,7 @@ final class Booking
         if (!is_dir($dir)) {
             @mkdir($dir, 0775, true);
         }
-        $name = 'report_' . $bookingId . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+        $name = $prefix . '_' . $bookingId . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
         $dest = $dir . '/' . $name;
         if (!move_uploaded_file($file['tmp_name'], $dest)) {
             return ['ok' => false, 'error' => 'อัปโหลดไฟล์ไม่สำเร็จ'];
@@ -927,11 +927,12 @@ final class Booking
     }
 
     /**
-     * Student reports a problem they encountered during (or immediately after) a booking slot.
-     * Overwrites any previous issue text so the student can correct their report.
+     * Student reports a problem encountered during a booking slot.
+     * Accepts optional image/PDF attachment. Re-submission overwrites the previous report.
+     * @param array|null $file  $_FILES entry for the attachment (null or error=4 = no file)
      * @return array{ok:bool,error?:string}
      */
-    public static function reportIssue(int $userId, int $bookingId, string $text): array
+    public static function reportIssue(int $userId, int $bookingId, string $text, ?array $file = null): array
     {
         $stmt = Database::pdo()->prepare('SELECT * FROM bookings WHERE id = ? AND user_id = ?');
         $stmt->execute([$bookingId, $userId]);
@@ -946,8 +947,22 @@ final class Booking
         if ($text === '') {
             return ['ok' => false, 'error' => 'กรุณาอธิบายปัญหาที่พบ'];
         }
-        Database::pdo()->prepare('UPDATE bookings SET issue_text = ?, issue_at = NOW() WHERE id = ?')
-            ->execute([mb_substr($text, 0, 1000), $bookingId]);
+
+        // Handle file upload — keep existing file if no new one is provided
+        $issueFile = $b['issue_file'] ?? null;
+        $hasUpload = $file && ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
+        if ($hasUpload) {
+            $stored = self::storeReportFile($file, $bookingId, 'issue');
+            if (!$stored['ok']) {
+                return $stored;
+            }
+            $issueFile = $stored['file'];
+        }
+
+        Database::pdo()->prepare(
+            'UPDATE bookings SET issue_text = ?, issue_file = ?, issue_at = NOW() WHERE id = ?'
+        )->execute([mb_substr($text, 0, 1000), $issueFile, $bookingId]);
+
         return ['ok' => true];
     }
 

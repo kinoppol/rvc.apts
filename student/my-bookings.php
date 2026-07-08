@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = Booking::submitReport($user['id'], (int) ($_POST['id'] ?? 0), $_POST['report_text'] ?? '', $_FILES['report_file'] ?? null, $extra);
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'ส่งรายงานการใช้งานเรียบร้อยแล้ว' : ($result['error'] ?? 'ส่งรายงานไม่สำเร็จ'));
     } elseif ($action === 'issue') {
-        $result = Booking::reportIssue($user['id'], (int) ($_POST['id'] ?? 0), $_POST['issue_text'] ?? '');
+        $result = Booking::reportIssue($user['id'], (int) ($_POST['id'] ?? 0), $_POST['issue_text'] ?? '', $_FILES['issue_file'] ?? null);
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'ส่งรายงานปัญหาเรียบร้อยแล้ว ผู้ดูแลระบบจะได้รับแจ้ง' : ($result['error'] ?? 'ส่งรายงานปัญหาไม่สำเร็จ'));
     }
     header('Location: ' . url('student/my-bookings.php') . (($_GET['filter'] ?? '') !== '' ? '?filter=' . urlencode($_GET['filter']) : ''));
@@ -203,7 +203,8 @@ require __DIR__ . '/../includes/header.php';
               <button type="button" class="action-btn-warn" data-issue-booking
                 data-id="<?= (int) $bk['id'] ?>"
                 data-meta="<?= e($bk['dateLabel'] . ' · ' . $bk['slotLabel']) ?>"
-                data-issue-text="<?= e($bk['issue_text'] ?? '') ?>">
+                data-issue-text="<?= e($bk['issue_text'] ?? '') ?>"
+                data-issue-file="<?= e($bk['issue_file'] ?? '') ?>">
                 <i class="bi bi-bug me-1"></i><?= $bk['hasIssue'] ? 'แก้ไขปัญหา' : 'รายงานปัญหา' ?>
               </button>
             <?php endif; ?>
@@ -286,10 +287,10 @@ require __DIR__ . '/../includes/header.php';
   </div>
 </div>
 <!-- Issue / problem report modal -->
-<div class="modal fade" id="issueModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="issueModal" tabindex="-1" aria-hidden="true" data-reports-base="<?= e(url('uploads/reports/')) ?>">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="border:none;border-radius:14px">
-      <form method="post" action="<?= url('student/my-bookings.php') ?>?filter=<?= e($filter) ?>">
+      <form method="post" enctype="multipart/form-data" action="<?= url('student/my-bookings.php') ?>?filter=<?= e($filter) ?>">
         <?= Csrf::field() ?>
         <input type="hidden" name="action" value="issue">
         <input type="hidden" name="id" id="issueBookingId">
@@ -297,15 +298,25 @@ require __DIR__ . '/../includes/header.php';
           <h6 class="modal-title" style="font-weight:700"><i class="bi bi-bug me-2" style="color:#D97706"></i>รายงานปัญหาการใช้งาน</h6>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
         </div>
-        <div class="modal-body" style="padding:20px">
-          <p style="font-size:12px;color:var(--bs-secondary-color);margin:0 0 4px" id="issueModalMeta">—</p>
-          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">กรอกรายละเอียดปัญหาที่ทำให้ไม่สามารถใช้งาน AI ได้ ผู้ดูแลระบบจะได้รับแจ้งและช่วยแก้ไข</p>
+        <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+          <p style="font-size:12px;color:var(--bs-secondary-color);margin:0" id="issueModalMeta">—</p>
           <div>
             <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">อธิบายปัญหาที่พบ <span style="color:#EF4444">*</span></label>
-            <textarea id="issueText" name="issue_text" rows="5" maxlength="1000" required class="form-control"
+            <textarea id="issueText" name="issue_text" rows="4" maxlength="1000" required class="form-control"
               placeholder="เช่น เข้าระบบไม่ได้ / รหัสผ่านไม่ถูกต้อง / เว็บไซต์ล่ม / บัญชีถูกล็อก ..."
               style="font-size:13px"></textarea>
             <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">สูงสุด 1,000 ตัวอักษร</div>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">แนบรูปภาพหรือ PDF <span style="font-weight:400;color:var(--bs-tertiary-color)">(ไม่บังคับ)</span></label>
+            <!-- Existing file indicator — shown when re-editing -->
+            <div id="issueExistingFile" style="display:none;margin-bottom:8px;padding:8px 12px;background:var(--bs-secondary-bg);border-radius:7px;font-size:12px;display:none;align-items:center;gap:8px">
+              <i class="bi bi-paperclip" style="color:#D97706;flex-shrink:0"></i>
+              <a id="issueExistingFileLink" href="#" target="_blank" style="color:#2563EB;text-decoration:none;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></a>
+              <span style="font-size:11px;color:var(--bs-tertiary-color);flex-shrink:0">อัปโหลดไฟล์ใหม่เพื่อแทนที่</span>
+            </div>
+            <input type="file" name="issue_file" id="issueFileInput" accept="image/*,application/pdf" class="form-control" style="font-size:13px">
+            <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">รองรับรูปภาพ (JPG/PNG/GIF/WEBP) หรือ PDF ขนาดไม่เกิน 5 MB</div>
           </div>
         </div>
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">

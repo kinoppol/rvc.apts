@@ -380,6 +380,22 @@
       if (meta) meta.textContent = btn.dataset.meta || "";
       var textarea = document.getElementById("issueText");
       if (textarea) textarea.value = btn.dataset.issueText || "";
+      // Reset file input so previous selection doesn't carry over
+      var fileInput = document.getElementById("issueFileInput");
+      if (fileInput) fileInput.value = "";
+      // Show existing-file indicator when re-editing a submitted issue
+      var existingWrap = document.getElementById("issueExistingFile");
+      var existingLink = document.getElementById("issueExistingFileLink");
+      if (existingWrap && existingLink) {
+        var f = btn.dataset.issueFile || "";
+        if (f) {
+          existingLink.textContent = f;
+          existingLink.href = (modalEl.dataset.reportsBase || "") + f;
+          existingWrap.style.display = "flex";
+        } else {
+          existingWrap.style.display = "none";
+        }
+      }
       new bootstrap.Modal(modalEl).show();
     });
   });
