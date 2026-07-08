@@ -16,7 +16,8 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd /var/www/rvc.apts #เปลี่ยน Path ตรงนี้ให้ถูกต้อง
+            cd /var/www/rvc.apts
             git fetch origin
             git reset --hard origin/main
             # composer install --no-dev --optimize-autoloader (ถ้ามี)
+            php migrate.php
