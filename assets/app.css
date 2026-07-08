@@ -1,4 +1,9 @@
 /* Ported from the original AI Pro Booking System prototype (AI Pro Booking System.dc.html) */
+/* ── Table headers ── */
+thead tr{background:#EFF6FF!important;border-bottom:2px solid #BFDBFE!important}
+thead th{color:#1D4ED8!important;font-size:11px!important;font-weight:700!important;text-transform:uppercase!important;letter-spacing:.05em!important}
+[data-bs-theme=dark] thead tr{background:#1e2d45!important;border-bottom:2px solid #2d4a7a!important}
+[data-bs-theme=dark] thead th{color:#93C5FD!important}
 *,*::before,*::after{font-family:'IBM Plex Sans Thai',system-ui,sans-serif;box-sizing:border-box}
 html,body{margin:0;padding:0}
 /* ── Sidebar ── */
