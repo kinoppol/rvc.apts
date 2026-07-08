@@ -52,8 +52,9 @@ final class Auth
         $province   = trim($data['province'] ?? '') ?: null;
         $password   = $data['password'] ?? '';
         $passwordConfirm = $data['password_confirm'] ?? '';
-        $majorId   = (int) ($data['major_id'] ?? 0);
-        $subjectId = (int) ($data['subject_id'] ?? 0);
+        $majorId        = (int) ($data['major_id'] ?? 0);
+        $subjectId      = (int) ($data['subject_id'] ?? 0);
+        $subjectNewName = trim($data['subject_new_name'] ?? '') ?: null;
 
         $needsId = $role === 'student';
         if ($name === '' || ($needsId && $staffId === '') || $email === '' || $password === '') {
@@ -62,8 +63,8 @@ final class Auth
         if ($role === 'student' && $majorId === 0) {
             return ['ok' => false, 'error' => 'กรุณาเลือกสาขาวิชา'];
         }
-        if ($role === 'teacher' && $subjectId === 0) {
-            return ['ok' => false, 'error' => 'กรุณาเลือกวิชาสอน'];
+        if ($role === 'teacher' && $subjectId === 0 && $subjectNewName === null) {
+            return ['ok' => false, 'error' => 'กรุณาเลือกหรือระบุวิชาสอน'];
         }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return ['ok' => false, 'error' => 'รูปแบบอีเมลไม่ถูกต้อง'];
@@ -95,9 +96,13 @@ final class Auth
             $majorName = $majorRow['name'];
             $subjectId = null;
         } else {
+            // Create new subject on-the-fly if teacher typed one not in the list
+            if ($subjectId === 0 && $subjectNewName !== null) {
+                $subjectId = Subject::addAndGetId($subjectNewName);
+            }
             $subjectRow = Subject::find($subjectId);
-            if (!$subjectRow || !$subjectRow['is_active']) {
-                return ['ok' => false, 'error' => 'วิชาสอนที่เลือกไม่ถูกต้องหรือปิดใช้งานแล้ว'];
+            if (!$subjectRow) {
+                return ['ok' => false, 'error' => 'วิชาสอนที่เลือกไม่ถูกต้อง'];
             }
             $majorName  = $subjectRow['name'];   // keep major column in sync for backward compat
             $majorId    = null;

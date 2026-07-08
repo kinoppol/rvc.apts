@@ -9,7 +9,7 @@ if (current_user()) {
 $majors    = Major::listActive();
 $subjects  = Subject::listActive();
 $error     = null;
-$values    = ['role' => 'student', 'name' => '', 'student_id' => '', 'major_id' => '', 'subject_id' => '', 'phone' => '', 'school_name' => '', 'province' => '', 'email' => ''];
+$values    = ['role' => 'student', 'name' => '', 'student_id' => '', 'major_id' => '', 'subject_id' => '', 'subject_new_name' => '', 'phone' => '', 'school_name' => '', 'province' => '', 'email' => ''];
 $termsFile = SlotSettings::getTermsFile();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -86,6 +86,7 @@ require __DIR__ . '/includes/guest-header.php';
           <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--bs-tertiary-color);font-size:13px;pointer-events:none"><i class="bi bi-search"></i></span>
           <input type="text" id="subjectText" autocomplete="off" class="form-control" placeholder="พิมพ์เพื่อค้นหาวิชาสอน..." style="font-size:13px;padding-left:33px">
           <input type="hidden" name="subject_id" id="subjectId" data-selected="<?= (int) $values['subject_id'] ?>">
+          <input type="hidden" name="subject_new_name" id="subjectNewName" value="<?= e($values['subject_new_name']) ?>">
           <div id="subjectDrop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);z-index:1050;max-height:220px;overflow-y:auto"></div>
         </div>
       </div>
@@ -147,31 +148,40 @@ require __DIR__ . '/includes/guest-header.php';
 (function(){
   var majorsData   = <?= json_encode(array_values(array_map(fn($m) => ['id' => (int)$m['id'], 'name' => $m['name']], $majors))) ?>;
   var subjectsData = <?= json_encode(array_values(array_map(fn($s) => ['id' => (int)$s['id'], 'name' => $s['name']], $subjects))) ?>;
+  var subjectNewNameInitial = <?= json_encode($values['subject_new_name']) ?>;
 
   /* ── Autocomplete widget ─────────────────────────────────── */
-  function initAutocomplete(textId, dropId, hiddenId, data) {
-    var textEl   = document.getElementById(textId);
-    var dropEl   = document.getElementById(dropId);
-    var hiddenEl = document.getElementById(hiddenId);
+  // opts: { allowNew: bool, newNameId: string } — when allowNew, shows "add" row for unmatched input
+  function initAutocomplete(textId, dropId, hiddenId, data, opts) {
+    opts = opts || {};
+    var textEl    = document.getElementById(textId);
+    var dropEl    = document.getElementById(dropId);
+    var hiddenEl  = document.getElementById(hiddenId);
+    var newNameEl = opts.newNameId ? document.getElementById(opts.newNameId) : null;
     var selectedId = parseInt(hiddenEl.dataset.selected || '0', 10);
 
-    // Pre-fill text on page re-render (POST with error)
     if (selectedId) {
       var pre = data.find(function(d) { return d.id === selectedId; });
       if (pre) { textEl.value = pre.name; hiddenEl.value = pre.id; }
     }
 
-    function renderDrop(items) {
+    function esc(s) {
+      return s.replace(/[&<>"]/g, function(c) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+      });
+    }
+
+    function renderDrop(items, rawQ) {
       dropEl.innerHTML = '';
-      if (!items.length) { dropEl.style.display = 'none'; return; }
       items.forEach(function(item) {
         var div = document.createElement('div');
         div.textContent = item.name;
         div.style.cssText = 'padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--bs-border-color)';
         div.addEventListener('mousedown', function(e) {
           e.preventDefault();
-          textEl.value    = item.name;
-          hiddenEl.value  = item.id;
+          textEl.value   = item.name;
+          hiddenEl.value = item.id;
+          if (newNameEl) newNameEl.value = '';
           dropEl.style.display = 'none';
           textEl.setCustomValidity('');
         });
@@ -179,21 +189,53 @@ require __DIR__ . '/includes/guest-header.php';
         div.addEventListener('mouseleave', function() { div.style.background = ''; div.style.color = ''; });
         dropEl.appendChild(div);
       });
-      dropEl.style.display = 'block';
+
+      // "Add new" row — only when allowNew, query is non-empty, no exact match
+      if (opts.allowNew && newNameEl && rawQ) {
+        var exactMatch = data.some(function(d) { return d.name.toLowerCase() === rawQ.toLowerCase(); });
+        if (!exactMatch) {
+          if (items.length) {
+            var sep = document.createElement('div');
+            sep.style.cssText = 'height:1px;background:var(--bs-border-color)';
+            dropEl.appendChild(sep);
+          }
+          var addDiv = document.createElement('div');
+          addDiv.innerHTML = '<i class="bi bi-plus-circle me-2" style="color:#059669;font-size:13px"></i>'
+            + '<span style="font-size:13px">เพิ่ม <strong>"' + esc(rawQ) + '"</strong> เป็นวิชาสอนใหม่</span>';
+          addDiv.style.cssText = 'padding:10px 14px;cursor:pointer;display:flex;align-items:center;color:#065f46;background:rgba(5,150,105,.05)';
+          addDiv.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            hiddenEl.value  = '';
+            newNameEl.value = rawQ;
+            dropEl.style.display = 'none';
+            textEl.setCustomValidity('');
+          });
+          addDiv.addEventListener('mouseenter', function() { addDiv.style.background = '#ECFDF5'; });
+          addDiv.addEventListener('mouseleave', function() { addDiv.style.background = 'rgba(5,150,105,.05)'; });
+          dropEl.appendChild(addDiv);
+        }
+      }
+
+      dropEl.style.display = dropEl.children.length ? 'block' : 'none';
     }
 
     function filter() {
-      var q = textEl.value.trim().toLowerCase();
-      renderDrop(q ? data.filter(function(d) { return d.name.toLowerCase().indexOf(q) !== -1; }) : data);
+      var q  = textEl.value.trim();
+      var ql = q.toLowerCase();
+      renderDrop(q ? data.filter(function(d) { return d.name.toLowerCase().indexOf(ql) !== -1; }) : data, q);
     }
 
     textEl.addEventListener('focus', filter);
-    textEl.addEventListener('input', function() { hiddenEl.value = ''; filter(); });
+    textEl.addEventListener('input', function() {
+      hiddenEl.value = '';
+      if (newNameEl) newNameEl.value = '';
+      filter();
+    });
     textEl.addEventListener('blur', function() {
       setTimeout(function() {
         dropEl.style.display = 'none';
-        // If user typed but didn't pick, clear
-        if (!hiddenEl.value) { textEl.value = ''; }
+        var hasValue = hiddenEl.value || (newNameEl && newNameEl.value);
+        if (!hasValue) { textEl.value = ''; }
       }, 180);
     });
     textEl.addEventListener('keydown', function(e) {
@@ -201,7 +243,11 @@ require __DIR__ . '/includes/guest-header.php';
     });
 
     return {
-      clear: function() { textEl.value = ''; hiddenEl.value = ''; dropEl.style.display = 'none'; },
+      clear: function() {
+        textEl.value = ''; hiddenEl.value = '';
+        if (newNameEl) newNameEl.value = '';
+        dropEl.style.display = 'none';
+      },
       setRequired: function(r) {
         textEl.required = r;
         if (!r) textEl.setCustomValidity('');
@@ -211,7 +257,13 @@ require __DIR__ . '/includes/guest-header.php';
 
   /* ── Init both widgets ───────────────────────────────────── */
   var majorAC   = initAutocomplete('majorText',   'majorDrop',   'majorId',   majorsData);
-  var subjectAC = initAutocomplete('subjectText', 'subjectDrop', 'subjectId', subjectsData);
+  var subjectAC = initAutocomplete('subjectText', 'subjectDrop', 'subjectId', subjectsData,
+                                   { allowNew: true, newNameId: 'subjectNewName' });
+
+  // Pre-fill after POST error when teacher had typed a new subject name
+  if (subjectNewNameInitial && !parseInt(document.getElementById('subjectId').dataset.selected || '0', 10)) {
+    document.getElementById('subjectText').value = subjectNewNameInitial;
+  }
 
   /* ── Role switching ──────────────────────────────────────── */
   var initial = <?= json_encode($values['role']) ?>;
@@ -245,12 +297,14 @@ require __DIR__ . '/includes/guest-header.php';
   window.setRole = setRole;
   setRole(initial);
 
-  /* ── Submit guard: ensure a valid pick was made ──────────── */
+  /* ── Submit guard ────────────────────────────────────────── */
   document.getElementById('regForm').addEventListener('submit', function(e) {
     var isTeacher = document.getElementById('roleInput').value === 'teacher';
     if (isTeacher) {
-      if (!document.getElementById('subjectId').value) {
-        document.getElementById('subjectText').setCustomValidity('กรุณาเลือกวิชาสอนจากรายการ');
+      var hasId  = !!document.getElementById('subjectId').value;
+      var hasNew = !!document.getElementById('subjectNewName').value;
+      if (!hasId && !hasNew) {
+        document.getElementById('subjectText').setCustomValidity('กรุณาเลือกหรือพิมพ์ชื่อวิชาสอน');
         document.getElementById('subjectText').reportValidity();
         e.preventDefault();
       }

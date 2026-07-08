@@ -27,6 +27,27 @@ final class Subject
         return $row ?: null;
     }
 
+    /**
+     * Find an existing subject by name (case-sensitive) or insert a new one.
+     * Used when a teacher types a subject that isn't in the list during registration.
+     */
+    public static function addAndGetId(string $name): int
+    {
+        $name = trim($name);
+        $pdo  = Database::pdo();
+        $stmt = $pdo->prepare("SELECT id FROM subjects WHERE name = ? LIMIT 1");
+        $stmt->execute([$name]);
+        $row = $stmt->fetch();
+        if ($row) {
+            return (int) $row['id'];
+        }
+        $pdo->prepare(
+            "INSERT INTO subjects (name, is_active, sort_order)
+             VALUES (?, 1, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM subjects s2))"
+        )->execute([$name]);
+        return (int) $pdo->lastInsertId();
+    }
+
     /** @return array{ok:bool,error?:string} */
     public static function add(string $name): array
     {
