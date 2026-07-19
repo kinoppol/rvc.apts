@@ -207,6 +207,142 @@ final class Booking
         return $days;
     }
 
+    /**
+     * Read-only week grid for the admin calendar: every AI pool (not just one group's), every slot,
+     * with the actual bookings behind each cell so the admin can drill in. Unlike getWeekGrid() this
+     * is not user-scoped and never marks anything bookable.
+     *
+     * @return array<int,array{dayName:string,date:int,dateStr:string,todayCls:string,slots:array}>
+     */
+    public static function adminWeekGrid(int $weekOffset): array
+    {
+        $settings = SlotSettings::get();
+        $start = self::weekStart($weekOffset);
+        $end   = $start->modify('+6 days');
+        $today = new DateTimeImmutable('today');
+        $now   = new DateTimeImmutable();
+
+        $accounts = Database::pdo()->query(
+            "SELECT id, name, status, capacity, expires_at FROM ai_accounts ORDER BY name"
+        )->fetchAll();
+
+        // All active bookings for the week in one query -> map[date][slot][accountId][]
+        $stmt = Database::pdo()->prepare(
+            "SELECT b.*, u.name AS student_name, u.email AS student_email, u.student_id AS student_code
+             FROM bookings b
+             JOIN users u ON u.id = b.user_id
+             WHERE b.status = 'upcoming' AND b.booking_date BETWEEN ? AND ?
+             ORDER BY u.name"
+        );
+        $stmt->execute([$start->format('Y-m-d'), $end->format('Y-m-d')]);
+        $booked = [];
+        foreach (self::attachDisplay($stmt->fetchAll()) as $r) {
+            $booked[$r['booking_date']][(int) $r['slot_index']][(int) $r['ai_account_id']][] = $r;
+        }
+
+        $days = [];
+        for ($d = 0; $d < 7; $d++) {
+            $date    = $start->modify("+{$d} days");
+            $dateStr = $date->format('Y-m-d');
+            $slots   = [];
+
+            for ($i = 0; $i < $settings['slots_per_day']; $i++) {
+                $slotStart = $date->setTime(...array_map('intval', explode(':', SlotSettings::slotStart($settings, $i))));
+                $slotEnd   = $date->setTime(...array_map('intval', explode(':', SlotSettings::slotEnd($settings, $i))));
+                $isLiveNow = $now >= $slotStart && $now < $slotEnd;
+                $isPast    = $now >= $slotEnd;
+
+                $pools = [];
+                $totalCapacity = $totalBooked = $liveCount = 0;
+
+                foreach ($accounts as $ac) {
+                    $aid       = (int) $ac['id'];
+                    $capacity  = max(1, (int) $ac['capacity']);
+                    $rows      = $booked[$dateStr][$i][$aid] ?? [];
+                    $isExpired = !empty($ac['expires_at']) && new DateTimeImmutable($ac['expires_at']) <= $now;
+                    $unusable  = $ac['status'] === 'maintenance' || $isExpired;
+
+                    // Occupancy counts bookings that still hold the pool (not checked out).
+                    $occupancy = count(array_filter($rows, fn ($r) => empty($r['checked_out_at'])));
+                    $live      = count(array_filter($rows, fn ($r) => $r['displayStatus'] === 'now'));
+
+                    if ($unusable) {
+                        $status = 'off';
+                    } elseif ($live > 0) {
+                        $status = 'now';
+                    } elseif ($occupancy >= $capacity) {
+                        $status = 'busy';
+                    } elseif ($occupancy > 0) {
+                        $status = 'partial';
+                    } else {
+                        $status = $isPast ? 'off' : 'available';
+                    }
+
+                    if (!$unusable) {
+                        $totalCapacity += $capacity;
+                        $totalBooked   += $occupancy;
+                        $liveCount     += $live;
+                    }
+
+                    $pools[] = [
+                        'accountId' => $aid,
+                        'name'      => $ac['name'],
+                        'status'    => $status,
+                        'capacity'  => $capacity,
+                        'occupancy' => $occupancy,
+                        'remaining' => max(0, $capacity - $occupancy),
+                        'bookings'  => array_map(fn ($r) => [
+                            'id'          => (int) $r['id'],
+                            'student'     => $r['student_name'],
+                            'email'       => $r['student_email'],
+                            'code'        => $r['student_code'],
+                            'status'      => $r['displayStatus'],
+                            'statusLabel' => $r['statusLabel'],
+                            'badgeCls'    => $r['badgeCls'],
+                            'purpose'     => $r['purpose'],
+                            'checkedIn'   => $r['checked_in_at'] ? date('H:i', strtotime($r['checked_in_at'])) : null,
+                            'checkedOut'  => $r['checked_out_at'] ? date('H:i', strtotime($r['checked_out_at'])) : null,
+                            'reported'    => !empty($r['reported_at']),
+                        ], $rows),
+                    ];
+                }
+
+                if ($liveCount > 0) {
+                    $cellStatus = 'now';
+                } elseif ($totalCapacity === 0) {
+                    $cellStatus = 'off';
+                } elseif ($totalBooked === 0) {
+                    $cellStatus = $isPast ? 'off' : 'empty';
+                } elseif ($totalBooked >= $totalCapacity) {
+                    $cellStatus = 'busy';
+                } else {
+                    $cellStatus = 'partial';
+                }
+
+                $slots[] = [
+                    'label'         => SlotSettings::slotLabel($i),
+                    'time'          => SlotSettings::slotStart($settings, $i) . '–' . SlotSettings::slotEnd($settings, $i),
+                    'date'          => $dateStr,
+                    'dateLabel'     => self::THAI_WEEKDAYS[$d] . 'ที่ ' . $date->format('j') . ' ' . self::THAI_MONTHS_SHORT[(int) $date->format('n')],
+                    'slotIndex'     => $i,
+                    'cellStatus'    => $cellStatus,
+                    'totalBooked'   => $totalBooked,
+                    'totalCapacity' => $totalCapacity,
+                    'pools'         => $pools,
+                ];
+            }
+
+            $days[] = [
+                'dayName'  => self::THAI_WEEKDAYS_SHORT[$d],
+                'date'     => (int) $date->format('j'),
+                'dateStr'  => $dateStr,
+                'todayCls' => $date == $today ? 'day-today' : 'day-normal',
+                'slots'    => $slots,
+            ];
+        }
+        return $days;
+    }
+
     private static function weekBoundsFor(DateTimeInterface $date): array
     {
         $d = DateTimeImmutable::createFromInterface($date);

@@ -105,6 +105,82 @@
     });
   }
 
+  // ── Admin booking calendar (admin/calendar.php) — click a slot cell to inspect its bookings ──
+  var calModal = document.getElementById("calSlotModal");
+  if (calModal) {
+    var calEsc = function (str) {
+      return String(str == null ? "" : str)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    };
+
+    var poolTint = {
+      now: "#059669", busy: "#D97706", partial: "#2563EB", available: "#94A3B8", off: "#94A3B8",
+    };
+
+    var renderBooking = function (b) {
+      var times = [];
+      if (b.checkedIn) times.push('<i class="bi bi-box-arrow-in-right"></i> ' + calEsc(b.checkedIn));
+      if (b.checkedOut) times.push('<i class="bi bi-box-arrow-right"></i> ' + calEsc(b.checkedOut));
+
+      var meta = [];
+      if (b.code) meta.push(calEsc(b.code));
+      if (b.email) meta.push(calEsc(b.email));
+
+      return '<div style="padding:8px 10px;border-top:1px solid var(--bs-border-color)">'
+        + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+        + '<span style="font-weight:600;font-size:13px">' + calEsc(b.student) + "</span>"
+        + '<span class="' + calEsc(b.badgeCls) + '" style="font-size:11px;padding:2px 8px">' + calEsc(b.statusLabel) + "</span>"
+        + (b.reported ? '<span style="font-size:11px;color:#059669"><i class="bi bi-check-circle"></i> รายงานแล้ว</span>' : "")
+        + (times.length ? '<span style="font-size:11px;color:var(--bs-secondary-color);margin-left:auto">' + times.join(" · ") + "</span>" : "")
+        + "</div>"
+        + (meta.length ? '<div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:2px">' + meta.join(" · ") + "</div>" : "")
+        + (b.purpose ? '<div style="font-size:12px;margin-top:4px"><i class="bi bi-bullseye me-1" style="color:#2563EB"></i>' + calEsc(b.purpose) + "</div>" : "")
+        + "</div>";
+    };
+
+    var renderPool = function (p) {
+      var tint = poolTint[p.status] || "#94A3B8";
+      var head = '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bs-secondary-bg)">'
+        + '<span style="font-weight:700;font-size:13px;color:' + tint + '">' + calEsc(p.name) + "</span>"
+        + '<span style="font-size:11px;color:var(--bs-secondary-color)">' + p.occupancy + "/" + p.capacity + " ที่นั่ง</span>"
+        + (p.status === "off" ? '<span style="font-size:11px;color:#94A3B8;margin-left:auto">ปิดใช้งาน</span>' : "")
+        + "</div>";
+
+      var body = p.bookings.length
+        ? p.bookings.map(renderBooking).join("")
+        : '<div style="padding:10px;font-size:12px;color:var(--bs-tertiary-color)">ไม่มีการจองในช่วงนี้</div>';
+
+      return '<div style="border:1px solid var(--bs-border-color);border-radius:10px;overflow:hidden;margin-bottom:10px">'
+        + head + body + "</div>";
+    };
+
+    document.querySelectorAll(".cal-cell").forEach(function (cell) {
+      cell.addEventListener("click", function () {
+        var d;
+        try { d = JSON.parse(cell.dataset.detail || "{}"); } catch (e) { return; }
+
+        document.getElementById("calModalTitle").textContent = d.dayLabel + " · " + d.slotLabel;
+        document.getElementById("calModalSub").textContent =
+          d.slotTime + " · จองแล้ว " + d.booked + "/" + d.capacity + " ที่นั่ง";
+
+        var manage = document.getElementById("calModalManage");
+        if (manage && manage.dataset.base) {
+          manage.href = manage.dataset.base + "?date_from=" + d.date + "&date_to=" + d.date;
+        }
+
+        // Pools that actually have bookings first — that's what the admin opened the cell to see.
+        var pools = (d.pools || []).slice().sort(function (a, b) {
+          return b.bookings.length - a.bookings.length;
+        });
+        document.getElementById("calModalBody").innerHTML = pools.length
+          ? pools.map(renderPool).join("")
+          : '<div style="padding:20px;text-align:center;color:var(--bs-tertiary-color)">ไม่มี AI Pool ที่ใช้งานได้ในช่วงนี้</div>';
+
+        new bootstrap.Modal(calModal).show();
+      });
+    });
+  }
+
   // ── Change AI-account password modal (admin/ai-accounts.php) — auto-generate, copy, save ──
   function generateSecurePassword(length) {
     length = length || 12;

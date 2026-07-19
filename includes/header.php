@@ -131,6 +131,9 @@ function nav_cls(string $key, ?string $active): string
           <a class="<?= nav_cls('booking-management', $activeNav ?? null) ?>" href="<?= url('admin/bookings.php') ?>">
             <i class="bi bi-calendar-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการการจอง</span>
           </a>
+          <a class="<?= nav_cls('calendar', $activeNav ?? null) ?>" href="<?= url('admin/calendar.php') ?>">
+            <i class="bi bi-calendar3" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ปฏิทินการจอง</span>
+          </a>
           <a class="<?= nav_cls('majors', $activeNav ?? null) ?>" href="<?= url('admin/majors.php') ?>">
             <i class="bi bi-mortarboard" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">สาขา / วิชาสอน</span>
           </a>
