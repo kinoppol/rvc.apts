@@ -36,6 +36,18 @@ final class Report
     }
 
     /**
+     * One page of rows() for the admin report table. The CSV export deliberately still uses
+     * rows() so it always contains every member, not just the visible page.
+     * @return array{rows:array<int,array>,total:int}
+     */
+    public static function pagedRows(int $page, int $perPage): array
+    {
+        $all = self::rows();
+        $offset = max(0, ($page - 1) * $perPage);
+        return ['rows' => array_slice($all, $offset, $perPage), 'total' => count($all)];
+    }
+
+    /**
      * Per-AI-account cost summary for the current calendar month.
      * Only returns accounts that have at least one cost field set.
      */

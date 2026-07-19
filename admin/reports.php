@@ -6,8 +6,27 @@ if (($_GET['export'] ?? '') === 'csv') {
     Report::streamCsv(); // sets headers, writes CSV, exits
 }
 
-$rows = Report::rows();
+$perPage = 10;
+$page = max(1, (int) ($_GET['page'] ?? 1));
+
+$data = Report::pagedRows($page, $perPage);
+$totalPages = max(1, (int) ceil($data['total'] / $perPage));
+if ($page > $totalPages) { // e.g. a stale ?page= after members drop off the report
+    $page = $totalPages;
+    $data = Report::pagedRows($page, $perPage);
+}
+$rows = $data['rows'];
+$shownFrom = $data['total'] > 0 ? ($page - 1) * $perPage + 1 : 0;
+$shownTo = min($page * $perPage, $data['total']);
+
 $costRows = Report::costRows();
+
+/** Rebuilds this page's URL with overridden query params. */
+function reports_link(array $overrides = []): string
+{
+    global $page;
+    return url('admin/reports.php') . '?' . http_build_query($overrides + ['page' => $page]);
+}
 
 $activeNav = 'reports';
 require __DIR__ . '/../includes/header.php';
@@ -52,6 +71,18 @@ require __DIR__ . '/../includes/header.php';
         </tbody>
       </table>
     </div>
+    <?php if ($data['total'] > $perPage): ?>
+    <div style="padding:14px 2px 0;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--bs-border-color);flex-wrap:wrap;gap:10px;margin-top:4px">
+      <span style="font-size:12px;color:var(--bs-secondary-color)">แสดง <?= (int) $shownFrom ?>–<?= (int) $shownTo ?> จาก <?= (int) $data['total'] ?> รายการ</span>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <a href="<?= reports_link(['page' => max(1, $page - 1)]) ?>" class="btn btn-sm btn-outline-secondary<?= $page <= 1 ? ' disabled' : '' ?>" style="font-size:12px">ก่อนหน้า</a>
+        <?php for ($p = 1; $p <= $totalPages; $p++): ?>
+          <a href="<?= reports_link(['page' => $p]) ?>" class="btn btn-sm <?= $p === $page ? 'btn-primary' : 'btn-outline-secondary' ?>" style="font-size:12px;<?= $p === $page ? 'background:#2563EB;border:none' : '' ?>"><?= $p ?></a>
+        <?php endfor; ?>
+        <a href="<?= reports_link(['page' => min($totalPages, $page + 1)]) ?>" class="btn btn-sm btn-outline-secondary<?= $page >= $totalPages ? ' disabled' : '' ?>" style="font-size:12px">ถัดไป</a>
+      </div>
+    </div>
+    <?php endif; ?>
   </div>
 </div>
 <?php if ($costRows): ?>
