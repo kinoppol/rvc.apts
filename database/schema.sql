@@ -14,6 +14,25 @@ CREATE TABLE user_groups (
     created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Student majors (admin-managed list; is_active=0 hides from registration dropdown).
+CREATE TABLE majors (
+    id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name       VARCHAR(150) NOT NULL UNIQUE,
+    is_active  TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Teacher subjects (admin-managed list; is_active=0 hides from registration dropdown).
+CREATE TABLE subjects (
+    id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name       VARCHAR(150) NOT NULL UNIQUE,
+    is_active  TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- NOTE: majors and subjects MUST be created before users — users has FKs into both.
 CREATE TABLE users (
     id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     role          ENUM('student','teacher','admin') NOT NULL DEFAULT 'student',
@@ -31,24 +50,6 @@ CREATE TABLE users (
     CONSTRAINT fk_users_group   FOREIGN KEY (group_id)   REFERENCES user_groups(id) ON DELETE SET NULL,
     CONSTRAINT fk_users_major   FOREIGN KEY (major_id)   REFERENCES majors(id)      ON DELETE SET NULL,
     CONSTRAINT fk_users_subject FOREIGN KEY (subject_id) REFERENCES subjects(id)    ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Student majors (admin-managed list; is_active=0 hides from registration dropdown).
-CREATE TABLE majors (
-    id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name       VARCHAR(150) NOT NULL UNIQUE,
-    is_active  TINYINT(1) NOT NULL DEFAULT 1,
-    sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Teacher subjects (admin-managed list; is_active=0 hides from registration dropdown).
-CREATE TABLE subjects (
-    id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name       VARCHAR(150) NOT NULL UNIQUE,
-    is_active  TINYINT(1) NOT NULL DEFAULT 1,
-    sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Admin-managed list of AI account types (Claude Pro, ChatGPT Plus, ...).
