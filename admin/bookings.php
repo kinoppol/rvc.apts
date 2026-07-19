@@ -102,6 +102,13 @@ $statusChips = [
     'cancelled'   => 'ยกเลิก',
 ];
 
+// Quick date-range shortcuts. These filter on booking_date (the "business day" a slot starts on),
+// so a slot running past midnight still counts as its start day — same rule the rest of the app uses.
+$dateChips = [
+    'วันนี้'   => date('Y-m-d'),
+    'พรุ่งนี้' => date('Y-m-d', strtotime('+1 day')),
+];
+
 $activeNav = 'booking-management';
 require __DIR__ . '/../includes/header.php';
 ?>
@@ -162,7 +169,17 @@ require __DIR__ . '/../includes/header.php';
         <a href="<?= bkgs_link(['search' => null, 'account_id' => null, 'date_from' => null, 'date_to' => null, 'page' => 1]) ?>" class="btn btn-outline-secondary btn-sm" style="font-size:13px">ล้าง</a>
       <?php endif; ?>
     </form>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;align-items:center">
+      <span style="font-size:12px;color:var(--bs-tertiary-color);margin-right:2px">ช่วงวันที่:</span>
+      <?php foreach ($dateChips as $label => $d): ?>
+        <?php $on = $dateFrom === $d && $dateTo === $d; ?>
+        <a href="<?= bkgs_link(['date_from' => $d, 'date_to' => $d, 'page' => 1]) ?>" style="text-decoration:none;border-radius:20px;font-size:12px;padding:5px 14px;border:1.5px solid <?= $on ? '#2563EB' : 'var(--bs-border-color)' ?>;font-weight:600;color:<?= $on ? '#2563EB' : 'var(--bs-secondary-color)' ?>;background:<?= $on ? 'rgba(37,99,235,.08)' : 'transparent' ?>"><?= e($label) ?></a>
+      <?php endforeach; ?>
+      <?php if ($dateFrom !== '' || $dateTo !== ''): ?>
+        <a href="<?= bkgs_link(['date_from' => null, 'date_to' => null, 'page' => 1]) ?>" style="text-decoration:none;border-radius:20px;font-size:12px;padding:5px 12px;border:1.5px solid var(--bs-border-color);font-weight:600;color:var(--bs-tertiary-color)"><i class="bi bi-x"></i> ล้างวันที่</a>
+      <?php endif; ?>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
       <?php foreach ($statusChips as $key => $label): ?>
         <a href="<?= bkgs_link(['status_filter' => $key, 'page' => 1]) ?>" style="text-decoration:none;border-radius:20px;font-size:12px;padding:5px 14px;border:1.5px solid <?= $statusFilter === $key ? '#2563EB' : 'var(--bs-border-color)' ?>;font-weight:600;color:<?= $statusFilter === $key ? '#2563EB' : 'var(--bs-secondary-color)' ?>;background:<?= $statusFilter === $key ? 'rgba(37,99,235,.08)' : 'transparent' ?>"><?= e($label) ?></a>
       <?php endforeach; ?>
