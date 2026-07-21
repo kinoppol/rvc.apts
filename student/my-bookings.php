@@ -145,6 +145,52 @@ require __DIR__ . '/../includes/header.php';
                   onclick="copyText(this,<?= e(json_encode($bk['account_password'], JSON_UNESCAPED_UNICODE)) ?>)"><i class="bi bi-clipboard"></i></button>
               </span>
             </div>
+            <?php
+              $aiProvider = strtolower($bk['ai_provider'] ?? '');
+              $isClaude = str_contains($aiProvider, 'claude') || str_contains(strtolower($bk['ai_name'] ?? ''), 'claude');
+              $isChatgpt = str_contains($aiProvider, 'chatgpt') || str_contains($aiProvider, 'openai') || str_contains(strtolower($bk['ai_name'] ?? ''), 'chatgpt');
+              $guideSteps = [];
+              if ($isClaude) {
+                  $guideSteps = [
+                      ['icon' => 'bi-chat-left-text',    'text' => 'ระบุ <strong>บทบาท + บริบท + ผลลัพธ์</strong> ที่ต้องการในประโยคแรก เช่น "ช่วยเป็นผู้ตรวจรายงานวิชาการ..."'],
+                      ['icon' => 'bi-folder2-open',      'text' => 'ใช้ <strong>Projects</strong> (ไอคอนโฟลเดอร์) เพื่อเก็บ context ข้ามบทสนทนา ไม่ต้องอธิบายซ้ำทุกครั้ง'],
+                      ['icon' => 'bi-paperclip',         'text' => 'แนบ<strong>ไฟล์ / รูปภาพ / PDF</strong> ได้โดยตรงในกล่องแชท (ลากวางหรือคลิก +)'],
+                      ['icon' => 'bi-arrow-counterclockwise', 'text' => 'หาก Claude ตอบผิดทิศ ให้บอก "ลองใหม่" พร้อมอธิบายส่วนที่ไม่ถูกต้อง ไม่ต้องเริ่มบทสนทนาใหม่'],
+                  ];
+              } elseif ($isChatgpt) {
+                  $guideSteps = [
+                      ['icon' => 'bi-cpu',               'text' => 'เลือก <strong>GPT-4o</strong> สำหรับงานทั่วไป / <strong>o1</strong> สำหรับคณิตศาสตร์และการใช้เหตุผลขั้นสูง'],
+                      ['icon' => 'bi-image',             'text' => 'สร้างรูปภาพด้วย <strong>DALL·E 3</strong> ได้เลย — พิมพ์ "สร้างรูป..." หรือ "วาด..." ในกล่องแชท'],
+                      ['icon' => 'bi-person-gear',       'text' => 'ตั้งค่า <strong>Custom Instructions</strong> (โปรไฟล์ → Customize ChatGPT) เพื่อกำหนด tone และสไตล์ถาวร'],
+                      ['icon' => 'bi-tools',             'text' => 'เปิด <strong>Advanced Tools</strong> (โค้ด / ค้นหาเว็บ / Canvas) ได้จากไอคอนเครื่องมือในกล่องข้อความ'],
+                  ];
+              } else {
+                  $guideSteps = [
+                      ['icon' => 'bi-chat-left-text',    'text' => 'ระบุบริบทและผลลัพธ์ที่ต้องการให้ชัดเจนตั้งแต่ต้น'],
+                      ['icon' => 'bi-arrow-repeat',      'text' => 'ถ้าคำตอบไม่ตรง ให้อธิบายเพิ่มเติมแทนการเริ่มใหม่'],
+                      ['icon' => 'bi-paperclip',         'text' => 'ลองแนบไฟล์หรือตัวอย่างเพื่อให้ AI เข้าใจงานได้ดีขึ้น'],
+                  ];
+              }
+            ?>
+            <details style="margin-top:8px" <?= !isset($_COOKIE['guide_seen_' . (int) $bk['id']]) ? 'open' : '' ?>>
+              <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#2563EB;list-style:none;display:flex;align-items:center;gap:5px;user-select:none;width:fit-content">
+                <i class="bi bi-lightbulb-fill" style="color:#D97706"></i>
+                คู่มือเริ่มต้นใช้งาน <?= e($bk['ai_name']) ?>
+                <i class="bi bi-chevron-down" style="font-size:10px;transition:transform .2s" id="guideChev<?= (int) $bk['id'] ?>"></i>
+              </summary>
+              <div style="margin-top:8px;padding:10px 12px;background:var(--bs-secondary-bg);border-left:3px solid #D97706;border-radius:0 8px 8px 0;display:flex;flex-direction:column;gap:7px"
+                   onconnect="document.getElementById('guideChev<?= (int) $bk['id'] ?>').style.transform='rotate(180deg)'">
+                <?php foreach ($guideSteps as $step): ?>
+                <div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.5">
+                  <i class="bi <?= e($step['icon']) ?>" style="color:#D97706;flex-shrink:0;margin-top:2px"></i>
+                  <span><?= $step['text'] ?></span>
+                </div>
+                <?php endforeach; ?>
+                <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:2px;padding-top:6px;border-top:1px solid var(--bs-border-color)">
+                  <i class="bi bi-info-circle me-1"></i>อย่าลืมส่ง<strong>รายงานการใช้งาน</strong>ภายใน 7 วันหลังสิ้นสุดการใช้งาน
+                </div>
+              </div>
+            </details>
             <?php elseif ($bk['displayStatus'] === 'checked_in'): ?>
             <div style="margin-top:8px;padding:6px 10px;background:var(--bs-secondary-bg);border-radius:7px;font-size:12px;color:var(--bs-secondary-color);display:inline-flex;align-items:center;gap:6px">
               <i class="bi bi-lock-fill" style="color:#059669"></i>ยืนยันแล้ว — รหัสผ่านจะแสดงเมื่อถึงเวลาจอง

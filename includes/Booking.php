@@ -619,8 +619,11 @@ final class Booking
     public static function listForUser(int $userId, ?string $filter = null): array
     {
         $stmt = Database::pdo()->prepare(
-            'SELECT b.*, a.name AS ai_name, a.email AS ai_email, a.account_password FROM bookings b
+            'SELECT b.*, a.name AS ai_name, a.email AS ai_email, a.account_password,
+                    COALESCE(p.name, a.provider) AS ai_provider
+             FROM bookings b
              JOIN ai_accounts a ON a.id = b.ai_account_id
+             LEFT JOIN ai_providers p ON p.id = a.provider_id
              WHERE b.user_id = ? ORDER BY b.booking_date DESC, b.slot_index DESC'
         );
         $stmt->execute([$userId]);
