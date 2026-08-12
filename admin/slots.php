@@ -62,13 +62,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    if ($action === 'institution') {
-        $result = SlotSettings::updateInstitutionName($_POST['institution_name'] ?? '');
-        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกชื่อสถานศึกษาเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
-        header('Location: ' . url('admin/slots.php'));
-        exit;
-    }
-
     // Default: update slot settings
     $result = SlotSettings::update(
         (int) ($_POST['slot_hours'] ?? 0),
@@ -88,20 +81,6 @@ $termsFile  = SlotSettings::getTermsFile();
 $activeNav = 'slot-management';
 require __DIR__ . '/../includes/header.php';
 ?>
-<h5 style="font-weight:700;margin:0 0 16px">ข้อมูลสถานศึกษา</h5>
-<div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;margin-bottom:28px">
-  <form method="post" style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
-    <?= Csrf::field() ?>
-    <input type="hidden" name="action" value="institution">
-    <div style="flex:1;min-width:260px">
-      <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">ชื่อสถานศึกษา</label>
-      <input name="institution_name" class="form-control" value="<?= e($settings['institution_name']) ?>" required maxlength="200" placeholder="วิทยาลัย RVC" style="font-size:13px">
-      <div style="font-size:11px;color:var(--bs-secondary-color);margin-top:4px">แสดงบนหน้าเข้าสู่ระบบและหน้าแรกของระบบ</div>
-    </div>
-    <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px;white-space:nowrap"><i class="bi bi-save me-1"></i>บันทึก</button>
-  </form>
-</div>
-
 <h5 style="font-weight:700;margin:0 0 20px">จัดการตารางเวลา</h5>
 <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px">
   <form method="post">

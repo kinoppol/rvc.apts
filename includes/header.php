@@ -91,7 +91,7 @@ $__institutionName = SlotSettings::get()['institution_name'] ?? 'วิทยา
             <div style="font-size:11px;color:var(--bs-secondary-color)"><?= e($__roleLabel) ?></div>
           </div>
         </a>
-        <a href="<?= url('logout.php') ?>" class="btn btn-sm" style="background:transparent;border:1px solid var(--bs-border-color);color:var(--bs-secondary-color);font-size:12px;padding:4px 10px;margin-left:4px"><i class="bi bi-box-arrow-right"></i></a>
+        <a href="<?= url('logout.php') ?>" data-logout-confirm class="btn btn-sm" style="background:transparent;border:1px solid var(--bs-border-color);color:var(--bs-secondary-color);font-size:12px;padding:4px 10px;margin-left:4px"><i class="bi bi-box-arrow-right"></i></a>
       </div>
     </div>
   </nav>
@@ -152,6 +152,9 @@ $__institutionName = SlotSettings::get()['institution_name'] ?? 'วิทยา
           </a>
           <a class="<?= nav_cls('migrations', $activeNav ?? null) ?>" href="<?= url('admin/migrations.php') ?>">
             <i class="bi bi-database-gear" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">DB Migrations</span>
+          </a>
+          <a class="<?= nav_cls('system-settings', $activeNav ?? null) ?>" href="<?= url('admin/settings.php') ?>">
+            <i class="bi bi-gear" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ตั้งค่าระบบ</span>
           </a>
           <a class="<?= nav_cls('admin-profile', $activeNav ?? null) ?>" href="<?= url('admin/profile.php') ?>">
             <i class="bi bi-person-circle" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">โปรไฟล์</span>

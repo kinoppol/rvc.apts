@@ -547,6 +547,23 @@
     });
   }
 
+  // ── Logout confirmation modal (intercepts clicks on links with data-logout-confirm) ──
+  var logoutModal = document.getElementById("logoutConfirmModal");
+  var logoutConfirmBtn = document.getElementById("logoutConfirmBtn");
+  var pendingLogoutHref = null;
+  if (logoutModal && logoutConfirmBtn) {
+    document.querySelectorAll("[data-logout-confirm]").forEach(function (link) {
+      link.addEventListener("click", function (e) {
+        e.preventDefault();
+        pendingLogoutHref = link.getAttribute("href");
+        new bootstrap.Modal(logoutModal).show();
+      });
+    });
+    logoutConfirmBtn.addEventListener("click", function () {
+      if (pendingLogoutHref) { window.location.href = pendingLogoutHref; }
+    });
+  }
+
   // ── Generic confirm modal (replaces native confirm() on admin/members.php) ──
   var confirmActionModal = document.getElementById("confirmActionModal");
   var confirmActionBtn = document.getElementById("confirmActionBtn");
