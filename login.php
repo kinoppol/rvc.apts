@@ -28,7 +28,7 @@ require __DIR__ . '/includes/guest-header.php';
       <i class="bi bi-robot" style="color:white;font-size:26px"></i>
     </div>
     <h4 style="font-weight:700;color:#0F172A;margin:0">AI Pro Time-Sharing</h4>
-    <p style="color:var(--bs-secondary-color);font-size:14px;margin:6px 0 0">ระบบจองคิวใช้งาน AI Pro — วิทยาลัย RVC</p>
+    <p style="color:var(--bs-secondary-color);font-size:14px;margin:6px 0 0">ระบบจองคิวใช้งาน AI Pro — <?= e($__institutionName) ?></p>
   </div>
 
   <?php if ($error): ?>

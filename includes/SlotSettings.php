@@ -33,6 +33,20 @@ final class SlotSettings
         return ['ok' => true];
     }
 
+    /** @return array{ok:bool,error?:string} */
+    public static function updateInstitutionName(string $name): array
+    {
+        $name = trim($name);
+        if ($name === '') {
+            return ['ok' => false, 'error' => 'กรุณากรอกชื่อสถานศึกษา'];
+        }
+        if (mb_strlen($name) > 200) {
+            return ['ok' => false, 'error' => 'ชื่อสถานศึกษายาวเกินไป (สูงสุด 200 ตัวอักษร)'];
+        }
+        Database::pdo()->prepare('UPDATE slot_settings SET institution_name = ? WHERE id = 1')->execute([$name]);
+        return ['ok' => true];
+    }
+
     public static function getTermsFile(): ?string
     {
         $row = Database::pdo()->query('SELECT terms_file FROM slot_settings WHERE id = 1')->fetch();

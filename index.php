@@ -7,6 +7,8 @@ if ($user) {
     exit;
 }
 
+$institutionName = SlotSettings::get()['institution_name'] ?? 'วิทยาลัย RVC';
+
 $studentFeatures = [
     ['icon' => 'bi-calendar2-check', 'title' => 'จองคิวใช้งาน AI Pro', 'desc' => 'เลือกวันและช่วงเวลาที่ต้องการ แล้วเลือก AI Pool ที่กลุ่มของคุณมีสิทธิ์ใช้งาน (Claude Pro, ChatGPT Plus)'],
     ['icon' => 'bi-box-arrow-in-right', 'title' => 'เช็คอิน / เช็คเอาท์', 'desc' => 'เช็คอินก่อนเริ่มใช้งานได้ล่วงหน้า และเช็คเอาท์ก่อนเวลาเพื่อคืนสิทธิ์ให้ผู้อื่นจองต่อ'],
@@ -25,7 +27,7 @@ $adminFeatures = [
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Pro Time-Sharing — RVC</title>
+<title>AI Pro Time-Sharing — <?= e($institutionName) ?></title>
 <link rel="icon" type="image/svg+xml" href="<?= asset('assets/favicon.svg') ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -57,7 +59,7 @@ $adminFeatures = [
     </div>
   </div>
   <div class="landing-hero-inner page-anim">
-    <h1 style="font-weight:700;font-size:34px;margin:32px 0 12px">ระบบจองคิวใช้งาน AI Pro<br>วิทยาลัย RVC</h1>
+    <h1 style="font-weight:700;font-size:34px;margin:32px 0 12px">ระบบจองคิวใช้งาน AI Pro<br><?= e($institutionName) ?></h1>
     <p style="font-size:15px;opacity:.92;margin:0 0 28px;line-height:1.7">
       บริหารจัดการการใช้งานบัญชี AI Pro ร่วมกัน (Claude Pro, ChatGPT Plus) ระหว่างนักศึกษาและอาจารย์
       อย่างเป็นระบบ จองล่วงหน้า เช็คอิน-เช็คเอาท์ และติดตามการใช้งานได้ในที่เดียว
@@ -108,7 +110,7 @@ $adminFeatures = [
 </div>
 
 <div class="landing-footer">
-  AI Pro Time-Sharing — วิทยาลัย RVC ·
+  AI Pro Time-Sharing — <?= e($institutionName) ?> ·
   <a href="<?= url('login.php') ?>" style="color:#2563EB;text-decoration:none;font-weight:600">เข้าสู่ระบบ</a> ·
   <a href="<?= url('register.php') ?>" style="color:#2563EB;text-decoration:none;font-weight:600">สมัครสมาชิก</a>
 </div>

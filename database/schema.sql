@@ -95,6 +95,7 @@ CREATE TABLE slot_settings (
     max_advance_days  SMALLINT UNSIGNED NOT NULL DEFAULT 14,
     day_start_time    TIME NOT NULL DEFAULT '08:00:00',
     terms_file        VARCHAR(255) NULL DEFAULT NULL,              -- filename of the active terms-of-service PDF (NULL = no terms required)
+    institution_name  VARCHAR(200) NOT NULL DEFAULT 'วิทยาลัย RVC', -- shown on the login/landing pages; admin-editable
     CONSTRAINT chk_slot_settings_singleton CHECK (id = 1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
