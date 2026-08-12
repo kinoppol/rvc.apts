@@ -141,7 +141,10 @@ $cellMeta = [
                     data-date="<?= e($slot['date']) ?>" data-slot-index="<?= (int) $slot['slotIndex'] ?>"
                     data-day-label="<?= e($slot['dateLabel']) ?>" data-slot-label="<?= e($slot['label']) ?>" data-slot-time="<?= e($slot['time']) ?>"
                     data-max-select="<?= (int) $remaining ?>"
-                    data-pools='<?= e(json_encode(array_map(fn ($p) => ['id' => $p['accountId'], 'name' => $p['name']], $avail), JSON_UNESCAPED_UNICODE)) ?>'>
+                    data-pools='<?= e(json_encode(array_map(fn ($p) => [
+                        'id' => $p['accountId'], 'name' => $p['name'], 'avatar' => $p['avatar'],
+                        'provider' => $p['provider'], 'bookable' => $p['bookable'], 'statusText' => $p['statusText'],
+                    ], $slot['pools']), JSON_UNESCAPED_UNICODE)) ?>'>
                     <div style="font-size:10px;font-weight:700;color:<?= $meta['fg'] ?>"><i class="bi <?= $meta['icon'] ?>"></i> <?= $meta['label'] ?></div>
                     <div style="font-size:9px;color:<?= $meta['fg'] ?>;opacity:.85;margin-top:2px;word-break:break-word"><?= e($preview) ?></div>
                     <?php if ($mine): ?><div style="font-size:9px;color:#1D4ED8;margin-top:2px">ของฉัน: <?= e(pool_names_preview($mine)) ?></div><?php endif; ?>

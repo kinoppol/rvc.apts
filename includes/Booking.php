@@ -177,6 +177,8 @@ final class Booking
                     $pools[] = [
                         'accountId' => $aid,
                         'name'      => $ac['name'],
+                        'avatar'    => $ac['avatar_emoji'] ?? '',
+                        'provider'  => $ac['provider_name'],
                         'status'    => $status,
                         'statusText' => $statusText,
                         'bg'        => $meta['bg'],
@@ -740,10 +742,12 @@ final class Booking
     public static function allowedAccountsFor(int $userId): array
     {
         $stmt = Database::pdo()->prepare(
-            'SELECT a.id, a.name, a.provider, a.status, a.expires_at, a.capacity
+            'SELECT a.id, a.name, a.provider, a.status, a.expires_at, a.capacity, a.avatar_emoji,
+                    COALESCE(p.name, a.provider) AS provider_name
              FROM users u
              JOIN group_ai_accounts ga ON ga.group_id = u.group_id
              JOIN ai_accounts a ON a.id = ga.ai_account_id
+             LEFT JOIN ai_providers p ON p.id = a.provider_id
              WHERE u.id = ?
              ORDER BY a.id'
         );

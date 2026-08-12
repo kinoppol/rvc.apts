@@ -66,6 +66,7 @@
       var boxes = container.querySelectorAll("input[type=checkbox]");
       var checkedCount = Array.prototype.filter.call(boxes, function (b) { return b.checked; }).length;
       boxes.forEach(function (b) {
+        if (b.dataset.unbookable === "1") { return; }
         b.disabled = !b.checked && checkedCount >= maxSelect;
       });
     };
@@ -87,15 +88,29 @@
           var pools = [];
           try { pools = JSON.parse(cell.dataset.pools || "[]"); } catch (e) { pools = []; }
           pools.forEach(function (p) {
+            var unbookable = !p.bookable;
             var label = document.createElement("label");
-            label.style.cssText = "display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer";
+            label.style.cssText = "display:flex;align-items:center;gap:8px;font-size:13px;cursor:" + (unbookable ? "not-allowed" : "pointer") + ";" + (unbookable ? "opacity:.55" : "");
             var box = document.createElement("input");
             box.type = "checkbox";
             box.name = "ai_account_id[]";
             box.value = p.id;
-            box.addEventListener("change", function () { applySelectLimit(container, maxSelect); });
+            if (unbookable) {
+              box.disabled = true;
+              box.dataset.unbookable = "1";
+            } else {
+              box.addEventListener("change", function () { applySelectLimit(container, maxSelect); });
+            }
             label.appendChild(box);
-            label.appendChild(document.createTextNode(p.name));
+            var text = document.createElement("span");
+            text.textContent = (p.avatar ? p.avatar + " " : "") + p.name + (p.provider ? " · " + p.provider : "");
+            label.appendChild(text);
+            if (unbookable && p.statusText) {
+              var badge = document.createElement("span");
+              badge.style.cssText = "margin-left:auto;font-size:11px;color:var(--bs-tertiary-color)";
+              badge.textContent = p.statusText;
+              label.appendChild(badge);
+            }
             container.appendChild(label);
           });
           applySelectLimit(container, maxSelect);

@@ -102,6 +102,7 @@ $flashOk    = null;
 $flashErr   = null;
 $installOk  = false;
 $userCount  = 0;
+$migResults = [];
 $testResult = null;   // null | 'ok' | 'err'
 $testMsg    = '';
 
@@ -163,6 +164,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     run_sql_file($pdo, SCHEMA_FILE);
                                     run_sql_file(make_pdo($fHost, $fPort, $fName, $fUser, $fPass, true), SEED_FILE);
                                     $userCount = (int) make_pdo($fHost, $fPort, $fName, $fUser, $fPass, true)->query('SELECT COUNT(*) FROM users')->fetchColumn();
+
+                                    // schema.sql is the union of every migration, so a fresh install is
+                                    // already schema-complete — but the _migrations tracking table would
+                                    // otherwise sit empty and show everything as "pending". Run/record them
+                                    // now so the install ends in the same state a `php migrate.php` would.
+                                    require_once __DIR__ . '/config.php';
+                                    require_once __DIR__ . '/includes/Database.php';
+                                    require_once __DIR__ . '/includes/Migration.php';
+                                    Migration::init();
+                                    $migResults = Migration::runPending();
+
                                     $installOk = true;
                                     $flashOk   = 'ติดตั้งฐานข้อมูลสำเร็จ! นำเข้าโครงสร้างและข้อมูลตัวอย่างเรียบร้อยแล้ว';
                                 } catch (Throwable $e) {
@@ -268,6 +280,24 @@ label.lbl { font-size:11px;font-weight:600;color:var(--bs-secondary-color);displ
           <div><i class="bi bi-person me-1" style="color:#2563EB"></i><strong>นักศึกษา (ตัวอย่าง):</strong> somchai@rvc.ac.th</div>
         </div>
       </div>
+
+      <?php $migFailed = array_filter($migResults, fn($r) => !$r['ok']); ?>
+      <div class="section-card">
+        <div class="section-title"><i class="bi bi-database-gear me-1"></i>Database Migration</div>
+        <?php if (!$migResults): ?>
+          <?= check_row(true, 'ไม่มี migration ค้างอยู่ — โครงสร้างฐานข้อมูลเป็นเวอร์ชันล่าสุดแล้ว') ?>
+        <?php else: ?>
+          <?php foreach ($migResults as $r): ?>
+            <?= check_row($r['ok'], $r['file'], $r['ok'] ? '' : (string) ($r['error'] ?? '')) ?>
+          <?php endforeach; ?>
+        <?php endif; ?>
+        <?php if ($migFailed): ?>
+          <div style="font-size:11px;color:#991B1B;margin-top:6px">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>Migration บางรายการล้มเหลว — ตรวจสอบได้ภายหลังที่ <code>admin/migrations.php</code>
+          </div>
+        <?php endif; ?>
+      </div>
+
       <div style="background:#FEF2F2;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#991B1B;display:flex;gap:8px;align-items:flex-start">
         <i class="bi bi-exclamation-triangle-fill" style="margin-top:1px;flex-shrink:0"></i>
         <span>เพื่อความปลอดภัย โปรด <strong>ลบหรือจำกัดการเข้าถึงไฟล์ <code>install.php</code></strong> หลังติดตั้งเสร็จ</span>
