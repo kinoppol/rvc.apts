@@ -87,6 +87,7 @@ final class Booking
         for ($d = 0; $d < 7; $d++) {
             $date = $start->modify("+{$d} days");
             $dateStr = $date->format('Y-m-d');
+            $dow = (int) $date->format('N');
             $slots = [];
             for ($i = 0; $i < $settings['slots_per_day']; $i++) {
                 $slotStart = $date->setTime(...array_map('intval', explode(':', SlotSettings::slotStart($settings, $i))));
@@ -112,6 +113,7 @@ final class Booking
                     $capacity = max(1, (int) $ac['capacity']);
                     $bkRows   = $cellBooked[$aid] ?? [];
                     $isExpired = !empty($ac['expires_at']) && new DateTimeImmutable($ac['expires_at']) <= $now;
+                    $isDayClosed = !AiAccount::isDayAllowed($ac, $dow);
 
                     // Find current user's booking for this pool (if any).
                     $myRow = null;
@@ -139,8 +141,8 @@ final class Booking
                         }
                     } elseif ($occupancy >= $capacity) {
                         // At capacity — pool is fully booked for this slot.
-                        $status = ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax) ? 'off' : 'busy';
-                    } elseif ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax || $isLiveNow) {
+                        $status = ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax || $isDayClosed) ? 'off' : 'busy';
+                    } elseif ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax || $isLiveNow || $isDayClosed) {
                         $status = 'off';
                     } else {
                         $status = 'available';
@@ -170,6 +172,8 @@ final class Booking
                         $statusText = 'ว่าง ' . $remaining . '/' . $capacity . ' ที่';
                     } elseif ($status === 'busy' && $capacity > 1) {
                         $statusText = 'เต็ม ' . $capacity . '/' . $capacity . ' ที่';
+                    } elseif ($status === 'off' && $isDayClosed && $ac['status'] !== 'maintenance' && !$isExpired && !$isPast && !$beyondMax) {
+                        $statusText = 'ไม่เปิดจองวันนี้';
                     } else {
                         $statusText = $meta['label'];
                     }
@@ -742,7 +746,7 @@ final class Booking
     public static function allowedAccountsFor(int $userId): array
     {
         $stmt = Database::pdo()->prepare(
-            'SELECT a.id, a.name, a.provider, a.status, a.expires_at, a.capacity, a.avatar_emoji,
+            'SELECT a.id, a.name, a.provider, a.status, a.expires_at, a.capacity, a.avatar_emoji, a.available_days,
                     COALESCE(p.name, a.provider) AS provider_name
              FROM users u
              JOIN group_ai_accounts ga ON ga.group_id = u.group_id

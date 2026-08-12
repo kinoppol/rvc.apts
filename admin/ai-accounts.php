@@ -159,6 +159,9 @@ require __DIR__ . '/../includes/header.php';
         <?php if ((int) $ac['capacity'] > 1): ?>
           <div style="font-size:12px;color:var(--bs-secondary-color);margin-bottom:4px"><i class="bi bi-people me-1"></i>รองรับ: <strong><?= (int) $ac['capacity'] ?></strong> ผู้ใช้/slot</div>
         <?php endif; ?>
+        <?php if ($ac['daysSummary'] !== 'ทุกวัน'): ?>
+          <div style="font-size:12px;color:var(--bs-secondary-color);margin-bottom:4px"><i class="bi bi-calendar-week me-1"></i>เปิดจอง: <strong><?= e($ac['daysSummary']) ?></strong></div>
+        <?php endif; ?>
         <div style="font-size:12px;color:var(--bs-secondary-color);margin-bottom:6px">ใช้วันนี้: <?= (int) $ac['usedToday'] ?>/<?= (int) $ac['totalSlots'] ?> slots</div>
         <div style="background:var(--bs-border-color);border-radius:4px;height:6px;overflow:hidden;margin-bottom:12px">
           <div style="background:#2563EB;width:<?= e($ac['usagePct']) ?>;height:100%;border-radius:4px"></div>
@@ -213,7 +216,8 @@ require __DIR__ . '/../includes/header.php';
                   data-monthly-cost="<?= $ac['monthly_cost'] !== null ? (float)$ac['monthly_cost'] : '' ?>"
                   data-cost-per-slot="<?= $ac['cost_per_slot'] !== null ? (float)$ac['cost_per_slot'] : '' ?>"
                   data-capacity="<?= (int) ($ac['capacity'] ?? 1) ?>"
-                  data-avatar="<?= e($ac['avatar_emoji'] ?? '') ?>"><i class="bi bi-pencil me-1"></i>แก้ไข</button>
+                  data-avatar="<?= e($ac['avatar_emoji'] ?? '') ?>"
+                  data-available-days="<?= e($ac['available_days'] ?? '1111111') ?>"><i class="bi bi-pencil me-1"></i>แก้ไข</button>
           <form method="post" style="margin:0" onsubmit="return confirm('ลบบัญชี AI นี้?')">
             <?= Csrf::field() ?>
             <input type="hidden" name="action" value="delete">
@@ -280,6 +284,16 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
       <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px"><i class="bi bi-people me-1"></i>จำนวนผู้ใช้พร้อมกันสูงสุดต่อ 1 slot</label>
         <input type="number" name="capacity" min="1" value="1" required class="form-control" style="font-size:13px;max-width:160px" placeholder="1">
         <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">ผู้ใช้หลายคนสามารถจอง slot เดียวกันได้พร้อมกัน ค่าต่ำสุดคือ 1</div>
+      </div>
+      <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:6px"><i class="bi bi-calendar-week me-1"></i>วันที่เปิดให้จอง</label>
+        <div class="day-picker" style="display:flex;gap:6px;flex-wrap:wrap">
+          <?php foreach (['1' => 'จ', '2' => 'อ', '3' => 'พ', '4' => 'พฤ', '5' => 'ศ', '6' => 'ส', '7' => 'อา'] as $dayVal => $dayLbl): ?>
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--bs-border-color);border-radius:8px;padding:6px 10px;cursor:pointer;user-select:none">
+              <input type="checkbox" name="available_days[]" value="<?= $dayVal ?>" checked style="margin:0"><?= $dayLbl ?>
+            </label>
+          <?php endforeach; ?>
+        </div>
+        <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">ค่าเริ่มต้นเปิดให้จองได้ทุกวัน — ยกเลิกติ๊กวันที่ไม่ต้องการเปิดให้จอง</div>
       </div>
       <div style="grid-column:span 2"><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">แจ้งเตือนให้เปลี่ยนรหัสผ่าน</label>
         <select name="password_reminder" class="form-select" style="font-size:13px">

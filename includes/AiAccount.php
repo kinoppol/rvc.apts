@@ -4,6 +4,7 @@ final class AiAccount
 {
     private const REMINDER_DAYS = ['daily' => 1, 'weekly' => 7, 'monthly' => 30];
     private const REMINDER_LABEL = ['none' => 'ปิด', 'daily' => 'ทุกวัน', 'weekly' => 'ทุกสัปดาห์', 'monthly' => 'ทุกเดือน'];
+    private const DAY_LABELS = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
 
     /**
      * All AI accounts with today's usage plus derived expiry / password-reminder info.
@@ -69,6 +70,9 @@ final class AiAccount
                 $ac['statusCls'] = 'badge-ok';
                 $ac['statusLabel'] = 'ใช้งานได้';
             }
+
+            // ── Available days (derived label) ──
+            $ac['daysSummary'] = self::daysSummary($ac['available_days'] ?? '1111111');
 
             // ── Password-update reminder (derived) ──
             $ac['reminderLabel'] = self::REMINDER_LABEL[$ac['password_reminder']] ?? 'ปิด';
@@ -144,14 +148,14 @@ final class AiAccount
         $avatarEmoji = self::sanitizeEmoji($d['avatar_emoji'] ?? '');
         $stmt = Database::pdo()->prepare(
             'INSERT INTO ai_accounts
-                (name, avatar_emoji, provider_id, provider, email, account_password, status, capacity, expires_at, password_updated_at, password_reminder, monthly_cost, cost_per_slot)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                (name, avatar_emoji, provider_id, provider, email, account_password, status, capacity, available_days, expires_at, password_updated_at, password_reminder, monthly_cost, cost_per_slot)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $fields['name'], $avatarEmoji ?: null,
             $fields['provider_id'], $fields['provider'], $fields['email'],
             $password !== '' ? $password : null,
-            $fields['status'], $capacity, $fields['expires_at'],
+            $fields['status'], $capacity, $fields['available_days'], $fields['expires_at'],
             $password !== '' ? date('Y-m-d H:i:s') : null,
             $fields['password_reminder'],
             $fields['monthly_cost'], $fields['cost_per_slot'],
@@ -186,14 +190,14 @@ final class AiAccount
         $stmt = Database::pdo()->prepare(
             'UPDATE ai_accounts SET
                 name = ?, avatar_emoji = ?, provider_id = ?, provider = ?, email = ?, account_password = ?,
-                status = ?, capacity = ?, expires_at = ?, password_updated_at = ?, password_reminder = ?,
+                status = ?, capacity = ?, available_days = ?, expires_at = ?, password_updated_at = ?, password_reminder = ?,
                 monthly_cost = ?, cost_per_slot = ?
              WHERE id = ?'
         );
         $stmt->execute([
             $fields['name'], $avatarEmoji ?: null,
             $fields['provider_id'], $fields['provider'], $fields['email'], $password,
-            $fields['status'], $capacity, $fields['expires_at'], $passwordUpdatedAt, $fields['password_reminder'],
+            $fields['status'], $capacity, $fields['available_days'], $fields['expires_at'], $passwordUpdatedAt, $fields['password_reminder'],
             $fields['monthly_cost'], $fields['cost_per_slot'], $id,
         ]);
         return ['ok' => true];
@@ -298,6 +302,11 @@ final class AiAccount
             return ['error' => 'ค่าต่อช่วงเวลาต้องไม่ติดลบ'];
         }
 
+        $availableDays = self::packDays($d['available_days'] ?? []);
+        if ($availableDays === '0000000') {
+            return ['error' => 'กรุณาเลือกอย่างน้อย 1 วันที่เปิดให้จอง'];
+        }
+
         return [
             'name' => $name,
             'provider_id' => $providerId,
@@ -308,6 +317,7 @@ final class AiAccount
             'expires_at' => $expiresAt,
             'monthly_cost' => $monthlyCost,
             'cost_per_slot' => $costPerSlot,
+            'available_days' => $availableDays,
         ];
     }
 
@@ -326,5 +336,38 @@ final class AiAccount
         }
         $d = new DateTimeImmutable($dt);
         return Booking::thaiDate($d) . ' ' . $d->format('H:i');
+    }
+
+    /** Whether $account can be booked on the given ISO weekday (1=Monday..7=Sunday). */
+    public static function isDayAllowed(array $account, int $isoWeekday): bool
+    {
+        $days = $account['available_days'] ?? '1111111';
+        return isset($days[$isoWeekday - 1]) && $days[$isoWeekday - 1] === '1';
+    }
+
+    /** Human-readable summary of a 7-char (Mon..Sun) availability string, e.g. "ทุกวัน" or "จ, อ, พ". */
+    public static function daysSummary(string $days): string
+    {
+        if ($days === '1111111') {
+            return 'ทุกวัน';
+        }
+        $labels = [];
+        for ($i = 0; $i < 7; $i++) {
+            if (($days[$i] ?? '0') === '1') {
+                $labels[] = self::DAY_LABELS[$i];
+            }
+        }
+        return $labels ? implode(', ', $labels) : 'ไม่เปิดจองวันใดเลย';
+    }
+
+    /** Build a 7-char (Mon..Sun) '1'/'0' string from posted day numbers (1..7, ISO weekday). */
+    private static function packDays(mixed $raw): string
+    {
+        $selected = array_map('intval', (array) $raw);
+        $out = '';
+        for ($i = 1; $i <= 7; $i++) {
+            $out .= in_array($i, $selected, true) ? '1' : '0';
+        }
+        return $out;
     }
 }

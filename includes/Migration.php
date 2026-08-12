@@ -30,6 +30,7 @@ final class Migration
         'migrate_issue_file.sql',
         'migrate_issue_files_table.sql',
         'migrate_institution_name.sql',
+        'migrate_ai_account_available_days.sql',
     ];
 
     /** Create the tracking table if it doesn't exist yet. */

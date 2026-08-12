@@ -62,12 +62,14 @@ CREATE TABLE ai_providers (
 CREATE TABLE ai_accounts (
     id                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name                 VARCHAR(100) NOT NULL,
+    avatar_emoji         VARCHAR(8) NULL,                     -- optional per-pool icon shown instead of the default robot icon
     provider_id          INT UNSIGNED NULL,
     provider             VARCHAR(100) NOT NULL,               -- denormalized type name (kept in sync with ai_providers)
     email                VARCHAR(190) NULL,                   -- shared login email for the AI account
     account_password     VARCHAR(255) NULL,                   -- shared login password, stored readable so admins can share it
     status               ENUM('active','maintenance') NOT NULL DEFAULT 'active',
     capacity             TINYINT UNSIGNED NOT NULL DEFAULT 1, -- max concurrent users per slot (≥ 1)
+    available_days       CHAR(7) NOT NULL DEFAULT '1111111',  -- Mon..Sun booking availability, 1=open 0=closed (index = ISO weekday - 1)
     expires_at           DATETIME NULL,                       -- when reached, the account is treated as disabled (derived at read time)
     password_updated_at  DATETIME NULL,                       -- last time the shared password was changed
     password_reminder    ENUM('none','daily','weekly','monthly') NOT NULL DEFAULT 'none',

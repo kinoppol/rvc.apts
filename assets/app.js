@@ -322,6 +322,12 @@
       var avatarVal = btn.dataset.avatar || "";
       set("avatar_emoji", avatarVal);
       applyAvatarSelection(modalEl, avatarVal);
+      // Available-days picker
+      var days = btn.dataset.availableDays || "1111111";
+      modalEl.querySelectorAll("input[name='available_days[]']").forEach(function (box) {
+        var idx = parseInt(box.value, 10) - 1;
+        box.checked = days.charAt(idx) === "1";
+      });
       new bootstrap.Modal(modalEl).show();
     });
   });
