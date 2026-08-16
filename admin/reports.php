@@ -32,7 +32,10 @@ $activeNav = 'reports';
 require __DIR__ . '/../includes/header.php';
 ?>
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-  <h5 style="font-weight:700;margin:0">รายงานสถิติ</h5>
+  <div>
+    <h5 style="font-weight:700;margin:0">รายงานสถิติ</h5>
+    <p style="color:var(--bs-secondary-color);font-size:13px;margin:4px 0 0">ข้อมูลการใช้งาน 30 วันล่าสุด</p>
+  </div>
   <a href="<?= url('admin/reports.php') ?>?export=csv" class="btn btn-outline-primary" style="font-size:13px;color:#2563EB;border-color:#2563EB"><i class="bi bi-download me-1"></i>Export CSV</a>
 </div>
 <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">

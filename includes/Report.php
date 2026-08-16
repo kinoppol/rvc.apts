@@ -4,7 +4,10 @@ final class Report
 {
     private const TARGET_HOURS = 50; // baseline hours representing a "100%" utilization rate
 
-    /** @return array<int,array{name:string,studentId:string,totalBookings:int,hours:int,rate:string}> */
+    /**
+     * Per-member usage over the trailing 30 days (completed bookings only).
+     * @return array<int,array{name:string,studentId:string,totalBookings:int,hours:int,rate:string}>
+     */
     public static function rows(): array
     {
         $settings = SlotSettings::get();
@@ -12,7 +15,8 @@ final class Report
             "SELECT u.name, u.student_id,
                     COUNT(b.id) AS total_bookings
              FROM users u
-             JOIN bookings b ON b.user_id = u.id AND b.status = 'upcoming' AND b.end_datetime < NOW()
+             JOIN bookings b ON b.user_id = u.id AND b.status = 'upcoming'
+                             AND b.end_datetime < NOW() AND b.end_datetime >= NOW() - INTERVAL 30 DAY
              WHERE u.role = 'student'
              GROUP BY u.id, u.name, u.student_id
              HAVING total_bookings > 0
