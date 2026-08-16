@@ -41,7 +41,7 @@ final class Member
     }
 
     /** @return array{rows:array,total:int,totalMembers:int,approvedCount:int,pendingCount:int,suspendedCount:int} */
-    public static function list(string $search, string $status, int $page, int $perPage, string $sort = 'created_at', string $dir = 'desc'): array
+    public static function list(string $search, string $status, int $page, int $perPage, string $sort = 'created_at', string $dir = 'desc', string $group = 'all'): array
     {
         $sortMap = [
             'name'       => 'u.name',
@@ -71,6 +71,12 @@ final class Member
             $where[] = '(u.name LIKE ? OR u.student_id LIKE ?)';
             $params[] = "%{$search}%";
             $params[] = "%{$search}%";
+        }
+        if ($group === 'none') {
+            $where[] = 'u.group_id IS NULL';
+        } elseif ($group !== 'all' && $group !== '') {
+            $where[] = 'u.group_id = ?';
+            $params[] = (int) $group;
         }
         $whereSql = implode(' AND ', $where);
 
