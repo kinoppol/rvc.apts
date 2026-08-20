@@ -1,0 +1,31 @@
+# Everything under uploads/ is user-supplied: student report evidence, LMS mission
+# attachments, admin-uploaded lesson images, the terms PDF. Uploads are validated on
+# the way in (extension allow-list + a finfo mime check that must agree), but this
+# directory is served directly by Apache, so this is belt-and-braces.
+#
+# Every directive below is guarded: if AllowOverride is None the file is ignored
+# entirely, and the php_flag lines only apply where mod_php is actually loaded —
+# an unguarded php_flag would 500 the whole directory on a PHP-FPM server.
+
+# 1. Never serve anything executable from here, whatever the extension claims.
+#    Works regardless of which PHP SAPI the server runs.
+<FilesMatch "\.(?i:php|phtml|php[0-9]|phps|phar|shtml|cgi|pl|py|jsp|asp|aspx|htaccess)$">
+    Require all denied
+</FilesMatch>
+
+# 2. Belt-and-braces for mod_php setups: disable the interpreter outright.
+#    php_flag (not php_admin_flag — that one is server/vhost only and 500s here).
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+
+# 3. Stop browsers sniffing a file into a different, scriptable type.
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>

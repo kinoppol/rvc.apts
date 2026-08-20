@@ -16,9 +16,20 @@ require_once __DIR__ . '/includes/UserGroup.php';
 require_once __DIR__ . '/includes/AiProvider.php';
 require_once __DIR__ . '/includes/AiAccount.php';
 require_once __DIR__ . '/includes/Report.php';
-require_once __DIR__ . '/includes/Notification.php';
 require_once __DIR__ . '/includes/Major.php';
 require_once __DIR__ . '/includes/Subject.php';
+// LMS subsystem — ordered after its dependencies (UserGroup, Member) and before
+// Notification, which derives its student/admin items from LmsProgress + LmsPromotion.
+require_once __DIR__ . '/includes/LmsFile.php';
+require_once __DIR__ . '/includes/LmsOrder.php';
+require_once __DIR__ . '/includes/LmsLevel.php';
+require_once __DIR__ . '/includes/LmsContent.php';
+require_once __DIR__ . '/includes/LmsQuestion.php';
+require_once __DIR__ . '/includes/LmsQuiz.php';
+require_once __DIR__ . '/includes/LmsProgress.php';
+require_once __DIR__ . '/includes/LmsPromotion.php';
+require_once __DIR__ . '/includes/LmsSeeder.php';
+require_once __DIR__ . '/includes/Notification.php';
 require_once __DIR__ . '/includes/Migration.php';
 
 // Compute APP_BASE (URL prefix of the project root) — three-level fallback:

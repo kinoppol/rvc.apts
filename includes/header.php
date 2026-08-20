@@ -6,6 +6,7 @@
 $__user = current_user();
 $__isAdmin = $__user['role'] === 'admin';
 $__pendingCount = $__isAdmin ? Member::pendingCount() : 0;
+$__lmsPending   = $__isAdmin ? LmsPromotion::pendingCount() : 0;
 $__initial = mb_substr($__user['name'], 0, 1);
 $__roleLabel = $__isAdmin ? 'Admin' : ('นักศึกษา' . (!empty($__user['group_name']) ? ' (กลุ่ม: ' . $__user['group_name'] . ')' : ''));
 $__notifications = Notification::forUser($__user);
@@ -117,6 +118,9 @@ $__institutionName = SlotSettings::get()['institution_name'] ?? 'วิทยา
           <a class="<?= nav_cls('my-bookings', $activeNav ?? null) ?>" href="<?= url('student/my-bookings.php') ?>">
             <i class="bi bi-journal-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">การจองของฉัน</span>
           </a>
+          <a class="<?= nav_cls('lms', $activeNav ?? null) ?>" href="<?= url('student/lms.php') ?>">
+            <i class="bi bi-journal-richtext" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">บทเรียน AI</span>
+          </a>
           <a class="<?= nav_cls('profile', $activeNav ?? null) ?>" href="<?= url('student/profile.php') ?>">
             <i class="bi bi-person-circle" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">โปรไฟล์</span>
           </a>
@@ -140,6 +144,13 @@ $__institutionName = SlotSettings::get()['institution_name'] ?? 'วิทยา
           </a>
           <a class="<?= nav_cls('groups', $activeNav ?? null) ?>" href="<?= url('admin/groups.php') ?>">
             <i class="bi bi-diagram-3" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการกลุ่มผู้ใช้</span>
+          </a>
+          <a class="<?= nav_cls('lms-content', $activeNav ?? null) ?>" href="<?= url('admin/lms.php') ?>">
+            <i class="bi bi-book" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการบทเรียน</span>
+          </a>
+          <a class="<?= nav_cls('lms-promotions', $activeNav ?? null) ?>" href="<?= url('admin/lms-promotions.php') ?>">
+            <i class="bi bi-patch-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">คำขอเลื่อนระดับ</span>
+            <?php if ($__lmsPending > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__lmsPending ?></span><?php endif; ?>
           </a>
           <a class="<?= nav_cls('slot-management', $activeNav ?? null) ?>" href="<?= url('admin/slots.php') ?>">
             <i class="bi bi-calendar-range" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการตารางเวลา</span>

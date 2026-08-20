@@ -574,19 +574,28 @@
   var confirmActionModal = document.getElementById("confirmActionModal");
   var confirmActionBtn = document.getElementById("confirmActionBtn");
   var pendingConfirmForm = null;
+  var pendingConfirmSubmitter = null;
   if (confirmActionModal && confirmActionBtn) {
     document.addEventListener("submit", function (e) {
       var form = e.target;
-      if (form.hasAttribute("data-confirm-modal") && !form._confirmOk) {
+      // The data-confirm-* attributes may sit on the form (one action per form) or on
+      // the clicked button (several actions sharing one form, e.g. the promotion queue).
+      var submitter = e.submitter || null;
+      var src = submitter && submitter.hasAttribute("data-confirm-modal")
+        ? submitter
+        : (form.hasAttribute("data-confirm-modal") ? form : null);
+
+      if (src && !form._confirmOk) {
         e.preventDefault();
         pendingConfirmForm = form;
+        pendingConfirmSubmitter = submitter;
 
-        var icon = form.dataset.confirmIcon || "bi-question-circle";
-        var color = form.dataset.confirmColor || "#2563EB";
-        var title = form.dataset.confirmTitle || "ยืนยัน";
-        var msg = form.dataset.confirmMsg || "";
-        var btn = form.dataset.confirmBtn || "ยืนยัน";
-        var btnCls = form.dataset.confirmBtnCls || "btn-primary";
+        var icon = src.dataset.confirmIcon || "bi-question-circle";
+        var color = src.dataset.confirmColor || "#2563EB";
+        var title = src.dataset.confirmTitle || "ยืนยัน";
+        var msg = src.dataset.confirmMsg || "";
+        var btn = src.dataset.confirmBtn || "ยืนยัน";
+        var btnCls = src.dataset.confirmBtnCls || src.dataset.confirmCls || "btn-primary";
 
         var iconEl = document.getElementById("confirmActionIcon");
         if (iconEl) {
@@ -609,8 +618,15 @@
       bootstrap.Modal.getInstance(confirmActionModal).hide();
       if (pendingConfirmForm) {
         pendingConfirmForm._confirmOk = true;
-        pendingConfirmForm.requestSubmit();
+        // Pass the original button back: a multi-action form carries its action in the
+        // submitter's name/value, and a bare requestSubmit() would drop it.
+        if (pendingConfirmSubmitter && pendingConfirmSubmitter.form === pendingConfirmForm) {
+          pendingConfirmForm.requestSubmit(pendingConfirmSubmitter);
+        } else {
+          pendingConfirmForm.requestSubmit();
+        }
         pendingConfirmForm = null;
+        pendingConfirmSubmitter = null;
       }
     });
   }
