@@ -4,12 +4,12 @@ $user = require_role('admin');
 
 $allMajors    = Major::listAll();
 $allSubjects  = Subject::listActive();
-$perPage = 8;
+$perPageOptions = [8, 20, 50, 100];
 
 /** Rebuilds the current list URL so redirects land back on the same filter/page. */
 function members_return_url(): string
 {
-    $q = array_intersect_key($_POST, array_flip(['search', 'status', 'group', 'page']));
+    $q = array_intersect_key($_POST, array_flip(['search', 'status', 'group', 'page', 'per_page']));
     return url('admin/members.php') . ($q ? '?' . http_build_query($q) : '');
 }
 
@@ -20,7 +20,7 @@ function members_return_url(): string
  */
 function member_action_form(int $id, string $action, string $btnCls, string $icon, string $label, ?array $modal = null): string
 {
-    global $search, $status, $group, $page;
+    global $search, $status, $group, $page, $perPage;
     $confirmAttrs = '';
     if ($modal) {
         $confirmAttrs = ' data-confirm-modal'
@@ -39,6 +39,7 @@ function member_action_form(int $id, string $action, string $btnCls, string $ico
         . '<input type="hidden" name="status" value="' . e($status) . '">'
         . '<input type="hidden" name="group" value="' . e($group) . '">'
         . '<input type="hidden" name="page" value="' . (int) $page . '">'
+        . '<input type="hidden" name="per_page" value="' . (int) $perPage . '">'
         . '<button type="submit" class="' . e($btnCls) . '"><i class="bi ' . e($icon) . ' me-1"></i>' . e($label) . '</button>'
         . '</form>';
 }
@@ -77,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'status' => $_POST['status'] ?? 'all',
                 'group'  => $_POST['group'] ?? 'all',
                 'page'   => (int) ($_POST['page'] ?? 1),
+                'per_page' => (int) ($_POST['per_page'] ?? $perPageOptions[0]),
             ]));
             exit;
         }
@@ -135,6 +137,7 @@ if (!in_array($group, $validGroups, true)) {
     $group = 'all';
 }
 $page = max(1, (int) ($_GET['page'] ?? 1));
+$perPage = in_array((int) ($_GET['per_page'] ?? 0), $perPageOptions, true) ? (int) $_GET['per_page'] : $perPageOptions[0];
 
 $allowedSorts = ['name', 'student_id', 'status', 'created_at'];
 $sort = in_array($_GET['sort'] ?? '', $allowedSorts, true) ? $_GET['sort'] : 'created_at';
@@ -156,8 +159,8 @@ $historyBookings = $historyMember ? Booking::listForUser($historyId) : [];
 /** Preserves search/status/sort when building filter + pagination links. */
 function members_link(array $overrides = []): string
 {
-    global $search, $status, $group, $page, $sort, $dir;
-    $params = array_filter(['search' => $search, 'status' => $status, 'group' => $group, 'page' => $page, 'sort' => $sort, 'dir' => $dir], fn ($v) => $v !== '' && $v !== null);
+    global $search, $status, $group, $page, $perPage, $sort, $dir;
+    $params = array_filter(['search' => $search, 'status' => $status, 'group' => $group, 'page' => $page, 'per_page' => $perPage, 'sort' => $sort, 'dir' => $dir], fn ($v) => $v !== '' && $v !== null);
     $params = array_merge($params, $overrides);
     return url('admin/members.php') . '?' . http_build_query($params);
 }
@@ -205,6 +208,7 @@ require __DIR__ . '/../includes/header.php';
   <div class="card-body" style="padding:16px">
     <form method="get" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0">
       <input type="hidden" name="status" value="<?= e($status) ?>">
+      <input type="hidden" name="per_page" value="<?= (int) $perPage ?>">
       <div style="flex:1;min-width:200px;position:relative">
         <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--bs-tertiary-color);font-size:14px"></i>
         <input name="search" value="<?= e($search) ?>" type="text" class="form-control" placeholder="ค้นหาชื่อหรือรหัสนักศึกษา..." style="padding-left:36px;font-size:13px">
@@ -241,6 +245,7 @@ require __DIR__ . '/../includes/header.php';
   <input type="hidden" name="status" value="<?= e($status) ?>">
   <input type="hidden" name="group" value="<?= e($group) ?>">
   <input type="hidden" name="page" value="<?= (int) $page ?>">
+  <input type="hidden" name="per_page" value="<?= (int) $perPage ?>">
 </form>
 
 <div id="bulkBar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(37,99,235,.08);border:1px solid #2563EB;border-radius:10px;padding:10px 14px;margin-bottom:14px">
@@ -338,6 +343,7 @@ require __DIR__ . '/../includes/header.php';
                 <input type="hidden" name="status" value="<?= e($status) ?>">
                 <input type="hidden" name="group" value="<?= e($group) ?>">
                 <input type="hidden" name="page" value="<?= (int) $page ?>">
+                <input type="hidden" name="per_page" value="<?= (int) $perPage ?>">
                 <select name="group_id" onchange="this.form.submit()" class="form-select form-select-sm" style="font-size:12px;min-width:130px">
                   <option value="">— ไม่มีกลุ่ม —</option>
                   <?php foreach ($allGroups as $g): ?>
@@ -377,7 +383,17 @@ require __DIR__ . '/../includes/header.php';
       </tbody>
     </table>
     <div style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--bs-border-color);flex-wrap:wrap;gap:10px">
-      <span style="font-size:12px;color:var(--bs-secondary-color)">แสดง <?= (int) $shownFrom ?>–<?= (int) $shownTo ?> จาก <?= (int) $data['total'] ?> รายการ</span>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--bs-secondary-color)">แสดง <?= (int) $shownFrom ?>–<?= (int) $shownTo ?> จาก <?= (int) $data['total'] ?> รายการ</span>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--bs-secondary-color);margin:0">
+          แสดงต่อหน้า
+          <select onchange="location.href=this.value" class="form-select form-select-sm" style="font-size:12px;width:auto;padding-right:28px">
+            <?php foreach ($perPageOptions as $opt): ?>
+              <option value="<?= e(members_link(['per_page' => $opt, 'page' => 1])) ?>" <?= $perPage === $opt ? 'selected' : '' ?>><?= $opt ?></option>
+            <?php endforeach; ?>
+          </select>
+        </label>
+      </div>
       <div style="display:flex;gap:4px">
         <a href="<?= members_link(['page' => max(1, $page - 1)]) ?>" class="btn btn-sm btn-outline-secondary<?= $page <= 1 ? ' disabled' : '' ?>" style="font-size:12px">ก่อนหน้า</a>
         <?php for ($p = 1; $p <= $totalPages; $p++): ?>
@@ -400,6 +416,7 @@ require __DIR__ . '/../includes/header.php';
         <input type="hidden" name="status" value="<?= e($status) ?>">
         <input type="hidden" name="group" value="<?= e($group) ?>">
         <input type="hidden" name="page" value="<?= (int) $page ?>">
+        <input type="hidden" name="per_page" value="<?= (int) $perPage ?>">
         <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
           <h6 class="modal-title" style="font-weight:700"><i class="bi bi-person-plus me-2" style="color:#2563EB"></i>เพิ่มสมาชิกใหม่</h6>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
@@ -440,6 +457,7 @@ require __DIR__ . '/../includes/header.php';
         <input type="hidden" name="status" value="<?= e($status) ?>">
         <input type="hidden" name="group" value="<?= e($group) ?>">
         <input type="hidden" name="page" value="<?= (int) $page ?>">
+        <input type="hidden" name="per_page" value="<?= (int) $perPage ?>">
         <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
           <h6 class="modal-title" style="font-weight:700"><i class="bi bi-key me-2" style="color:#2563EB"></i>รีเซตรหัสผ่าน</h6>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
@@ -470,6 +488,7 @@ require __DIR__ . '/../includes/header.php';
         <input type="hidden" name="status" value="<?= e($status) ?>">
         <input type="hidden" name="group" value="<?= e($group) ?>">
         <input type="hidden" name="page" value="<?= (int) $page ?>">
+        <input type="hidden" name="per_page" value="<?= (int) $perPage ?>">
         <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
           <h6 class="modal-title" style="font-weight:700"><i class="bi bi-pencil-square me-2" style="color:#2563EB"></i>แก้ไขบัญชีผู้ใช้ — <span id="editCredName"></span></h6>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
@@ -523,6 +542,7 @@ require __DIR__ . '/../includes/header.php';
         <input type="hidden" name="status" value="<?= e($status) ?>">
         <input type="hidden" name="group" value="<?= e($group) ?>">
         <input type="hidden" name="page" value="<?= (int) $page ?>">
+        <input type="hidden" name="per_page" value="<?= (int) $perPage ?>">
         <input type="hidden" name="role" id="editRoleInput" value="<?= e($editMember['role']) ?>">
         <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
           <h6 class="modal-title" style="font-weight:700"><i class="bi bi-person-gear me-2" style="color:#2563EB"></i>แก้ไขข้อมูลสมาชิก — <?= e($editMember['name']) ?></h6>
