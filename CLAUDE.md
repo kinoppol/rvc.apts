@@ -89,10 +89,12 @@ toast UI.
   `calendar.php` is the read-only admin twin of the student booking grid: `Booking::adminWeekGrid()`
   builds a week of all pools (not group-scoped, nothing bookable) and each cell embeds its bookings as
   JSON in `data-detail`, which `initAdminCalendar` in `assets/app.js` renders into a modal — no AJAX.
+- `student/lms*.php`, `admin/lms*.php` — the LMS subsystem (see "### The LMS subsystem" below).
 - `includes/` — domain classes (all `static`-method, PDO-backed): `Database` (PDO singleton), `Auth`,
   `Booking`, `Member`, `UserGroup`, `AiProvider`, `AiAccount`, `SlotSettings`, `Major`, `Subject`,
-  `Report`, `Notification`, `Migration`, `Csrf`; plus the shared view partials `header.php` /
-  `footer.php` (authenticated shell) and `guest-header.php` / `guest-footer.php` (login/register shell).
+  `Report`, `Notification`, `Migration`, `Csrf`, plus the `Lms*` classes documented below; plus the
+  shared view partials `header.php` / `footer.php` (authenticated shell) and `guest-header.php` /
+  `guest-footer.php` (login/register shell).
 - `uploads/` — student-uploaded usage-report and issue files (image/PDF). Git-ignored except `.gitkeep`.
 - `assets/app.css` (ported from the prototype's `<style>`), `assets/app.js` (sidebar collapse, theme
   toggle, booking modal population, AI-account edit modal, `generateSecurePassword`, `initUsageChart`).
@@ -184,7 +186,57 @@ toast UI.
   (`Subject::addAndGetId`).
 - Admins can **impersonate** a member from `admin/members.php` (`$_SESSION['impersonating']` +
   `admin_id`; `is_impersonating()` drives the banner in `header.php`, and `logout.php` restores the
-  admin session rather than logging out).
+  admin session rather than logging out). Impersonation blocks LMS quizzes and mission submissions
+  (`LmsQuiz::start()` / `LmsPromotion::submit()` both reject when `is_impersonating()`).
+
+### The LMS subsystem
+
+A self-contained "บทเรียน AI" (AI lessons) feature bolted onto the booking app: students climb a fixed
+5-rung ladder of levels, and clearing a level's post-test unlocks a skill-mission submission that an
+admin can approve to move the student into a new `user_groups` row (i.e. change their booking quota /
+AI-pool access). It follows every rule above (no AJAX, business logic in `includes/Lms*.php`, CSRF,
+`require_role`, Thai copy) plus its own:
+
+- **Structure:** `lms_levels` (the ladder, `sort_order` *is* the position — no `prev_level_id` column)
+  → `lms_topics` (lesson content within a level) → `lms_blocks` (typed content chunks: heading /
+  paragraph / list / image / code / youtube / callout, rendered by the `includes/lms-blocks.php`
+  partial) and `lms_questions`/`lms_choices` (a question bank per level, tagged `phase` = `pre` | `post`
+  | `review`, `review` questions additionally scoped to one topic). `LmsOrder::swap()` is the shared
+  up/down reorder helper for all four reorderable tables (whitelisted table/column names only —
+  identifiers can't be bound as params).
+- **Nothing about progress is stored** — same rule as booking status/expiry above, just deeper:
+  there is no `lms_progress` table, no unlocked/completed flag anywhere. `LmsProgress::forUser()`
+  derives unlock state, per-topic completion, and best pre/post scores from `lms_attempts` in exactly
+  four queries, cached per request. A level unlocks when the *previous published* level's post-test is
+  passed; an unpublished level in the middle of the ladder doesn't strand everything above it.
+- **Quiz engine (`LmsQuiz`):** one POST to `student/lms-quiz.php` starts an attempt, one GET renders it,
+  one POST submits it — no AJAX. Question order and per-question choice order are persisted in
+  `lms_attempt_questions` (not the session or hidden fields), so refreshing or resuming shows the exact
+  same paper and a draw can't be abandoned for a friendlier one — `start()` resumes any open attempt
+  instead of redrawing. `questionsForTaking()` deliberately omits `is_correct`/`explanation` from its
+  query so the answer key never reaches the page source; `submit()` re-validates every submitted choice
+  id belongs to its question and closes the attempt with a compare-and-swap update
+  (`... WHERE id = ? AND submitted_at IS NULL`) to shut the double-submit race.
+- **Skill missions (`LmsPromotion`):** `lms_promotions` is **append-only** — a "please revise" verdict
+  inserts a new row rather than editing the old one, so the newest row per `(user_id, level_id)` is the
+  live request and everything before it is an audit trail. Approving a mission is the one place the LMS
+  reaches into the booking side of the app: it calls `Member::assignGroup()` directly. A level only
+  accepts missions once an admin has wired it to a destination group (`lms_levels.promo_group_id`, set
+  via the "ภารกิจ" tab on `admin/lms.php`).
+- **File uploads (`LmsFile`)** land under `uploads/lms/{missions,blocks}/` — a deliberate ~20-line
+  duplicate of `Booking`'s private upload-validation sequence (size cap, extension allow-list, `finfo`
+  mime check, random filename) rather than a refactor of that file. `SUBDIRS` is a hardcoded whitelist;
+  don't pass a caller-controlled subdir.
+- **Bundled curriculum:** `database/seed_lms/level{1..5}.php` are plain PHP arrays (not SQL) imported by
+  `LmsSeeder::run()` — a Thai lesson can contain a `;` that would corrupt `Migration`'s naive statement
+  splitter, so import goes through prepared statements instead. Matching is by stable `slug`, so
+  re-running an import updates content in place instead of duplicating it; a topic that already has
+  blocks is left alone unless `$overwriteBlocks` is passed, to protect hand-edited admin content.
+  Import is a manual admin action on `admin/lms.php` ("นำเข้าเนื้อหาตัวอย่าง"), **not** part of
+  `php migrate.php` — a deploy must never silently rewrite lesson content.
+- `includes/lms-blocks.php` and `includes/lms-question-fields.php` are view partials (like
+  `header.php`/`footer.php`) shared between the student content view and admin editor/preview forms —
+  not autoloaded from `bootstrap.php`, required directly where needed.
 
 ### Migrations
 
