@@ -280,6 +280,80 @@ final class Member
         Database::pdo()->prepare("UPDATE users SET status = 'approved' WHERE id = ? AND role IN ('student','teacher')")->execute([$id]);
     }
 
+    /** @param int[] $ids @return int how many rows were actually pending and got approved */
+    public static function bulkApprove(array $ids): int
+    {
+        $ids = self::sanitizeIds($ids);
+        if (!$ids) {
+            return 0;
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = Database::pdo()->prepare(
+            "UPDATE users SET status = 'approved' WHERE role IN ('student','teacher') AND status = 'pending' AND id IN ({$ph})"
+        );
+        $stmt->execute($ids);
+        return $stmt->rowCount();
+    }
+
+    /** @param int[] $ids @return int how many rows were actually approved and got suspended */
+    public static function bulkSuspend(array $ids): int
+    {
+        $ids = self::sanitizeIds($ids);
+        if (!$ids) {
+            return 0;
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = Database::pdo()->prepare(
+            "UPDATE users SET status = 'suspended' WHERE role IN ('student','teacher') AND status = 'approved' AND id IN ({$ph})"
+        );
+        $stmt->execute($ids);
+        return $stmt->rowCount();
+    }
+
+    /** @param int[] $ids @return int how many rows were actually suspended and got reactivated */
+    public static function bulkActivate(array $ids): int
+    {
+        $ids = self::sanitizeIds($ids);
+        if (!$ids) {
+            return 0;
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = Database::pdo()->prepare(
+            "UPDATE users SET status = 'approved' WHERE role IN ('student','teacher') AND status = 'suspended' AND id IN ({$ph})"
+        );
+        $stmt->execute($ids);
+        return $stmt->rowCount();
+    }
+
+    /**
+     * Assigns every listed member to a group (or clears it when $groupId is null) in one statement.
+     * @param int[] $ids
+     * @return array{ok:bool,error?:string,count?:int}
+     */
+    public static function bulkAssignGroup(array $ids, ?int $groupId): array
+    {
+        if ($groupId !== null && !UserGroup::find($groupId)) {
+            return ['ok' => false, 'error' => 'ไม่พบกลุ่มที่เลือก'];
+        }
+        $ids = self::sanitizeIds($ids);
+        if (!$ids) {
+            return ['ok' => false, 'error' => 'กรุณาเลือกสมาชิกอย่างน้อย 1 คน'];
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = Database::pdo()->prepare(
+            "UPDATE users SET group_id = ? WHERE role IN ('student','teacher') AND id IN ({$ph})"
+        );
+        $stmt->execute(array_merge([$groupId], $ids));
+        return ['ok' => true, 'count' => $stmt->rowCount()];
+    }
+
+    /** @param mixed[] $ids raw checkbox values from $_POST @return int[] deduplicated, positive ids */
+    private static function sanitizeIds(array $ids): array
+    {
+        $ids = array_unique(array_map('intval', $ids));
+        return array_values(array_filter($ids, fn ($id) => $id > 0));
+    }
+
     public static function reject(int $id): void
     {
         Database::pdo()->prepare("DELETE FROM users WHERE id = ? AND role IN ('student','teacher') AND status = 'pending'")->execute([$id]);

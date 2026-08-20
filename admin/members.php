@@ -91,6 +91,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $gid = ($_POST['group_id'] ?? '') !== '' ? (int) $_POST['group_id'] : null;
         $result = Member::assignGroup($id, $gid);
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'อัปเดตกลุ่มของสมาชิกเรียบร้อยแล้ว' : ($result['error'] ?? 'อัปเดตกลุ่มไม่สำเร็จ'));
+    } elseif ($action === 'bulk_approve') {
+        $n = Member::bulkApprove($_POST['ids'] ?? []);
+        flash_set($n > 0 ? 'ok' : 'warn', $n > 0 ? "อนุมัติสมาชิกเรียบร้อยแล้ว ({$n} คน)" : 'ไม่มีรายการที่รออนุมัติในรายการที่เลือก');
+    } elseif ($action === 'bulk_suspend') {
+        $n = Member::bulkSuspend($_POST['ids'] ?? []);
+        flash_set($n > 0 ? 'warn' : 'warn', $n > 0 ? "ระงับสิทธิ์สมาชิกเรียบร้อยแล้ว ({$n} คน)" : 'ไม่มีรายการที่อนุมัติแล้วในรายการที่เลือก');
+    } elseif ($action === 'bulk_activate') {
+        $n = Member::bulkActivate($_POST['ids'] ?? []);
+        flash_set($n > 0 ? 'ok' : 'warn', $n > 0 ? "เปิดใช้งานสมาชิกเรียบร้อยแล้ว ({$n} คน)" : 'ไม่มีรายการที่ถูกระงับในรายการที่เลือก');
+    } elseif ($action === 'bulk_assign_group') {
+        $gid = ($_POST['bulk_group_id'] ?? '') !== '' ? (int) $_POST['bulk_group_id'] : null;
+        $result = Member::bulkAssignGroup($_POST['ids'] ?? [], $gid);
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'ปรับเปลี่ยนกลุ่มเรียบร้อยแล้ว (' . ($result['count'] ?? 0) . ' คน)' : ($result['error'] ?? 'ปรับเปลี่ยนกลุ่มไม่สำเร็จ'));
     } elseif ($action === 'waive') {
         $n = Booking::waiveOverdueForUser($id);
         flash_set('ok', 'ปลดการระงับเรียบร้อยแล้ว (ยกเว้นรายงานค้าง ' . $n . ' รายการ)');
@@ -222,11 +235,65 @@ require __DIR__ . '/../includes/header.php';
   </div>
 </div>
 
+<form id="bulkForm" method="post">
+  <?= Csrf::field() ?>
+  <input type="hidden" name="search" value="<?= e($search) ?>">
+  <input type="hidden" name="status" value="<?= e($status) ?>">
+  <input type="hidden" name="group" value="<?= e($group) ?>">
+  <input type="hidden" name="page" value="<?= (int) $page ?>">
+</form>
+
+<div id="bulkBar" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(37,99,235,.08);border:1px solid #2563EB;border-radius:10px;padding:10px 14px;margin-bottom:14px">
+  <span id="bulkCount" style="font-size:13px;font-weight:700;color:#2563EB;white-space:nowrap"></span>
+  <button type="submit" form="bulkForm" name="action" value="bulk_approve" class="action-btn-ok"
+          data-confirm-modal data-confirm-title="อนุมัติสมาชิกที่เลือก"
+          data-confirm-msg="อนุมัติสมาชิกที่เลือกทั้งหมด (เฉพาะรายการที่ยังรออนุมัติจะถูกอนุมัติ)?"
+          data-confirm-icon="bi-check-lg" data-confirm-color="#059669"
+          data-confirm-btn="อนุมัติ" data-confirm-btn-cls="btn-success">
+    <i class="bi bi-check-lg me-1"></i>อนุมัติ
+  </button>
+  <button type="submit" form="bulkForm" name="action" value="bulk_suspend" class="action-btn-warn"
+          data-confirm-modal data-confirm-title="ระงับสิทธิ์สมาชิกที่เลือก"
+          data-confirm-msg="ระงับสิทธิ์สมาชิกที่เลือกทั้งหมด (เฉพาะรายการที่อนุมัติแล้วจะถูกระงับ) ผู้ใช้จะไม่สามารถเข้าสู่ระบบและจองได้จนกว่าจะเปิดใช้งาน"
+          data-confirm-icon="bi-slash-circle" data-confirm-color="#D97706"
+          data-confirm-btn="ระงับสิทธิ์" data-confirm-btn-cls="btn-warning">
+    <i class="bi bi-slash-circle me-1"></i>ระงับ
+  </button>
+  <button type="submit" form="bulkForm" name="action" value="bulk_activate" class="action-btn-ok"
+          data-confirm-modal data-confirm-title="ปลดระงับสมาชิกที่เลือก"
+          data-confirm-msg="เปิดใช้งานสมาชิกที่เลือกทั้งหมด (เฉพาะรายการที่ถูกระงับอยู่จะถูกเปิดใช้งาน)?"
+          data-confirm-icon="bi-check-circle" data-confirm-color="#059669"
+          data-confirm-btn="ปลดระงับ" data-confirm-btn-cls="btn-success">
+    <i class="bi bi-check-circle me-1"></i>ปลดระงับ
+  </button>
+  <div style="display:flex;align-items:center;gap:6px">
+    <select form="bulkForm" name="bulk_group_id" class="form-select form-select-sm" style="font-size:12px;min-width:150px">
+      <option value="">— ไม่มีกลุ่ม —</option>
+      <?php foreach ($allGroups as $g): ?>
+        <option value="<?= (int) $g['id'] ?>"><?= e($g['name']) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <button type="submit" form="bulkForm" name="action" value="bulk_assign_group" class="action-btn-blue"
+            data-confirm-modal data-confirm-title="ปรับเปลี่ยนกลุ่มสมาชิกที่เลือก"
+            data-confirm-msg="ปรับกลุ่มของสมาชิกที่เลือกทั้งหมดเป็นกลุ่มที่ระบุ?"
+            data-confirm-icon="bi-diagram-3" data-confirm-color="#2563EB"
+            data-confirm-btn="ย้ายกลุ่ม" data-confirm-btn-cls="btn-primary">
+      <i class="bi bi-diagram-3 me-1"></i>ย้ายกลุ่ม
+    </button>
+  </div>
+  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearBulkSelection()" style="margin-left:auto;font-size:12px">
+    <i class="bi bi-x-lg me-1"></i>ยกเลิกการเลือก
+  </button>
+</div>
+
 <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
   <div class="card-body" style="padding:0;overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>
         <tr style="background:var(--bs-secondary-bg);border-top:1px solid var(--bs-border-color);border-bottom:2px solid var(--bs-border-color)">
+          <th style="padding:12px 10px;text-align:center;border-right:1px solid var(--bs-border-color);width:36px">
+            <input type="checkbox" id="bulkSelectAll" class="form-check-input" onchange="toggleAllBulk(this)" title="เลือกทั้งหมดในหน้านี้">
+          </th>
           <?= sort_th('สมาชิก',       'name') ?>
           <?= sort_th('รหัส / สาขา',  'student_id') ?>
           <?= sort_th('สถานะ',        'status') ?>
@@ -239,6 +306,9 @@ require __DIR__ . '/../includes/header.php';
       <tbody>
         <?php foreach ($data['rows'] as $m): ?>
           <tr style="border-bottom:1px solid var(--bs-border-color)">
+            <td style="padding:12px 10px;text-align:center">
+              <input type="checkbox" class="bulk-check form-check-input" form="bulkForm" name="ids[]" value="<?= (int) $m['id'] ?>" onchange="updateBulkBar()">
+            </td>
             <td style="padding:12px 16px">
               <div style="display:flex;align-items:center;gap:10px">
                 <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#EFF6FF,#DBEAFE);display:flex;align-items:center;justify-content:center;font-weight:700;color:#2563EB;font-size:14px;flex-shrink:0"><?= e($m['initial']) ?></div>
@@ -302,7 +372,7 @@ require __DIR__ . '/../includes/header.php';
           </tr>
         <?php endforeach; ?>
         <?php if (!$data['rows']): ?>
-          <tr><td colspan="7" style="padding:32px;text-align:center;color:var(--bs-tertiary-color)">ไม่พบสมาชิกที่ตรงกับเงื่อนไข</td></tr>
+          <tr><td colspan="8" style="padding:32px;text-align:center;color:var(--bs-tertiary-color)">ไม่พบสมาชิกที่ตรงกับเงื่อนไข</td></tr>
         <?php endif; ?>
       </tbody>
     </table>
@@ -630,4 +700,34 @@ require __DIR__ . '/../includes/header.php';
   });
 </script>
 <?php endif; ?>
+<script>
+(function () {
+  function boxes() { return document.querySelectorAll('.bulk-check'); }
+  function checked() { return document.querySelectorAll('.bulk-check:checked'); }
+  function updateBulkBar() {
+    var n = checked().length;
+    var all = boxes();
+    var bar = document.getElementById('bulkBar');
+    var countEl = document.getElementById('bulkCount');
+    if (bar) bar.style.display = n > 0 ? 'flex' : 'none';
+    if (countEl) countEl.textContent = 'เลือกแล้ว ' + n + ' คน (เฉพาะหน้านี้)';
+    var selectAll = document.getElementById('bulkSelectAll');
+    if (selectAll) {
+      selectAll.checked = all.length > 0 && n === all.length;
+      selectAll.indeterminate = n > 0 && n < all.length;
+    }
+  }
+  function toggleAllBulk(cb) {
+    boxes().forEach(function (c) { c.checked = cb.checked; });
+    updateBulkBar();
+  }
+  function clearBulkSelection() {
+    boxes().forEach(function (c) { c.checked = false; });
+    updateBulkBar();
+  }
+  window.updateBulkBar = updateBulkBar;
+  window.toggleAllBulk = toggleAllBulk;
+  window.clearBulkSelection = clearBulkSelection;
+})();
+</script>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
