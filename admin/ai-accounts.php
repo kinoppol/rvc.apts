@@ -91,6 +91,7 @@ function provider_options(array $providers, int $selectedId = 0): string
 }
 
 $reminderOpts = ['none' => 'ปิดการแจ้งเตือน', 'daily' => 'ทุกวัน', 'weekly' => 'ทุกสัปดาห์', 'monthly' => 'ทุกเดือน'];
+$expiredCount = count(array_filter($accounts, fn ($ac) => $ac['isExpired']));
 
 $activeNav = 'ai-accounts';
 require __DIR__ . '/../includes/header.php';
@@ -117,10 +118,109 @@ require __DIR__ . '/../includes/header.php';
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">
+<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+  <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--bs-secondary-color);cursor:pointer;margin:0">
+    <input type="checkbox" id="aiPoolShowExpired" class="form-check-input" style="margin:0" onchange="aiPoolApplyFilter()">
+    แสดงบัญชีที่หมดอายุ<?php if ($expiredCount > 0): ?> <span style="color:var(--bs-tertiary-color)">(<?= $expiredCount ?>)</span><?php endif; ?>
+  </label>
+  <div id="aiPoolViewToggle" style="display:inline-flex;border:1px solid var(--bs-border-color);border-radius:8px;overflow:hidden">
+    <button type="button" data-ai-view="list" class="ai-pool-view-btn" style="border:none;background:transparent;padding:6px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="aiPoolSetView('list')"><i class="bi bi-list-ul"></i>รายการ</button>
+    <button type="button" data-ai-view="card" class="ai-pool-view-btn" style="border:none;background:transparent;padding:6px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;border-left:1px solid var(--bs-border-color)" onclick="aiPoolSetView('card')"><i class="bi bi-grid-3x3-gap"></i>การ์ด</button>
+  </div>
+</div>
+
+<!-- List view -->
+<div id="aiPoolListView" class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);display:none">
+  <div class="card-body" style="padding:0;overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:var(--bs-secondary-bg);border-bottom:2px solid var(--bs-border-color)">
+          <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">บัญชี AI</th>
+          <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">ประเภท</th>
+          <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">บัญชีเข้าสู่ระบบ</th>
+          <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">สถานะ</th>
+          <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">ใช้วันนี้</th>
+          <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">หมดอายุ</th>
+          <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">ต้นทุน</th>
+          <th style="padding:12px 14px;text-align:center;font-weight:600;color:var(--bs-secondary-color)">การดำเนินการ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($accounts as $ac): ?>
+          <?php $expiresInput = !empty($ac['expires_at']) ? date('Y-m-d\TH:i', strtotime($ac['expires_at'])) : ''; ?>
+          <tr class="ai-pool-row" data-expired="<?= $ac['isExpired'] ? '1' : '0' ?>" style="border-bottom:1px solid var(--bs-border-color)<?= $ac['isExpired'] ? ';opacity:.7' : '' ?>">
+            <td style="padding:10px 14px">
+              <div style="display:flex;align-items:center;gap:9px">
+                <?php if (!empty($ac['avatar_emoji'])): ?>
+                  <div class="stat-icon" style="background:var(--bs-secondary-bg);width:30px;height:30px;font-size:16px;border:1px solid var(--bs-border-color);flex-shrink:0"><?= e($ac['avatar_emoji']) ?></div>
+                <?php else: ?>
+                  <div class="stat-icon" style="background:#EFF6FF;width:30px;height:30px;flex-shrink:0"><i class="bi bi-robot" style="color:#2563EB;font-size:13px"></i></div>
+                <?php endif; ?>
+                <span style="font-weight:600"><?= e($ac['name']) ?></span>
+              </div>
+            </td>
+            <td style="padding:10px 14px;color:var(--bs-secondary-color)"><?= e($ac['provider']) ?></td>
+            <td style="padding:10px 14px">
+              <div style="font-size:11px;color:var(--bs-secondary-color);word-break:break-all"><?= e($ac['email'] ?: '—') ?></div>
+              <?php if (!empty($ac['account_password'])): ?>
+                <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
+                  <input type="password" class="pw-field" value="<?= e($ac['account_password']) ?>" readonly
+                         style="border:none;background:transparent;padding:0;font-size:11px;color:var(--bs-body-color);font-family:monospace;width:90px">
+                  <button type="button" class="pw-toggle" title="แสดง/ซ่อนรหัสผ่าน" style="border:none;background:none;cursor:pointer;color:var(--bs-secondary-color);padding:0"><i class="bi bi-eye"></i></button>
+                </div>
+              <?php endif; ?>
+            </td>
+            <td style="padding:10px 14px"><span class="<?= $ac['statusCls'] ?>"><?= e($ac['statusLabel']) ?></span></td>
+            <td style="padding:10px 14px;white-space:nowrap"><?= (int) $ac['usedToday'] ?>/<?= (int) $ac['totalSlots'] ?> slots</td>
+            <td style="padding:10px 14px;white-space:nowrap;<?= $ac['expiryWarn'] ? 'color:#DC2626;font-weight:600' : '' ?>"><?= e($ac['expiresLabel']) ?></td>
+            <td style="padding:10px 14px;white-space:nowrap;color:var(--bs-secondary-color)">
+              <?php
+                $parts = [];
+                if ($ac['monthly_cost'] !== null) $parts[] = '฿' . number_format((float) $ac['monthly_cost'], 2) . '/ด.';
+                if ($ac['cost_per_slot'] !== null) $parts[] = '฿' . number_format((float) $ac['cost_per_slot'], 2) . '/slot';
+                echo $parts ? implode(' · ', $parts) : '—';
+              ?>
+            </td>
+            <td style="padding:10px 14px">
+              <div style="display:flex;gap:5px;justify-content:center">
+                <button type="button" class="action-btn-blue"
+                        data-edit-account
+                        data-id="<?= (int) $ac['id'] ?>"
+                        data-name="<?= e($ac['name']) ?>"
+                        data-provider-id="<?= (int) ($ac['provider_id'] ?? 0) ?>"
+                        data-email="<?= e($ac['email'] ?? '') ?>"
+                        data-password="<?= e($ac['account_password'] ?? '') ?>"
+                        data-status="<?= e($ac['status']) ?>"
+                        data-expires="<?= e($expiresInput) ?>"
+                        data-reminder="<?= e($ac['password_reminder']) ?>"
+                        data-monthly-cost="<?= $ac['monthly_cost'] !== null ? (float) $ac['monthly_cost'] : '' ?>"
+                        data-cost-per-slot="<?= $ac['cost_per_slot'] !== null ? (float) $ac['cost_per_slot'] : '' ?>"
+                        data-capacity="<?= (int) ($ac['capacity'] ?? 1) ?>"
+                        data-avatar="<?= e($ac['avatar_emoji'] ?? '') ?>"
+                        data-available-days="<?= e($ac['available_days'] ?? '1111111') ?>"><i class="bi bi-pencil"></i></button>
+                <form method="post" style="margin:0" onsubmit="return confirm('ลบบัญชี AI นี้?')">
+                  <?= Csrf::field() ?>
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="id" value="<?= (int) $ac['id'] ?>">
+                  <button type="submit" class="action-btn-err"><i class="bi bi-trash"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        <?php if (!$accounts): ?>
+          <tr><td colspan="8" style="padding:32px;text-align:center;color:var(--bs-tertiary-color)">ยังไม่มีบัญชี AI ในระบบ</td></tr>
+        <?php endif; ?>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Card view -->
+<div id="aiPoolCardView" style="display:none;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">
   <?php foreach ($accounts as $ac): ?>
     <?php $expiresInput = !empty($ac['expires_at']) ? date('Y-m-d\TH:i', strtotime($ac['expires_at'])) : ''; ?>
-    <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)<?= $ac['isExpired'] ? ';opacity:.85' : '' ?>">
+    <div class="card ai-pool-row" data-expired="<?= $ac['isExpired'] ? '1' : '0' ?>" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)<?= $ac['isExpired'] ? ';opacity:.85' : '' ?>">
       <div class="card-body" style="padding:18px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div style="display:flex;align-items:center;gap:10px">
@@ -454,4 +554,41 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
     </div>
   </div>
 </div>
+<script>
+(function () {
+  var listBtn = document.querySelector('.ai-pool-view-btn[data-ai-view="list"]');
+  var cardBtn = document.querySelector('.ai-pool-view-btn[data-ai-view="card"]');
+  function markActive(view) {
+    [listBtn, cardBtn].forEach(function (btn) {
+      if (!btn) return;
+      var active = btn.dataset.aiView === view;
+      btn.style.background = active ? '#2563EB' : 'transparent';
+      btn.style.color = active ? 'white' : 'var(--bs-secondary-color)';
+      btn.style.fontWeight = active ? '600' : '400';
+    });
+  }
+  function setView(view) {
+    view = view === 'card' ? 'card' : 'list';
+    var listEl = document.getElementById('aiPoolListView');
+    var cardEl = document.getElementById('aiPoolCardView');
+    if (listEl) listEl.style.display = view === 'list' ? 'block' : 'none';
+    if (cardEl) cardEl.style.display = view === 'card' ? 'grid' : 'none';
+    markActive(view);
+    localStorage.setItem('aiPoolView', view);
+  }
+  function applyFilter() {
+    var showExpired = document.getElementById('aiPoolShowExpired').checked;
+    document.querySelectorAll('.ai-pool-row').forEach(function (el) {
+      el.style.display = (el.dataset.expired === '1' && !showExpired) ? 'none' : '';
+    });
+    localStorage.setItem('aiPoolShowExpired', showExpired ? '1' : '0');
+  }
+  window.aiPoolSetView = setView;
+  window.aiPoolApplyFilter = applyFilter;
+
+  setView(localStorage.getItem('aiPoolView') || 'list');
+  document.getElementById('aiPoolShowExpired').checked = localStorage.getItem('aiPoolShowExpired') === '1';
+  applyFilter();
+})();
+</script>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
