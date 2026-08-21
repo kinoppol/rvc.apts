@@ -96,6 +96,7 @@ CREATE TABLE slot_settings (
     weekly_quota      TINYINT UNSIGNED NOT NULL DEFAULT 3,
     max_advance_days  SMALLINT UNSIGNED NOT NULL DEFAULT 14,
     day_start_time    TIME NOT NULL DEFAULT '08:00:00',
+    allow_current_slot TINYINT(1) NOT NULL DEFAULT 0,              -- 1 = students may still book the slot that is in progress right now
     terms_file        VARCHAR(255) NULL DEFAULT NULL,              -- filename of the active terms-of-service PDF (NULL = no terms required)
     institution_name  VARCHAR(200) NOT NULL DEFAULT 'วิทยาลัย RVC', -- shown on the login/landing pages; admin-editable
     CONSTRAINT chk_slot_settings_singleton CHECK (id = 1)

@@ -68,7 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         (int) ($_POST['slots_per_day'] ?? 0),
         (int) ($_POST['weekly_quota'] ?? 0),
         (int) ($_POST['max_advance_days'] ?? 0),
-        (string) ($_POST['day_start_time'] ?? '')
+        (string) ($_POST['day_start_time'] ?? ''),
+        !empty($_POST['allow_current_slot'])
     );
     flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกการตั้งค่าเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
     header('Location: ' . url('admin/slots.php'));
@@ -91,6 +92,13 @@ require __DIR__ . '/../includes/header.php';
       <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">โควต้า/สัปดาห์/คน</label><input name="weekly_quota" class="form-control" value="<?= (int) $settings['weekly_quota'] ?>" type="number" min="1" required style="font-size:13px"></div>
       <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">จองล่วงหน้าสูงสุด (วัน)</label><input name="max_advance_days" class="form-control" value="<?= (int) $settings['max_advance_days'] ?>" type="number" min="1" required style="font-size:13px"></div>
       <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">เวลาเริ่มต้นของวัน</label><input name="day_start_time" class="form-control" value="<?= e(substr($settings['day_start_time'], 0, 5)) ?>" type="time" required style="font-size:13px"></div>
+    </div>
+    <div style="border:1px solid var(--bs-border-color);border-radius:8px;padding:12px 14px;margin-top:16px;max-width:600px;display:flex;gap:10px;align-items:flex-start">
+      <input type="checkbox" name="allow_current_slot" id="allow_current_slot" value="1" class="form-check-input" style="margin:2px 0 0" <?= !empty($settings['allow_current_slot']) ? 'checked' : '' ?>>
+      <label for="allow_current_slot" style="cursor:pointer">
+        <span style="font-size:13px;font-weight:600;color:var(--bs-body-color);display:block">เปิดให้จอง Slot ของเวลาปัจจุบัน</span>
+        <span style="font-size:11px;color:var(--bs-secondary-color)">เมื่อเปิด นักศึกษาจะจองช่วงเวลาที่กำลังดำเนินอยู่ได้ (ถ้า Pool ยังไม่เต็ม) และเช็คอินได้ทันทีภายใน 15 นาทีหลังจอง · เมื่อปิด ช่วงเวลาปัจจุบันจะแสดงเป็น “ปิด” เหมือนเดิม</span>
+      </label>
     </div>
     <div style="background:#FFF7ED;border-radius:8px;padding:10px 14px;margin-top:16px;font-size:12px;color:#92400E;display:flex;gap:8px;align-items:flex-start;max-width:600px">
       <i class="bi bi-info-circle-fill" style="margin-top:1px;flex-shrink:0"></i>

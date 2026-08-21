@@ -138,11 +138,19 @@ toast UI.
   `(ai_account_id, booking_date, slot_uniq_guard)` where `slot_uniq_guard` is a **virtual column** that
   resolves to `NULL` for cancelled or checked-out rows — MariaDB skips NULLs in unique keys, which is
   what lets a released slot be re-booked. Don't "restore" the old `uniq_account_slot` index.
-- **Check-in / check-out.** `Booking::checkIn()` opens 15 minutes before the slot; `checkOut()` releases
-  the pool early (sets `checked_out_at`, which excludes the row from every occupancy and
-  `max_concurrent` count). `Booking::earlyAccessForUser()` surfaces a booking whose *previous* slot is
-  effectively empty (previous holder never checked in, or already checked out) so the student can start
-  ahead of time.
+- **Check-in / check-out.** `Booking::checkIn()` opens 15 minutes before the slot — measured from
+  `GREATEST(start_datetime, created_at)`, so a booking made *during* its own live slot (see the
+  `allow_current_slot` switch below) still gets a 15-minute check-in window instead of being instantly
+  a no-show. `checkOut()` releases the pool early (sets `checked_out_at`, which excludes the row from
+  every occupancy and `max_concurrent` count).
+- **Early access is capacity-limited, not all-or-nothing.** `Booking::earlyAccessForUser()` (and the
+  matching `'early'` status in `getWeekGrid`, and the re-check inside `checkIn()`) grant a student an
+  early start while the pool still has a free seat during the *previous* slot:
+  `(previous-slot holders still effectively using it — checked in, or inside their own 15-min no-show
+  grace) + (peers of the student's own slot who already started early)` must be **below the pool's
+  `capacity`**. So a `capacity`-N pool hosts up to N early users at once, exactly as it hosts N in a
+  normal slot; at `capacity` 1 this reduces to the old "previous slot must be empty" rule. All three
+  call sites implement the same count — keep them in sync.
 - **AI-account type is an FK to `ai_providers`** (admin-managed via the "จัดการประเภท" modal on
   `ai-accounts.php`). `ai_accounts.provider` is a denormalized copy of the type name kept in sync by
   `AiProvider::rename()`; reads prefer `COALESCE(p.name, a.provider)`. The shared login password
@@ -163,6 +171,11 @@ toast UI.
   Thai too and are shown verbatim as toasts.
 - Slot count/labels/times are computed in PHP from `slot_settings` (`SlotSettings::slotLabel/slotStart/
   slotEnd`, incl. the admin-editable `day_start_time`) — not a fixed table.
+- **The slot that is running right now is closed unless an admin opens it.**
+  `slot_settings.allow_current_slot` (checkbox on `admin/slots.php`, read via
+  `SlotSettings::allowsCurrentSlot()`) defaults to 0 = the live slot renders `off` in `getWeekGrid` and
+  `create()` rejects it. When on, the live slot stays bookable until 15 minutes before it ends (there
+  must be time left to check in). Past slots are always closed either way.
 - **Slots use a 30-hour "business-day" clock.** A slot may run past midnight; `SlotSettings::slotStart/
   slotEnd` emit `24:00`–`30:00` (e.g. `25:00` = 1 AM the next calendar day) rather than wrapping, and
   `update()` caps `day_start + slot_hours×slots_per_day` at 30:00. `bookings.booking_date` stays the

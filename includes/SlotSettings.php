@@ -2,15 +2,22 @@
 
 final class SlotSettings
 {
-    /** @return array{id:int,slot_hours:int,slots_per_day:int,weekly_quota:int,max_advance_days:int,day_start_time:string} */
+    /** @return array{id:int,slot_hours:int,slots_per_day:int,weekly_quota:int,max_advance_days:int,day_start_time:string,allow_current_slot:int} */
     public static function get(): array
     {
         $stmt = Database::pdo()->query('SELECT * FROM slot_settings WHERE id = 1');
         return $stmt->fetch();
     }
 
+    /** True when admins have opened booking for the slot that is currently in progress. */
+    public static function allowsCurrentSlot(?array $settings = null): bool
+    {
+        $settings ??= self::get();
+        return !empty($settings['allow_current_slot']);
+    }
+
     /** @return array{ok:bool,error?:string} */
-    public static function update(int $slotHours, int $slotsPerDay, int $weeklyQuota, int $maxAdvanceDays, string $dayStartTime): array
+    public static function update(int $slotHours, int $slotsPerDay, int $weeklyQuota, int $maxAdvanceDays, string $dayStartTime, bool $allowCurrentSlot = false): array
     {
         if ($slotHours < 1 || $slotsPerDay < 1 || $weeklyQuota < 1 || $maxAdvanceDays < 1) {
             return ['ok' => false, 'error' => 'ค่าที่กรอกต้องเป็นจำนวนเต็มบวก'];
@@ -26,9 +33,9 @@ final class SlotSettings
         }
 
         $stmt = Database::pdo()->prepare(
-            'UPDATE slot_settings SET slot_hours = ?, slots_per_day = ?, weekly_quota = ?, max_advance_days = ?, day_start_time = ? WHERE id = 1'
+            'UPDATE slot_settings SET slot_hours = ?, slots_per_day = ?, weekly_quota = ?, max_advance_days = ?, day_start_time = ?, allow_current_slot = ? WHERE id = 1'
         );
-        $stmt->execute([$slotHours, $slotsPerDay, $weeklyQuota, $maxAdvanceDays, $m[1] . ':' . $m[2] . ':00']);
+        $stmt->execute([$slotHours, $slotsPerDay, $weeklyQuota, $maxAdvanceDays, $m[1] . ':' . $m[2] . ':00', $allowCurrentSlot ? 1 : 0]);
 
         return ['ok' => true];
     }

@@ -65,6 +65,8 @@ final class Booking
         $today = new DateTimeImmutable('today');
         $now = new DateTimeImmutable();
         $maxDate = $today->modify('+' . $settings['max_advance_days'] . ' days');
+        // Admin switch: when on, the slot that is running right now stays bookable.
+        $allowLive = SlotSettings::allowsCurrentSlot($settings);
 
         // Week's upcoming bookings in one query -> map[date][slot][accountId][] = {uid,ci,co,sd}
         // Multiple rows per account are now possible when capacity > 1.
@@ -142,23 +144,30 @@ final class Booking
                     } elseif ($occupancy >= $capacity) {
                         // At capacity — pool is fully booked for this slot.
                         $status = ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax || $isDayClosed) ? 'off' : 'busy';
-                    } elseif ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax || $isLiveNow || $isDayClosed) {
+                    } elseif ($ac['status'] === 'maintenance' || $isExpired || $isPast || $beyondMax || ($isLiveNow && !$allowLive) || $isDayClosed) {
                         $status = 'off';
                     } else {
                         $status = 'available';
                     }
 
-                    // Early access: my slot can start early if the prev slot on this pool is
-                    // effectively empty — all non-checked-out bookings are no-shows (grace expired).
+                    // Early access: my slot can start early while the pool still has a free seat during
+                    // the previous slot — i.e. (prev-slot holders still effectively using it) plus
+                    // (peers of my own slot who already started early) is below the pool's capacity.
+                    // With capacity > 1 that lets as many people start early as the pool can host.
                     if ($status === 'mine' && $i > 0 && $now < $slotStart) {
                         $prevRows  = $booked[$dateStr][$i - 1][$aid] ?? [];
                         $prevStart = $slotStart->modify('-' . (int) $settings['slot_hours'] . ' hours');
                         $inNoShowWindow = $now >= $prevStart->modify('+15 minutes');
                         // Active prev bookings: not checked out.
                         $prevActive = array_filter($prevRows, fn ($r) => empty($r['co']));
-                        // "Effectively occupied" if any active booking is either checked-in or still in grace period.
-                        $prevOccupied = !empty(array_filter($prevActive, fn ($r) => !empty($r['ci']) || !$inNoShowWindow));
-                        if (!$prevOccupied) {
+                        // "Effectively occupied" if the booking is either checked-in or still in grace period.
+                        $prevInUse = count(array_filter($prevActive, fn ($r) => !empty($r['ci']) || !$inNoShowWindow));
+                        // Others from my own slot who already checked in early are using the pool right now.
+                        $earlyPeers = count(array_filter(
+                            $bkRows,
+                            fn ($r) => $r['uid'] !== $userId && empty($r['co']) && !empty($r['ci'])
+                        ));
+                        if ($prevInUse + $earlyPeers < $capacity) {
                             $status = 'early';
                         }
                     }
@@ -411,7 +420,14 @@ final class Booking
 
         $slotStart = $date->setTime(...array_map('intval', explode(':', SlotSettings::slotStart($settings, $slotIndex))));
         $slotEnd = $date->setTime(...array_map('intval', explode(':', SlotSettings::slotEnd($settings, $slotIndex))));
-        if ($slotStart <= new DateTimeImmutable()) {
+        $nowTs = new DateTimeImmutable();
+        if (SlotSettings::allowsCurrentSlot($settings)) {
+            // Admin opened the live slot: bookable until it ends, but leave enough time to check in
+            // (check-in closes 15 minutes after booking) and actually use the pool.
+            if ($slotEnd <= $nowTs->modify('+15 minutes')) {
+                return ['ok' => false, 'error' => 'ช่วงเวลานี้ใกล้สิ้นสุดแล้ว ไม่สามารถจองได้'];
+            }
+        } elseif ($slotStart <= $nowTs) {
             return ['ok' => false, 'error' => 'ไม่สามารถจองช่วงเวลาที่ผ่านไปแล้วหรือกำลังเริ่มได้'];
         }
 
@@ -878,8 +894,11 @@ final class Booking
     }
 
     /**
-     * Bookings eligible for early access: the previous slot on the same AI account is effectively
-     * empty — either no one booked it, or a booking exists but the 15-min no-show grace expired.
+     * Bookings eligible for early access: the AI account still has a free seat during the previous
+     * slot. Seats in use = previous-slot holders that are effectively occupying it (checked in, or
+     * still inside their 15-min no-show grace) + peers of this booking's own slot who already
+     * started early. While that total is below the pool's capacity the booking can start early, so
+     * a shared pool hosts as many early users as it hosts in a normal slot.
      * Returns rows augmented with dateLabel, slotLabel, hasCheckedIn, and AI credentials.
      */
     public static function earlyAccessForUser(int $userId): array
@@ -897,18 +916,26 @@ final class Booking
               AND b.start_datetime > NOW()
               AND b.slot_index > 0
               AND DATE_SUB(b.start_datetime, INTERVAL ? HOUR) <= DATE_SUB(NOW(), INTERVAL 15 MINUTE)
-              AND NOT EXISTS (
-                  SELECT 1 FROM bookings prev
-                  WHERE prev.ai_account_id = b.ai_account_id
-                    AND prev.booking_date = b.booking_date
-                    AND prev.slot_index = b.slot_index - 1
-                    AND prev.status = 'upcoming'
-                    AND prev.checked_out_at IS NULL
-                    AND (
-                        prev.checked_in_at IS NOT NULL
-                        OR NOW() < DATE_ADD(prev.start_datetime, INTERVAL 15 MINUTE)
-                    )
-              )
+              AND (
+                    (SELECT COUNT(*) FROM bookings prev
+                      WHERE prev.ai_account_id = b.ai_account_id
+                        AND prev.booking_date = b.booking_date
+                        AND prev.slot_index = b.slot_index - 1
+                        AND prev.status = 'upcoming'
+                        AND prev.checked_out_at IS NULL
+                        AND (
+                            prev.checked_in_at IS NOT NULL
+                            OR NOW() < DATE_ADD(prev.start_datetime, INTERVAL 15 MINUTE)
+                        ))
+                  + (SELECT COUNT(*) FROM bookings cur
+                      WHERE cur.ai_account_id = b.ai_account_id
+                        AND cur.booking_date = b.booking_date
+                        AND cur.slot_index = b.slot_index
+                        AND cur.id <> b.id
+                        AND cur.status = 'upcoming'
+                        AND cur.checked_out_at IS NULL
+                        AND cur.checked_in_at IS NOT NULL)
+                  ) < GREATEST(a.capacity, 1)
             ORDER BY b.start_datetime
         ");
         $stmt->execute([$userId, $slotHours]);
@@ -943,28 +970,48 @@ final class Booking
         $now = new DateTimeImmutable();
         $start = new DateTimeImmutable($booking['start_datetime']);
         $end = new DateTimeImmutable($booking['end_datetime']);
+        // A booking made while its own slot was already running (admin's "book the live slot" switch)
+        // gets its 15-minute check-in window measured from the moment it was booked, not from the
+        // slot start it already missed.
+        $created = new DateTimeImmutable($booking['created_at']);
+        $anchor = $created > $start ? $created : $start;
 
         if ($now >= $end) return ['ok' => false, 'error' => 'ช่วงเวลาสิ้นสุดแล้ว'];
-        if ($now >= $start->modify('+15 minutes')) {
+        if ($now >= $anchor->modify('+15 minutes')) {
             return ['ok' => false, 'error' => 'เลยกำหนดเช็คอิน 15 นาทีแล้ว ช่วงเวลาถือว่าว่าง'];
         }
 
-        $normalWindowOpen = $now >= $start->modify('-15 minutes');
+        $normalWindowOpen = $now >= $anchor->modify('-15 minutes');
         $earlyAccess = false;
 
         if (!$normalWindowOpen && (int) $booking['slot_index'] > 0) {
             $slotHours = (int) SlotSettings::get()['slot_hours'];
             $prevStart = $start->modify('-' . $slotHours . ' hours');
             if ($now >= $prevStart->modify('+15 minutes')) {
-                // Prev slot is "effectively occupied" if: has check-in OR still in grace period
+                // Seats in use during the previous slot: prev-slot holders that are effectively
+                // occupying it (checked in, or still inside their own 15-min grace) plus peers of
+                // this booking's own slot who already started early. Early access is granted while
+                // that total is below the pool's capacity, so a shared pool can host several
+                // early users at once — as many as it can hold in a normal slot.
                 $chk = Database::pdo()->prepare(
-                    "SELECT COUNT(*) FROM bookings
-                     WHERE ai_account_id = ? AND booking_date = ? AND slot_index = ? AND status = 'upcoming'
-                       AND checked_out_at IS NULL
-                       AND (checked_in_at IS NOT NULL OR NOW() < DATE_ADD(start_datetime, INTERVAL 15 MINUTE))"
+                    "SELECT (SELECT COUNT(*) FROM bookings prev
+                             WHERE prev.ai_account_id = a.id AND prev.booking_date = ? AND prev.slot_index = ?
+                               AND prev.status = 'upcoming' AND prev.checked_out_at IS NULL
+                               AND (prev.checked_in_at IS NOT NULL OR NOW() < DATE_ADD(prev.start_datetime, INTERVAL 15 MINUTE)))
+                          + (SELECT COUNT(*) FROM bookings cur
+                             WHERE cur.ai_account_id = a.id AND cur.booking_date = ? AND cur.slot_index = ?
+                               AND cur.id <> ? AND cur.status = 'upcoming'
+                               AND cur.checked_out_at IS NULL AND cur.checked_in_at IS NOT NULL) AS in_use,
+                            GREATEST(a.capacity, 1) AS capacity
+                     FROM ai_accounts a WHERE a.id = ?"
                 );
-                $chk->execute([$booking['ai_account_id'], $booking['booking_date'], (int) $booking['slot_index'] - 1]);
-                if ((int) $chk->fetchColumn() === 0) {
+                $chk->execute([
+                    $booking['booking_date'], (int) $booking['slot_index'] - 1,
+                    $booking['booking_date'], (int) $booking['slot_index'], $bookingId,
+                    $booking['ai_account_id'],
+                ]);
+                $seat = $chk->fetch();
+                if ($seat && (int) $seat['in_use'] < (int) $seat['capacity']) {
                     $earlyAccess = true;
                 }
             }
