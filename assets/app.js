@@ -647,6 +647,55 @@
     }
   };
 
+  // ── Chart.js init hook for admin/ai-accounts.php: remaining usage limit per pool ──
+  // items: [{ label, remaining, tone, atLabel }] — one horizontal bar per AI account.
+  window.initPoolLimitChart = function (canvasId, items) {
+    var canvas = document.getElementById(canvasId);
+    if (!canvas || !window.Chart || !items || !items.length) return;
+    var tones = { ok: "#16A34A", warn: "#F59E0B", crit: "#DC2626" };
+    var render = function () {
+      var isDark = root.getAttribute("data-bs-theme") === "dark";
+      var gc = isDark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)";
+      var tc = isDark ? "#94A3B8" : "#64748B";
+      if (canvas._chart) canvas._chart.destroy();
+      canvas._chart = new Chart(canvas, {
+        type: "bar",
+        data: {
+          labels: items.map(function (it) { return it.label; }),
+          datasets: [{
+            label: "คงเหลือ (%)",
+            data: items.map(function (it) { return it.remaining; }),
+            backgroundColor: items.map(function (it) { return tones[it.tone] || tones.ok; }),
+            borderRadius: 4,
+            barThickness: 18,
+          }],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function (ctx) { return "คงเหลือ " + ctx.parsed.x + "% (ใช้ไป " + (100 - ctx.parsed.x) + "%)"; },
+                afterLabel: function (ctx) {
+                  var it = items[ctx.dataIndex];
+                  return it && it.atLabel ? "อัปเดตล่าสุด " + it.atLabel : "";
+                },
+              },
+            },
+          },
+          scales: {
+            x: { grid: { color: gc }, ticks: { color: tc, callback: function (v) { return v + "%"; } }, min: 0, max: 100 },
+            y: { grid: { display: false }, ticks: { color: tc, font: { size: 12 } } },
+          },
+        },
+      });
+    };
+    render();
+    window.addEventListener("app:theme-changed", render);
+  };
+
   // ── Chart.js init hook for admin/dashboard.php ──
   window.initUsageChart = function (canvasId, labels, datasets) {
     var canvas = document.getElementById(canvasId);

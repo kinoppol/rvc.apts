@@ -103,6 +103,50 @@ final class AiAccount
         return $accounts;
     }
 
+    /**
+     * Latest reported "usage limit" reading for every pool, derived at read time from usage
+     * reports — a report carries token_end_pct (% of the account's usage limit consumed when the
+     * session ended), so the newest reading is the best estimate of what is left right now.
+     * Nothing is stored: no balance column, no cron, same rule as expiry above.
+     *
+     * @return array<int,array{used:int,remaining:int,at:string,atLabel:string,resetLabel:?string,tone:string}>
+     *         keyed by ai_account_id; pools that were never reported on are simply absent.
+     */
+    public static function usageLimitReadings(): array
+    {
+        // Ascending, so a newer row overwrites an older one for the same pool.
+        $rows = Database::pdo()->query(
+            "SELECT ai_account_id, token_end_pct, end_datetime, token_reset_at
+             FROM bookings
+             WHERE token_end_pct IS NOT NULL AND status <> 'cancelled'
+             ORDER BY end_datetime ASC, id ASC"
+        )->fetchAll();
+
+        $out = [];
+        foreach ($rows as $r) {
+            $id = (int) $r['ai_account_id'];
+            $used = max(0, min(100, (int) $r['token_end_pct']));
+
+            // A shared (capacity > 1) pool can produce two readings for the same slot —
+            // keep the pessimistic one rather than whichever row happens to sort last.
+            if (isset($out[$id]) && $out[$id]['at'] === $r['end_datetime'] && $out[$id]['used'] > $used) {
+                continue;
+            }
+
+            $remaining = 100 - $used;
+            $out[$id] = [
+                'used'        => $used,
+                'remaining'   => $remaining,
+                'at'          => (string) $r['end_datetime'],
+                'atLabel'     => self::thaiDateTime($r['end_datetime']),
+                'resetLabel'  => !empty($r['token_reset_at']) ? self::thaiDateTime($r['token_reset_at']) : null,
+                'tone'        => $remaining <= 20 ? 'crit' : ($remaining <= 50 ? 'warn' : 'ok'),
+            ];
+        }
+
+        return $out;
+    }
+
     public static function find(int $id): ?array
     {
         $stmt = Database::pdo()->prepare('SELECT * FROM ai_accounts WHERE id = ?');

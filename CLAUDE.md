@@ -85,7 +85,9 @@ toast UI.
 - `migration.php` — standalone *web* migration runner, same standalone-of-bootstrap rationale as
   `install.php`. `admin/migrations.php` is the in-app equivalent for logged-in admins.
 - `student/{dashboard,booking,my-bookings,profile}.php` — used by **both** students and teachers.
-- `admin/{dashboard,members,groups,slots,ai-accounts,majors,bookings,calendar,reports,migrations,profile}.php`.
+- `admin/{dashboard,members,groups,slots,ai-accounts,majors,bookings,calendar,reports,migrations,settings,profile}.php`
+  (`settings.php` is the small system-settings page — currently just the institution name shown on the
+  login/landing screens, stored on the single `slot_settings` row).
   `calendar.php` is the read-only admin twin of the student booking grid: `Booking::adminWeekGrid()`
   builds a week of all pools (not group-scoped, nothing bookable) and each cell embeds its bookings as
   JSON in `data-detail`, which `initAdminCalendar` in `assets/app.js` renders into a modal — no AJAX.
@@ -120,6 +122,12 @@ toast UI.
     "ปิดใช้งาน (หมดอายุ)" badge and every availability query filters
     `(expires_at IS NULL OR expires_at > NOW())`. Days-remaining and password-reminder due dates are
     derived the same way.
+  - Pool usage limit: `AiAccount::usageLimitReadings()` recomputes each pool's remaining usage-limit
+    % from the newest non-cancelled booking whose report carried `token_end_pct`. No balance column;
+    `admin/ai-accounts.php` charts the result via `initPoolLimitChart` in `assets/app.js`.
+  - Notifications: there is **no notifications table**. `Notification::forUser()` re-derives the whole
+    bell list on every request from bookings / pending members / LMS attempts, branching to
+    `forAdmin()` vs `forStudent()`. Add a new alert by adding a query there, not by inserting rows.
   - Report-overdue suspension: `Booking::isRestricted($userId)` (any completed booking unreported past
     `Booking::REPORT_DEADLINE_DAYS` = 7) blocks new bookings — no stored "suspended" flag.
 - **Booking is per-pool, gated by group access, and capacity-limited.** A group's members may only book
@@ -151,6 +159,11 @@ toast UI.
   `capacity`**. So a `capacity`-N pool hosts up to N early users at once, exactly as it hosts N in a
   normal slot; at `capacity` 1 this reduces to the old "previous slot must be empty" rule. All three
   call sites implement the same count — keep them in sync.
+- **A pool also has a weekday mask and cost fields.** `ai_accounts.available_days` is a 7-char
+  `1`/`0` string, **Monday-first** (`AiAccount::isDayAllowed($account, $isoWeekday)`,
+  `packDays()`/`daysSummary()`); a `0` day makes the pool unbookable that weekday just like an expiry
+  does, so any new availability query must honor it. `monthly_cost` / `cost_per_slot` are optional and
+  feed `Report::costRows()` on `admin/reports.php` — they are reporting-only and never gate booking.
 - **AI-account type is an FK to `ai_providers`** (admin-managed via the "จัดการประเภท" modal on
   `ai-accounts.php`). `ai_accounts.provider` is a denormalized copy of the type name kept in sync by
   `AiProvider::rename()`; reads prefer `COALESCE(p.name, a.provider)`. The shared login password
