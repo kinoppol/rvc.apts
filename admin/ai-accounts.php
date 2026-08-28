@@ -93,30 +93,6 @@ function provider_options(array $providers, int $selectedId = 0): string
 $reminderOpts = ['none' => 'ปิดการแจ้งเตือน', 'daily' => 'ทุกวัน', 'weekly' => 'ทุกสัปดาห์', 'monthly' => 'ทุกเดือน'];
 $expiredCount = count(array_filter($accounts, fn ($ac) => $ac['isExpired']));
 
-// ── Usage-limit chart: remaining % per active pool, from each pool's newest reported reading ──
-$limitReadings = AiAccount::usageLimitReadings();
-$limitChart = [];
-$limitUnknown = [];
-foreach ($accounts as $ac) {
-    if ($ac['isExpired']) {
-        continue;
-    }
-    $label = trim(($ac['avatar_emoji'] ?? '') . ' ' . $ac['name']);
-    $reading = $limitReadings[(int) $ac['id']] ?? null;
-    if ($reading === null) {
-        $limitUnknown[] = $label;
-        continue;
-    }
-    $limitChart[] = [
-        'label'     => $label,
-        'remaining' => $reading['remaining'],
-        'tone'      => $reading['tone'],
-        'atLabel'   => $reading['atLabel'],
-    ];
-}
-// Most depleted first — that is the row an admin needs to act on.
-usort($limitChart, fn ($a, $b) => $a['remaining'] <=> $b['remaining']);
-
 $activeNav = 'ai-accounts';
 require __DIR__ . '/../includes/header.php';
 ?>
@@ -141,32 +117,6 @@ require __DIR__ . '/../includes/header.php';
     <button type="button" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px" data-bs-toggle="modal" data-bs-target="#addAccountModal"><i class="bi bi-plus-lg me-1"></i>เพิ่มบัญชี AI</button>
   </div>
 </div>
-
-<?php if ($limitChart || $limitUnknown): ?>
-<div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);margin-bottom:16px">
-  <div class="card-body" style="padding:18px 20px">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">
-      <h6 style="font-weight:700;margin:0"><i class="bi bi-battery-half me-1" style="color:#2563EB"></i>Usage Limit คงเหลือของแต่ละบัญชี</h6>
-      <div style="display:flex;align-items:center;gap:12px;font-size:11px;color:var(--bs-secondary-color);flex-wrap:wrap">
-        <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#16A34A;margin-right:5px"></span>เหลือมาก (มากกว่า 50%)</span>
-        <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#F59E0B;margin-right:5px"></span>เหลือน้อย (21–50%)</span>
-        <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#DC2626;margin-right:5px"></span>ใกล้หมด (ไม่เกิน 20%)</span>
-      </div>
-    </div>
-    <div style="font-size:11px;color:var(--bs-tertiary-color);margin-bottom:12px">คำนวณจาก % การใช้งานที่ผู้ใช้รายงานไว้ล่าสุดของแต่ละบัญชี (ไม่รวมบัญชีที่หมดอายุ)</div>
-    <?php if ($limitChart): ?>
-    <div style="height:<?= max(150, count($limitChart) * 34 + 44) ?>px">
-      <canvas id="poolLimitChart"></canvas>
-    </div>
-    <?php else: ?>
-    <div style="font-size:13px;color:var(--bs-secondary-color);padding:6px 0">ยังไม่มีรายงานการใช้งานที่ระบุ % Usage Limit</div>
-    <?php endif; ?>
-    <?php if ($limitUnknown): ?>
-    <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:12px"><i class="bi bi-info-circle me-1"></i>ยังไม่มีข้อมูลรายงาน: <?= e(implode(', ', $limitUnknown)) ?></div>
-    <?php endif; ?>
-  </div>
-</div>
-<?php endif; ?>
 
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
   <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--bs-secondary-color);cursor:pointer;margin:0">
@@ -641,13 +591,4 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
   applyFilter();
 })();
 </script>
-<?php if ($limitChart): ?>
-<script>
-  window.addEventListener('DOMContentLoaded', function () {
-    if (window.initPoolLimitChart) {
-      window.initPoolLimitChart('poolLimitChart', <?= json_encode($limitChart, JSON_UNESCAPED_UNICODE) ?>);
-    }
-  });
-</script>
-<?php endif; ?>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

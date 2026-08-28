@@ -122,9 +122,6 @@ toast UI.
     "ปิดใช้งาน (หมดอายุ)" badge and every availability query filters
     `(expires_at IS NULL OR expires_at > NOW())`. Days-remaining and password-reminder due dates are
     derived the same way.
-  - Pool usage limit: `AiAccount::usageLimitReadings()` recomputes each pool's remaining usage-limit
-    % from the newest non-cancelled booking whose report carried `token_end_pct`. No balance column;
-    `admin/ai-accounts.php` charts the result via `initPoolLimitChart` in `assets/app.js`.
   - Notifications: there is **no notifications table**. `Notification::forUser()` re-derives the whole
     bell list on every request from bookings / pending members / LMS attempts, branching to
     `forAdmin()` vs `forStudent()`. Add a new alert by adding a query there, not by inserting rows.
