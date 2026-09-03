@@ -56,6 +56,7 @@ CREATE TABLE users (
 CREATE TABLE ai_providers (
     id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name       VARCHAR(100) NOT NULL UNIQUE,
+    login_url  VARCHAR(255) NULL,                    -- provider's own login page, offered as a button on the credential card
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -642,7 +642,7 @@ final class Booking
     {
         $stmt = Database::pdo()->prepare(
             'SELECT b.*, a.name AS ai_name, a.email AS ai_email, a.account_password,
-                    COALESCE(p.name, a.provider) AS ai_provider
+                    COALESCE(p.name, a.provider) AS ai_provider, p.login_url AS ai_login_url
              FROM bookings b
              JOIN ai_accounts a ON a.id = b.ai_account_id
              LEFT JOIN ai_providers p ON p.id = a.provider_id
@@ -907,9 +907,11 @@ final class Booking
         $stmt = Database::pdo()->prepare("
             SELECT b.id, b.ai_account_id, b.booking_date, b.slot_index,
                    b.start_datetime, b.end_datetime, b.purpose, b.checked_in_at,
-                   a.name AS ai_name, a.email AS ai_email, a.account_password
+                   a.name AS ai_name, a.email AS ai_email, a.account_password,
+                   COALESCE(p.name, a.provider) AS ai_provider, p.login_url AS ai_login_url
             FROM bookings b
             JOIN ai_accounts a ON a.id = b.ai_account_id
+            LEFT JOIN ai_providers p ON p.id = a.provider_id
             WHERE b.user_id = ?
               AND b.status = 'upcoming'
               AND b.end_datetime > NOW()

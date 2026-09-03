@@ -48,6 +48,7 @@ require __DIR__ . '/../includes/header.php';
       <button type="button" title="คัดลอกรหัสผ่าน" style="background:none;border:1px solid var(--bs-border-color);border-radius:4px;padding:2px 6px;cursor:pointer;color:var(--bs-secondary-color);font-size:12px;line-height:1"
         onclick="copyText(this,<?= e(json_encode($ea['account_password'], JSON_UNESCAPED_UNICODE)) ?>)"><i class="bi bi-clipboard"></i></button>
     </div>
+    <?= AiProvider::loginButton($ea['ai_login_url'] ?? null, $ea['ai_provider'] ?? null) ?>
   </div>
   <?php else: ?>
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -161,6 +162,7 @@ require __DIR__ . '/../includes/header.php';
               <button type="button" title="คัดลอกรหัสผ่าน" style="background:none;border:1px solid var(--bs-border-color);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--bs-secondary-color);font-size:11px;line-height:1"
                 onclick="copyText(this,<?= e(json_encode($next['account_password'], JSON_UNESCAPED_UNICODE)) ?>)"><i class="bi bi-clipboard"></i></button>
             </span>
+            <?= AiProvider::loginButton($next['ai_login_url'] ?? null, $next['ai_provider'] ?? null, true) ?>
           </div>
           <?php elseif ($next['displayStatus'] === 'checked_in'): ?>
           <div style="margin-top:10px;padding:8px 12px;background:#F0FDF4;border-radius:8px;font-size:12px;color:#059669;display:flex;align-items:center;gap:6px;border:1px solid #BBF7D0">

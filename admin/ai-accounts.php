@@ -62,10 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $r = AiAccount::bulkResetPasswords($_POST['passwords'] ?? []);
         flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? "รีเซ็ตรหัสผ่านทั้งหมด {$r['count']} บัญชีเรียบร้อยแล้ว" : ($r['error'] ?? 'รีเซ็ตไม่สำเร็จ'));
     } elseif ($action === 'type_add') {
-        $r = AiProvider::add($_POST['type_name'] ?? '');
+        $r = AiProvider::add($_POST['type_name'] ?? '', $_POST['type_login_url'] ?? '');
         flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? 'เพิ่มประเภทเรียบร้อยแล้ว' : ($r['error'] ?? 'เพิ่มประเภทไม่สำเร็จ'));
     } elseif ($action === 'type_rename') {
-        $r = AiProvider::rename((int) ($_POST['type_id'] ?? 0), $_POST['type_name'] ?? '');
+        $r = AiProvider::rename((int) ($_POST['type_id'] ?? 0), $_POST['type_name'] ?? '', $_POST['type_login_url'] ?? '');
         flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? 'แก้ไขประเภทเรียบร้อยแล้ว' : ($r['error'] ?? 'แก้ไขไม่สำเร็จ'));
     } elseif ($action === 'type_delete') {
         $r = AiProvider::delete((int) ($_POST['type_id'] ?? 0));
@@ -466,32 +466,51 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
       <div class="modal-body" style="padding:20px">
         <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
           <?php foreach ($typeRows as $t): ?>
-            <div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--bs-border-color);border-radius:8px">
-              <form method="post" style="display:flex;gap:6px;flex:1;margin:0">
-                <?= Csrf::field() ?>
-                <input type="hidden" name="action" value="type_rename">
-                <input type="hidden" name="type_id" value="<?= (int) $t['id'] ?>">
-                <input name="type_name" value="<?= e($t['name']) ?>" class="form-control form-control-sm" style="font-size:13px">
-                <button type="submit" class="btn btn-sm btn-outline-primary" style="font-size:12px;white-space:nowrap" title="บันทึกชื่อ"><i class="bi bi-check-lg"></i></button>
-              </form>
-              <span style="font-size:11px;color:var(--bs-tertiary-color);white-space:nowrap"><?= (int) $t['usage'] ?> บัญชี</span>
-              <form method="post" style="margin:0" onsubmit="return confirm('ลบประเภทนี้?')">
-                <?= Csrf::field() ?>
-                <input type="hidden" name="action" value="type_delete">
-                <input type="hidden" name="type_id" value="<?= (int) $t['id'] ?>">
-                <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:12px" <?= $t['usage'] > 0 ? 'disabled title="มีบัญชีใช้อยู่ ลบไม่ได้"' : '' ?>><i class="bi bi-trash"></i></button>
-              </form>
+            <div style="padding:10px;border:1px solid var(--bs-border-color);border-radius:8px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <form method="post" style="display:flex;gap:6px;flex:1;margin:0;flex-wrap:wrap">
+                  <?= Csrf::field() ?>
+                  <input type="hidden" name="action" value="type_rename">
+                  <input type="hidden" name="type_id" value="<?= (int) $t['id'] ?>">
+                  <div style="display:flex;gap:6px;width:100%">
+                    <input name="type_name" value="<?= e($t['name']) ?>" class="form-control form-control-sm" style="font-size:13px" title="ชื่อประเภท">
+                    <button type="submit" class="btn btn-sm btn-outline-primary" style="font-size:12px;white-space:nowrap" title="บันทึก"><i class="bi bi-check-lg"></i></button>
+                  </div>
+                  <div class="input-group input-group-sm" style="width:100%;margin-top:6px">
+                    <span class="input-group-text" style="font-size:11px"><i class="bi bi-box-arrow-up-right"></i></span>
+                    <input name="type_login_url" type="url" value="<?= e((string) ($t['login_url'] ?? '')) ?>"
+                           class="form-control form-control-sm" style="font-size:12px"
+                           placeholder="ลิงก์หน้าล็อกอิน เช่น https://claude.ai/login" title="ลิงก์หน้าล็อกอินของผู้ให้บริการ">
+                  </div>
+                </form>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+                  <span style="font-size:11px;color:var(--bs-tertiary-color);white-space:nowrap"><?= (int) $t['usage'] ?> บัญชี</span>
+                  <form method="post" style="margin:0" onsubmit="return confirm('ลบประเภทนี้?')">
+                    <?= Csrf::field() ?>
+                    <input type="hidden" name="action" value="type_delete">
+                    <input type="hidden" name="type_id" value="<?= (int) $t['id'] ?>">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:12px" <?= $t['usage'] > 0 ? 'disabled title="มีบัญชีใช้อยู่ ลบไม่ได้"' : '' ?>><i class="bi bi-trash"></i></button>
+                  </form>
+                </div>
+              </div>
             </div>
           <?php endforeach; ?>
           <?php if (!$typeRows): ?>
             <div style="text-align:center;color:var(--bs-tertiary-color);font-size:13px;padding:12px">ยังไม่มีประเภท</div>
           <?php endif; ?>
+          <div style="font-size:11px;color:var(--bs-tertiary-color);line-height:1.7">
+            <i class="bi bi-info-circle me-1"></i>ลิงก์หน้าล็อกอินจะแสดงเป็นปุ่มบนการ์ดข้อมูลบัญชีของผู้เรียนหลังเช็คอิน — เว้นว่างไว้หากไม่ต้องการให้มีปุ่ม
+          </div>
         </div>
-        <form method="post" style="display:flex;gap:8px;border-top:1px solid var(--bs-border-color);padding-top:16px">
+        <form method="post" style="border-top:1px solid var(--bs-border-color);padding-top:16px">
           <?= Csrf::field() ?>
           <input type="hidden" name="action" value="type_add">
-          <input name="type_name" required class="form-control" placeholder="เพิ่มประเภทใหม่ เช่น Google Gemini Advanced" style="font-size:13px">
-          <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px;white-space:nowrap"><i class="bi bi-plus-lg me-1"></i>เพิ่ม</button>
+          <div style="display:flex;gap:8px">
+            <input name="type_name" required class="form-control" placeholder="เพิ่มประเภทใหม่ เช่น Google Gemini Advanced" style="font-size:13px">
+            <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px;white-space:nowrap"><i class="bi bi-plus-lg me-1"></i>เพิ่ม</button>
+          </div>
+          <input name="type_login_url" type="url" class="form-control" style="font-size:12px;margin-top:8px"
+                 placeholder="ลิงก์หน้าล็อกอิน (ไม่บังคับ) เช่น https://chatgpt.com/">
         </form>
       </div>
     </div>

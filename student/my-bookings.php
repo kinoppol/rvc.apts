@@ -78,6 +78,7 @@ require __DIR__ . '/../includes/header.php';
       <button type="button" title="คัดลอกรหัสผ่าน" style="background:none;border:1px solid var(--bs-border-color);border-radius:4px;padding:2px 6px;cursor:pointer;color:var(--bs-secondary-color);font-size:12px;line-height:1"
         onclick="copyText(this,<?= e(json_encode($ea['account_password'], JSON_UNESCAPED_UNICODE)) ?>)"><i class="bi bi-clipboard"></i></button>
     </div>
+    <?= AiProvider::loginButton($ea['ai_login_url'] ?? null, $ea['ai_provider'] ?? null) ?>
   </div>
   <?php else: ?>
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">

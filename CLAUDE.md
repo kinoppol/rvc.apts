@@ -169,6 +169,13 @@ toast UI.
   client-side (`generateSecurePassword()` in `assets/app.js` — one guaranteed char per class, avoiding
   ambiguous glyphs like `0/O`, `1/l/I`); saving posts to `AiAccount::updatePassword()`, which resets
   `password_updated_at` (the reminder clock) without touching any other field.
+  `ai_providers.login_url` (optional, admin-set in the same modal) is the provider's own sign-in page;
+  `AiProvider::loginButton()` renders it as a button on the three student credential cards
+  (dashboard early-access, dashboard next-booking, `my-bookings` early-access) and returns `''` when
+  it is unset. It is a view helper in the spirit of `Csrf::field()`, deliberately holding the markup
+  and the `http(s)`-only allow-list together — the value lands in an `href` on a student page, so it
+  is re-validated at render time and a row edited straight in the DB still cannot inject `javascript:`.
+  Booking rows carry it as `ai_login_url` from `listForUser()` / `earlyAccessForUser()`.
 - **Portable URLs:** never hardcode paths. `url('student/booking.php')` prefixes the computed
   `APP_BASE`. That computation is deliberately intricate — production serves the app through a symlink
   (`/var/www/web` → `/var/www/rvc.apts`), which `SCRIPT_FILENAME` preserves but `realpath()`/`__DIR__`

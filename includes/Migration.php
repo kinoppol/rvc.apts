@@ -33,6 +33,7 @@ final class Migration
         'migrate_ai_account_available_days.sql',
         'migrate_lms.sql',
         'migrate_current_slot_booking.sql',
+        'migrate_provider_login_url.sql',
     ];
 
     /** Create the tracking table if it doesn't exist yet. */
