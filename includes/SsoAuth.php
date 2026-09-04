@@ -48,6 +48,14 @@ final class SsoAuth
         if ($tokenId === '' || $tokenKey === '') {
             return ['ok' => false, 'error' => 'ไม่พบโทเคนจากระบบ ONE-RVC'];
         }
+        if (!function_exists('curl_init')) {
+            // Fails clean instead of a fatal "Call to undefined function curl_init()"
+            // (a plain PHP \Error, not a Throwable subclass caught anywhere useful) —
+            // the server's PHP build is missing ext-curl. Requires a server-side fix
+            // (install/enable php-curl and restart the web server); nothing here can
+            // work around a missing extension.
+            return ['ok' => false, 'error' => 'เซิร์ฟเวอร์ไม่พร้อมใช้งานการยืนยันตัวตนผ่าน ONE-RVC (ไม่มีส่วนขยาย PHP curl) กรุณาติดต่อผู้ดูแลระบบ'];
+        }
 
         $ch = curl_init(ONE_RVC_VERIFY_URL);
         $opts = [
