@@ -139,7 +139,12 @@ try {
     exit;
 } catch (Throwable $e) {
     sso_log_failure('POST', $e);
-    flash_set('err', 'เกิดข้อผิดพลาดขณะเข้าสู่ระบบผ่าน ONE-RVC กรุณาลองใหม่อีกครั้ง หรือติดต่อผู้ดูแลระบบหากยังไม่สำเร็จ');
+    // Short, generic diagnostic tag appended so the failure is self-diagnosable from the
+    // screen alone when nobody has access to the server's error log yet — this is only
+    // the bare exception class name (e.g. "PDOException"), never $e->getMessage(), which
+    // could echo column/table names or other schema detail back to the browser.
+    $diagTag = basename(str_replace('\\', '/', get_class($e)));
+    flash_set('err', 'เกิดข้อผิดพลาดขณะเข้าสู่ระบบผ่าน ONE-RVC กรุณาลองใหม่อีกครั้ง หรือติดต่อผู้ดูแลระบบหากยังไม่สำเร็จ (อ้างอิง: ' . $diagTag . ')');
     header('Location: ' . url(($linkUserId ?? null) !== null ? sso_profile_path(current_user()) : 'login.php'));
     exit;
 }
