@@ -95,15 +95,14 @@ try {
 
     $result = SsoAuth::verifyToken($tokenId, $tokenKey);
     if (!$result['ok']) {
-        // $result['error'] is always one of SsoAuth::verifyToken()'s own generic Thai
-        // messages (network failure / invalid-or-expired token / ONE-RVC's own reason
-        // string) — never token data — so it's safe to both log and surface here;
-        // logging it is what actually lets us tell "gateway unreachable" apart from
-        // "token rejected" apart from "malformed response" without guessing blind.
+        // Logged (never shown — this endpoint is reachable by anyone completing an SSO
+        // round trip, not just an authenticated admin) so a real failure still leaves a
+        // trail distinguishing "gateway unreachable" from "token rejected" from
+        // "malformed response" without needing to guess blind again.
         error_log('[SsoAuth callback] verify failed: ' . ($result['error'] ?? '(no reason)'));
         http_response_code(401);
         header('Content-Type: text/plain; charset=utf-8');
-        exit('SSO token verification failed: ' . ($result['error'] ?? 'unknown reason'));
+        exit('SSO token verification failed.');
     }
     $ssoUser = $result['user'];
 
@@ -145,16 +144,12 @@ try {
     exit;
 } catch (Throwable $e) {
     sso_log_failure('POST', $e);
-    // Temporary, wider diagnostic tag (class + message + file:line, still never
-    // $tokenId/$tokenKey/$ssoUser) so the failure is self-diagnosable from the screen
-    // while nobody has server error-log access — the bare class name alone ("Error")
-    // wasn't enough to tell apart e.g. "call to a member function on null" from
-    // "call to undefined method". Only reachable by whoever completes the SSO round
-    // trip (the linking flow is admin/logged-in-user-only; login-mode is reachable by
-    // anyone, so tighten this back to class-name-only once the real cause is found).
-    $diagTag = basename(str_replace('\\', '/', get_class($e))) . ': ' . $e->getMessage()
-        . ' @ ' . basename($e->getFile()) . ':' . $e->getLine();
-    flash_set('err', 'เกิดข้อผิดพลาดขณะเข้าสู่ระบบผ่าน ONE-RVC กรุณาลองใหม่อีกครั้ง หรือติดต่อผู้ดูแลระบบหากยังไม่สำเร็จ (อ้างอิง: ' . $diagTag . ')');
+    // The wider on-screen diagnostic (class + message + file:line) that lived here
+    // during debugging is gone now that it did its job (found the missing ext-curl on
+    // production) — login-mode reaches this same branch and is open to anyone, so back
+    // to a generic message; sso_log_failure() above still has the exact class/message/
+    // file:line for whoever has server log access if this ever needs revisiting.
+    flash_set('err', 'เกิดข้อผิดพลาดขณะเข้าสู่ระบบผ่าน ONE-RVC กรุณาลองใหม่อีกครั้ง หรือติดต่อผู้ดูแลระบบหากยังไม่สำเร็จ');
     header('Location: ' . url(($linkUserId ?? null) !== null ? sso_profile_path(current_user()) : 'login.php'));
     exit;
 }
