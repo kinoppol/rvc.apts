@@ -54,6 +54,25 @@ final class SlotSettings
         return ['ok' => true];
     }
 
+    /** Admin-configured private-IP override for the ONE-RVC verify-token call, or null if unset. */
+    public static function getSsoVerifyIp(): ?string
+    {
+        $row = Database::pdo()->query('SELECT sso_verify_ip FROM slot_settings WHERE id = 1')->fetch();
+        return ($row && $row['sso_verify_ip'] !== null && $row['sso_verify_ip'] !== '') ? $row['sso_verify_ip'] : null;
+    }
+
+    /** @return array{ok:bool,error?:string} */
+    public static function updateSsoVerifyIp(string $ip): array
+    {
+        $ip = trim($ip);
+        if ($ip !== '' && filter_var($ip, FILTER_VALIDATE_IP) === false) {
+            return ['ok' => false, 'error' => 'รูปแบบ IP ไม่ถูกต้อง'];
+        }
+        Database::pdo()->prepare('UPDATE slot_settings SET sso_verify_ip = ? WHERE id = 1')
+            ->execute([$ip !== '' ? $ip : null]);
+        return ['ok' => true];
+    }
+
     public static function getTermsFile(): ?string
     {
         $row = Database::pdo()->query('SELECT terms_file FROM slot_settings WHERE id = 1')->fetch();

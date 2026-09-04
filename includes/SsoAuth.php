@@ -50,14 +50,32 @@ final class SsoAuth
         }
 
         $ch = curl_init(ONE_RVC_VERIFY_URL);
-        curl_setopt_array($ch, [
+        $opts = [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => http_build_query(['token_id' => $tokenId, 'token_key' => $tokenKey]),
             CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => self::HTTP_TIMEOUT,
             CURLOPT_CONNECTTIMEOUT => self::CONNECT_TIMEOUT,
-        ]);
+        ];
+        // Production's app server and the SSO gateway share an internal bridge network
+        // where the public hostname doesn't resolve/route server-side (only a visitor's
+        // own browser reaches it, for the auth-redirect step) — CURLOPT_RESOLVE pins
+        // just the TCP connect to a private IP while leaving the URL and Host header
+        // untouched, so name-based virtual hosting on the gateway still routes
+        // correctly. Admin-configurable (admin/settings.php -> SlotSettings), since this
+        // is production network topology, not something to hardcode or redeploy for.
+        // ONE_RVC_VERIFY_IP (config.local.php) is a fallback for when nobody has set it
+        // in the UI yet.
+        $verifyIp = SlotSettings::getSsoVerifyIp() ?? (ONE_RVC_VERIFY_IP !== '' ? ONE_RVC_VERIFY_IP : null);
+        if ($verifyIp !== null) {
+            $host = parse_url(ONE_RVC_VERIFY_URL, PHP_URL_HOST) ?: '';
+            $port = parse_url(ONE_RVC_VERIFY_URL, PHP_URL_PORT) ?: (parse_url(ONE_RVC_VERIFY_URL, PHP_URL_SCHEME) === 'https' ? 443 : 80);
+            if ($host !== '') {
+                $opts[CURLOPT_RESOLVE] = ["{$host}:{$port}:" . $verifyIp];
+            }
+        }
+        curl_setopt_array($ch, $opts);
         $body  = curl_exec($ch);
         $errno = curl_errno($ch);
         curl_close($ch);

@@ -27,4 +27,15 @@ define('ONE_RVC_VERIFY_URL',   $_localCfg['one_rvc_verify_url']   ?? 'http://wor
 define('ONE_RVC_CLIENT_ID',    $_localCfg['one_rvc_client_id']    ?? 'apts');
 define('ONE_RVC_REDIRECT_URI', $_localCfg['one_rvc_redirect_uri'] ?? 'https://apts.rvc.ac.th/web/api/callback.php');
 
+// Optional: pin the *server-to-server* verify-token call to a private IP instead of
+// resolving ONE_RVC_VERIFY_URL's hostname. This app's production box and the SSO
+// gateway sit on the same internal bridge network, where the public
+// workspace.rvc.ac.th domain is not reachable from server-side code (only from a
+// visitor's own browser, which is what actually resolves it for the auth-redirect
+// step). This is purely environment-specific network topology, so it has no
+// hardcoded default here — set it in production's config.local.php
+// ('one_rvc_verify_ip' => '192.168.10.121'). Leave unset for local dev, where no
+// such override is needed (or possible to test against).
+define('ONE_RVC_VERIFY_IP', $_localCfg['one_rvc_verify_ip'] ?? '');
+
 unset($_localCfg);
