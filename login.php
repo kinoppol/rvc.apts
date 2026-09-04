@@ -7,6 +7,19 @@ if (current_user()) {
 }
 
 $error = null;
+$notice = null;
+
+// api/callback.php redirects failures/successes here via flash — this guest shell has
+// no toast system (that's authenticated-only, see includes/footer.php), so fold the
+// flash into the same inline alerts the password form already uses.
+$ssoFlash = flash_get();
+if ($ssoFlash) {
+    if ($ssoFlash['type'] === 'err') {
+        $error = $ssoFlash['msg'];
+    } else {
+        $notice = $ssoFlash['msg'];
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
@@ -34,6 +47,16 @@ require __DIR__ . '/includes/guest-header.php';
   <?php if ($error): ?>
     <div class="alert alert-danger" style="font-size:13px"><?= e($error) ?></div>
   <?php endif; ?>
+  <?php if ($notice): ?>
+    <div class="alert alert-success" style="font-size:13px"><?= e($notice) ?></div>
+  <?php endif; ?>
+
+  <a href="<?= url('sso-login.php') ?>" class="btn w-100" style="background:#0F172A;color:#fff;font-weight:600;padding:11px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none">
+    <i class="bi bi-shield-lock"></i>ลงชื่อเข้าใช้ผ่านระบบ ONE-RVC
+  </a>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <hr style="flex:1;margin:0;border-color:var(--bs-border-color)"><span style="font-size:12px;color:var(--bs-secondary-color)">หรือ</span><hr style="flex:1;margin:0;border-color:var(--bs-border-color)">
+  </div>
 
   <form method="post">
     <?= Csrf::field() ?>

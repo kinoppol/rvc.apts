@@ -16,4 +16,15 @@ define('DB_CHARSET', 'utf8mb4');
 // Needed when Apache/Nginx serves the app via an Alias or symlink that doesn't match __DIR__.
 define('APP_BASE_OVERRIDE', $_localCfg['app_base'] ?? '');
 
+// ONE-RVC single sign-on (the college's external SSO gateway). These four values are
+// fixed by ONE-RVC's own client registration for this app (client_id "apts" and the
+// exact redirect_uri it was registered with) — kept in one place per the house rule of
+// never hardcoding an endpoint in more than one file. config.local.php can still
+// override them (e.g. a genuinely different deployment), but there is normally no
+// reason to: unlike DB_*, these are not environment-specific dev/prod values.
+define('ONE_RVC_AUTH_URL',     $_localCfg['one_rvc_auth_url']     ?? 'http://workspace.rvc.ac.th/oa/index.php');
+define('ONE_RVC_VERIFY_URL',   $_localCfg['one_rvc_verify_url']   ?? 'http://workspace.rvc.ac.th/oa/api/verify_token.php');
+define('ONE_RVC_CLIENT_ID',    $_localCfg['one_rvc_client_id']    ?? 'apts');
+define('ONE_RVC_REDIRECT_URI', $_localCfg['one_rvc_redirect_uri'] ?? 'https://apts.rvc.ac.th/web/api/callback.php');
+
 unset($_localCfg);

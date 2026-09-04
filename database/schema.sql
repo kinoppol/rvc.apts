@@ -45,11 +45,14 @@ CREATE TABLE users (
     major_id      INT UNSIGNED NULL,
     subject_id    INT UNSIGNED NULL,
     password_hash VARCHAR(255) NOT NULL,
+    sso_user_id   VARCHAR(64) NULL,                    -- ONE-RVC user.id once linked (NULL = not linked)
+    sso_linked_at DATETIME NULL,                        -- when the ONE-RVC link was established
     status        ENUM('pending','approved','suspended') NOT NULL DEFAULT 'pending',
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_users_group   FOREIGN KEY (group_id)   REFERENCES user_groups(id) ON DELETE SET NULL,
     CONSTRAINT fk_users_major   FOREIGN KEY (major_id)   REFERENCES majors(id)      ON DELETE SET NULL,
-    CONSTRAINT fk_users_subject FOREIGN KEY (subject_id) REFERENCES subjects(id)    ON DELETE SET NULL
+    CONSTRAINT fk_users_subject FOREIGN KEY (subject_id) REFERENCES subjects(id)    ON DELETE SET NULL,
+    UNIQUE KEY uniq_users_sso_user_id (sso_user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Admin-managed list of AI account types (Claude Pro, ChatGPT Plus, ...).

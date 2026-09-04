@@ -3,12 +3,35 @@ declare(strict_types=1);
 
 date_default_timezone_set('Asia/Bangkok');
 
+// ONE-RVC's callback is the user's own browser doing a top-level cross-site POST
+// (an auto-submitted form on workspace.rvc.ac.th, action=our callback URL) back to
+// api/callback.php. Browsers only attach a SameSite=Lax cookie (PHP's default) to a
+// cross-site *GET* navigation, never a POST — so without this, our session cookie
+// (and the CSRF-equivalent `state` value stored in it) would silently not arrive at
+// the callback in production, and every SSO login would fail state validation.
+// SameSite=None requires Secure, hence the HTTPS check; local HTTP dev falls back to
+// the normal Lax default (a real round trip to the external gateway can't be tested
+// from localhost anyway, since ONE-RVC only ever redirects back to the registered
+// production redirect_uri).
+$__isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || (($_SERVER['SERVER_PORT'] ?? '') === '443')
+    || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'secure'   => $__isHttps,
+    'httponly' => true,
+    'samesite' => $__isHttps ? 'None' : 'Lax',
+]);
+unset($__isHttps);
+
 session_start();
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/Database.php';
 require_once __DIR__ . '/includes/Csrf.php';
 require_once __DIR__ . '/includes/Auth.php';
+require_once __DIR__ . '/includes/SsoAuth.php';
 require_once __DIR__ . '/includes/SlotSettings.php';
 require_once __DIR__ . '/includes/Booking.php';
 require_once __DIR__ . '/includes/Member.php';

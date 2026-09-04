@@ -11,6 +11,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'password') {
         $result = Auth::changePassword($user['id'], $_POST['current'] ?? '', $_POST['new'] ?? '', $_POST['new_confirm'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว' : ($result['error'] ?? 'เปลี่ยนรหัสผ่านไม่สำเร็จ'));
+    } elseif ($action === 'sso_unlink') {
+        SsoAuth::unlink($user['id']);
+        flash_set('ok', 'ยกเลิกการผูกบัญชี ONE-RVC เรียบร้อยแล้ว');
     }
     header('Location: ' . url('admin/profile.php'));
     exit;
@@ -42,6 +45,34 @@ require __DIR__ . '/../includes/header.php';
         <div><label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">เบอร์โทร</label><input name="phone" class="form-control" value="<?= e($user['phone'] ?? '') ?>" placeholder="08X-XXX-XXXX" style="font-size:13px"></div>
         <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px">บันทึกข้อมูล</button>
       </form>
+    </div>
+  </div>
+  <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+    <div class="card-body" style="padding:20px">
+      <h6 style="font-weight:700;margin:0 0 14px">บัญชี ONE-RVC</h6>
+      <?php if (!empty($user['sso_user_id'])): ?>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span class="badge-ok"><i class="bi bi-shield-check me-1"></i>ผูกบัญชีแล้ว</span>
+        </div>
+        <p style="font-size:12.5px;color:var(--bs-secondary-color);margin:0 0 14px">
+          <?php if (!empty($user['sso_linked_at'])): ?>
+            ผูกบัญชีเมื่อ <?= e(Booking::thaiDate(new DateTimeImmutable((string) $user['sso_linked_at']))) ?> —
+          <?php endif; ?>
+          คุณเข้าสู่ระบบผ่าน ONE-RVC ได้แล้ว โดยยังใช้อีเมล/รหัสผ่านเดิมได้ตามปกติ
+        </p>
+        <form method="post" onsubmit="return confirm('ยกเลิกการผูกบัญชีกับ ONE-RVC ใช่หรือไม่? คุณยังเข้าสู่ระบบด้วยอีเมล/รหัสผ่านได้ตามปกติ')">
+          <?= Csrf::field() ?>
+          <input type="hidden" name="action" value="sso_unlink">
+          <button type="submit" class="btn btn-outline-danger" style="font-size:13px"><i class="bi bi-link-45deg me-1"></i>ยกเลิกการผูกบัญชี</button>
+        </form>
+      <?php else: ?>
+        <p style="font-size:12.5px;color:var(--bs-secondary-color);margin:0 0 14px">
+          ผูกบัญชีของคุณกับ ONE-RVC เพื่อเข้าสู่ระบบด้วยบัญชีเดียวกับระบบอื่นของวิทยาลัยได้ในครั้งถัดไป
+        </p>
+        <a href="<?= url('sso-login.php') ?>?link=1" class="btn" style="background:#0F172A;color:#fff;font-size:13px;text-decoration:none">
+          <i class="bi bi-shield-lock me-1"></i>ผูกบัญชีกับ ONE-RVC
+        </a>
+      <?php endif; ?>
     </div>
   </div>
   <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">

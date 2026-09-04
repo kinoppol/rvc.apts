@@ -76,6 +76,7 @@ toast UI.
   defines the global helpers `current_user()`, `require_login()`, `require_role()`, `flash_set()` /
   `flash_get()`, `url()`, `asset()`, `is_impersonating()`, and `e()` (htmlspecialchars).
 - `index.php`, `login.php`, `register.php`, `logout.php` — auth entry / role redirect.
+- `sso-login.php`, `api/callback.php` — ONE-RVC single sign-on (see "### ONE-RVC SSO" below).
 - `install.php` — standalone web installer (imports `schema.sql` + `seed.sql`, with a guarded
   drop-and-reinstall; can also write `config.local.php`). Deliberately does **not** use `bootstrap.php`
   (which selects the not-yet-created DB); it reads only `config.php` and runs each `.sql` file on its
@@ -93,8 +94,9 @@ toast UI.
   JSON in `data-detail`, which `initAdminCalendar` in `assets/app.js` renders into a modal — no AJAX.
 - `student/lms*.php`, `admin/lms*.php` — the LMS subsystem (see "### The LMS subsystem" below).
 - `includes/` — domain classes (all `static`-method, PDO-backed): `Database` (PDO singleton), `Auth`,
-  `Booking`, `Member`, `UserGroup`, `AiProvider`, `AiAccount`, `SlotSettings`, `Major`, `Subject`,
-  `Report`, `Notification`, `Migration`, `Csrf`, plus the `Lms*` classes documented below; plus the
+  `SsoAuth` (ONE-RVC SSO, see below), `Booking`, `Member`, `UserGroup`, `AiProvider`, `AiAccount`,
+  `SlotSettings`, `Major`, `Subject`, `Report`, `Notification`, `Migration`, `Csrf`, plus the `Lms*`
+  classes documented below; plus the
   shared view partials `header.php` / `footer.php` (authenticated shell) and `guest-header.php` /
   `guest-footer.php` (login/register shell).
 - `uploads/` — student-uploaded usage-report and issue files (image/PDF). Git-ignored except `.gitkeep`.
@@ -218,6 +220,52 @@ toast UI.
   `admin_id`; `is_impersonating()` drives the banner in `header.php`, and `logout.php` restores the
   admin session rather than logging out). Impersonation blocks LMS quizzes and mission submissions
   (`LmsQuiz::start()` / `LmsPromotion::submit()` both reject when `is_impersonating()`).
+
+### ONE-RVC SSO
+
+Optional single sign-on against the college's external SSO gateway, alongside (not replacing) the
+existing email/password login — `Auth::attempt()` and `login.php`'s form are untouched.
+
+- **Config lives in one place**: `config.php` defines `ONE_RVC_AUTH_URL`, `ONE_RVC_VERIFY_URL`,
+  `ONE_RVC_CLIENT_ID`, `ONE_RVC_REDIRECT_URI`, overridable via `config.local.php` (keys
+  `one_rvc_auth_url`/`one_rvc_verify_url`/`one_rvc_client_id`/`one_rvc_redirect_uri`) the same way
+  `DB_*` is — but unlike `DB_*` these normally don't need a per-environment override, since
+  `redirect_uri` is fixed by ONE-RVC's own client registration for this app (`apts` →
+  `https://apts.rvc.ac.th/web/api/callback.php`). A real end-to-end round trip can only be tested
+  against that production URL; there's no way to exercise the live gateway from localhost.
+- **The flow is a top-level browser redirect, not a server-to-server call**, for both directions:
+  `sso-login.php` sends the browser to `ONE_RVC_AUTH_URL` with a random `state` stashed in session;
+  ONE-RVC's own page later auto-submits an HTML form that POSTs `token_id`/`token_key`/`state` back to
+  `api/callback.php` (or redirects there with `?error=...` if the user declined). Only the token
+  *verification* (`SsoAuth::verifyToken()`, POST to `ONE_RVC_VERIFY_URL`) is server-to-server — the
+  token is never trusted just because `token_id` looks well-formed (it embeds `{user_id}_{expiry}`).
+- **Because ONE-RVC's callback is a cross-site POST navigation, `bootstrap.php` sets the session
+  cookie to `SameSite=None; Secure` whenever the request is HTTPS** (checked via `$_SERVER['HTTPS']` /
+  `SERVER_PORT` / `X-Forwarded-Proto`, falling back to the normal `Lax` default on plain HTTP for local
+  dev). Without this, browsers never attach a `Lax` cookie to a cross-site POST, so the session holding
+  `state` would silently not exist when `api/callback.php` runs — do not "simplify" this back to `Lax`.
+  `state` mismatch is the anti-CSRF check for the callback; a POST form can't carry `Csrf::field()`
+  because ONE-RVC's page — not this app — renders it.
+- **`users.sso_user_id`** (nullable, unique — same NULL-tolerant-unique pattern as `student_id`) is the
+  linked ONE-RVC identity; `sso_linked_at` records when. `SsoAuth::resolveLogin()` (used only by the
+  *login* flow, `sso-login.php` with no `?link=1`) resolves in order: an account already linked by
+  `sso_user_id`, else auto-link an existing **unlinked** account whose email matches what ONE-RVC
+  returned (this is what lets someone who self-registered before SSO existed sign in with no extra
+  step). It never creates a new account — registration here requires admin approval plus a
+  major/subject selection ONE-RVC doesn't provide — an unmatched identity is turned away with a
+  Thai message pointing at password login + the profile page's link button, or at `register.php`.
+- **Explicit linking** (`sso-login.php?link=1`, surfaced as a "ผูกบัญชีกับ ONE-RVC" card on both
+  `student/profile.php` and `admin/profile.php`) is a different code path from login-time auto-link:
+  it requires being logged in already (`require_login()`), stashes the acting user's id as
+  `$_SESSION['sso_link_user_id']`, and `api/callback.php` re-checks that `current_user()` still matches
+  that id before calling `SsoAuth::link()` — guards against the identity being attached to the wrong
+  account if the session's logged-in user changes mid-flow (e.g. impersonation switches
+  `$_SESSION['user_id']` without going through `logout.php`'s full `session_destroy()`).
+  `SsoAuth::link()` itself refuses to attach an identity already linked to a *different* account.
+  Unlinking (`action=sso_unlink` on either profile page) just clears both columns; the account's
+  password keeps working exactly as before — SSO is additive, never the only way in.
+- **Never log `token_id` / `token_key`**, in `SsoAuth::verifyToken()` or its callers — this is
+  commented at both.
 
 ### The LMS subsystem
 

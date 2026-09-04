@@ -34,6 +34,7 @@ final class Migration
         'migrate_lms.sql',
         'migrate_current_slot_booking.sql',
         'migrate_provider_login_url.sql',
+        'migrate_sso_login.sql',
     ];
 
     /** Create the tracking table if it doesn't exist yet. */
