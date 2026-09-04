@@ -95,9 +95,15 @@ try {
 
     $result = SsoAuth::verifyToken($tokenId, $tokenKey);
     if (!$result['ok']) {
+        // $result['error'] is always one of SsoAuth::verifyToken()'s own generic Thai
+        // messages (network failure / invalid-or-expired token / ONE-RVC's own reason
+        // string) — never token data — so it's safe to both log and surface here;
+        // logging it is what actually lets us tell "gateway unreachable" apart from
+        // "token rejected" apart from "malformed response" without guessing blind.
+        error_log('[SsoAuth callback] verify failed: ' . ($result['error'] ?? '(no reason)'));
         http_response_code(401);
         header('Content-Type: text/plain; charset=utf-8');
-        exit('SSO token verification failed.');
+        exit('SSO token verification failed: ' . ($result['error'] ?? 'unknown reason'));
     }
     $ssoUser = $result['user'];
 
