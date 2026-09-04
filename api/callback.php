@@ -139,11 +139,15 @@ try {
     exit;
 } catch (Throwable $e) {
     sso_log_failure('POST', $e);
-    // Short, generic diagnostic tag appended so the failure is self-diagnosable from the
-    // screen alone when nobody has access to the server's error log yet — this is only
-    // the bare exception class name (e.g. "PDOException"), never $e->getMessage(), which
-    // could echo column/table names or other schema detail back to the browser.
-    $diagTag = basename(str_replace('\\', '/', get_class($e)));
+    // Temporary, wider diagnostic tag (class + message + file:line, still never
+    // $tokenId/$tokenKey/$ssoUser) so the failure is self-diagnosable from the screen
+    // while nobody has server error-log access — the bare class name alone ("Error")
+    // wasn't enough to tell apart e.g. "call to a member function on null" from
+    // "call to undefined method". Only reachable by whoever completes the SSO round
+    // trip (the linking flow is admin/logged-in-user-only; login-mode is reachable by
+    // anyone, so tighten this back to class-name-only once the real cause is found).
+    $diagTag = basename(str_replace('\\', '/', get_class($e))) . ': ' . $e->getMessage()
+        . ' @ ' . basename($e->getFile()) . ':' . $e->getLine();
     flash_set('err', 'เกิดข้อผิดพลาดขณะเข้าสู่ระบบผ่าน ONE-RVC กรุณาลองใหม่อีกครั้ง หรือติดต่อผู้ดูแลระบบหากยังไม่สำเร็จ (อ้างอิง: ' . $diagTag . ')');
     header('Location: ' . url(($linkUserId ?? null) !== null ? sso_profile_path(current_user()) : 'login.php'));
     exit;
