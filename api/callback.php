@@ -72,39 +72,54 @@ if (!$result['ok']) {
 }
 $ssoUser = $result['user'];
 
-// ---- Linking mode: attach this ONE-RVC identity to the account that started the flow ----
-if ($linkUserId !== null) {
-    $current = current_user();
+// Everything from here on touches the database in a brand-new way (users.sso_user_id /
+// sso_linked_at) that no earlier request on this server has ever exercised — this is
+// the very first real, successfully-verified ONE-RVC token this app has ever received.
+// If migrate_sso_login.sql hasn't actually been applied here, every query below throws
+// a raw PDOException; catch that (and anything else unexpected) so a deploy/ops issue
+// degrades to a Thai error message instead of a blank HTTP 500. The exception is logged
+// server-side (class + message only — never $tokenId/$tokenKey, never $ssoUser) so
+// whoever has log access can see exactly what broke.
+try {
+    // ---- Linking mode: attach this ONE-RVC identity to the account that started the flow ----
+    if ($linkUserId !== null) {
+        $current = current_user();
 
-    if (!$current || (int) $current['id'] !== $linkUserId) {
-        // Session changed mid-flow (e.g. logged out in another tab) — don't link blindly.
-        flash_set('err', 'เซสชันของคุณเปลี่ยนแปลงระหว่างการผูกบัญชี กรุณาเข้าสู่ระบบแล้วลองใหม่อีกครั้ง');
+        if (!$current || (int) $current['id'] !== $linkUserId) {
+            // Session changed mid-flow (e.g. logged out in another tab) — don't link blindly.
+            flash_set('err', 'เซสชันของคุณเปลี่ยนแปลงระหว่างการผูกบัญชี กรุณาเข้าสู่ระบบแล้วลองใหม่อีกครั้ง');
+            header('Location: ' . url('login.php'));
+            exit;
+        }
+
+        $link = SsoAuth::link($linkUserId, (string) ($ssoUser['id'] ?? ''));
+        flash_set($link['ok'] ? 'ok' : 'err',
+            $link['ok'] ? 'ผูกบัญชี ONE-RVC เรียบร้อยแล้ว' : ($link['error'] ?? 'ผูกบัญชีไม่สำเร็จ'));
+        header('Location: ' . url(sso_profile_path($current)));
+        exit;
+    }
+
+    // ---- Login mode: resolve the ONE-RVC identity to a local account and sign in ----
+    $resolved = SsoAuth::resolveLogin($ssoUser);
+    if (!$resolved['ok']) {
+        flash_set('err', $resolved['error'] ?? 'เข้าสู่ระบบผ่าน ONE-RVC ไม่สำเร็จ');
         header('Location: ' . url('login.php'));
         exit;
     }
 
-    $link = SsoAuth::link($linkUserId, (string) ($ssoUser['id'] ?? ''));
-    flash_set($link['ok'] ? 'ok' : 'err',
-        $link['ok'] ? 'ผูกบัญชี ONE-RVC เรียบร้อยแล้ว' : ($link['error'] ?? 'ผูกบัญชีไม่สำเร็จ'));
-    header('Location: ' . url(sso_profile_path($current)));
+    $user = $resolved['user'];
+    session_regenerate_id(true);
+    $_SESSION['user_id'] = $user['id'];
+
+    if (!empty($resolved['justLinked'])) {
+        flash_set('ok', 'เข้าสู่ระบบสำเร็จ และผูกบัญชี ONE-RVC ให้อัตโนมัติแล้ว (พบอีเมลที่ตรงกับบัญชีเดิมของคุณ)');
+    }
+
+    header('Location: ' . url($user['role'] === 'admin' ? 'admin/dashboard.php' : 'student/dashboard.php'));
+    exit;
+} catch (Throwable $e) {
+    error_log('[SsoAuth callback] ' . get_class($e) . ': ' . $e->getMessage());
+    flash_set('err', 'เกิดข้อผิดพลาดขณะเข้าสู่ระบบผ่าน ONE-RVC กรุณาลองใหม่อีกครั้ง หรือติดต่อผู้ดูแลระบบหากยังไม่สำเร็จ');
+    header('Location: ' . url($linkUserId !== null ? sso_profile_path(current_user()) : 'login.php'));
     exit;
 }
-
-// ---- Login mode: resolve the ONE-RVC identity to a local account and sign in ----
-$resolved = SsoAuth::resolveLogin($ssoUser);
-if (!$resolved['ok']) {
-    flash_set('err', $resolved['error'] ?? 'เข้าสู่ระบบผ่าน ONE-RVC ไม่สำเร็จ');
-    header('Location: ' . url('login.php'));
-    exit;
-}
-
-$user = $resolved['user'];
-session_regenerate_id(true);
-$_SESSION['user_id'] = $user['id'];
-
-if (!empty($resolved['justLinked'])) {
-    flash_set('ok', 'เข้าสู่ระบบสำเร็จ และผูกบัญชี ONE-RVC ให้อัตโนมัติแล้ว (พบอีเมลที่ตรงกับบัญชีเดิมของคุณ)');
-}
-
-header('Location: ' . url($user['role'] === 'admin' ? 'admin/dashboard.php' : 'student/dashboard.php'));
-exit;

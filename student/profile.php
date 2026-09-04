@@ -17,8 +17,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = Auth::changePassword($user['id'], $_POST['current'] ?? '', $_POST['new'] ?? '', $_POST['new_confirm'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว' : ($result['error'] ?? 'เปลี่ยนรหัสผ่านไม่สำเร็จ'));
     } elseif ($action === 'sso_unlink') {
-        SsoAuth::unlink($user['id']);
-        flash_set('ok', 'ยกเลิกการผูกบัญชี ONE-RVC เรียบร้อยแล้ว');
+        try {
+            SsoAuth::unlink($user['id']);
+            flash_set('ok', 'ยกเลิกการผูกบัญชี ONE-RVC เรียบร้อยแล้ว');
+        } catch (Throwable $e) {
+            error_log('[SsoAuth unlink] ' . get_class($e) . ': ' . $e->getMessage());
+            flash_set('err', 'ยกเลิกการผูกบัญชีไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        }
     }
     header('Location: ' . url('student/profile.php'));
     exit;
