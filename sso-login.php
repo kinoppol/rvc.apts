@@ -35,6 +35,19 @@ if ($isLink) {
     unset($_SESSION['sso_link_user_id']);
 }
 
+// Force a fresh Set-Cookie with the *current* SameSite=None;Secure attributes
+// (bootstrap.php sets those via session_set_cookie_params() before session_start(),
+// but that only shapes cookies issued from here on — it cannot retroactively upgrade
+// a PHPSESSID the browser already has stored from an earlier visit, e.g. before this
+// attribute existed, or a plain Lax cookie from browsing the rest of the site). Without
+// this, a visitor whose browser is still holding an old/Lax cookie would have it
+// silently dropped on the cross-site POST back from ONE-RVC, and api/callback.php
+// would see no session — indistinguishable from a forged request, so it fails closed
+// with "Invalid or missing state." session_regenerate_id() keeps $_SESSION intact
+// (including sso_link_user_id, just set above) and only replaces the id + re-sends
+// the cookie.
+session_regenerate_id(true);
+
 $state = bin2hex(random_bytes(32));
 $_SESSION['sso_state'] = $state;
 $authUrl = SsoAuth::authorizationUrl($state);
