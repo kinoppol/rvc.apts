@@ -1,6 +1,28 @@
 <?php
 require_once __DIR__ . '/bootstrap.php';
 
+// sso-login.php stashes a `state` in session right before sending the browser to
+// ONE-RVC. If that state is still sitting here unused, the SSO round trip started but
+// never reached api/callback.php with a token — in practice this is ONE-RVC bouncing
+// straight back without ever showing its login screen (e.g. no live ONE-RVC session),
+// which lands the browser on this app's own root with nothing to show for it. Without
+// this check that looks exactly like "the button did nothing"; say so instead.
+if (!empty($_SESSION['sso_state'])) {
+    $wasLinking = !empty($_SESSION['sso_link_user_id']);
+    $linkUserId = $wasLinking ? (int) $_SESSION['sso_link_user_id'] : null;
+    unset($_SESSION['sso_state'], $_SESSION['sso_link_user_id']);
+
+    flash_set('err', 'ดูเหมือนคุณยังไม่ได้ลงชื่อเข้าใช้งานระบบ ONE-RVC หรือการยืนยันตัวตนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+
+    $activeUser = current_user();
+    if ($wasLinking && $activeUser && (int) $activeUser['id'] === $linkUserId) {
+        header('Location: ' . url($activeUser['role'] === 'admin' ? 'admin/profile.php' : 'student/profile.php'));
+    } else {
+        header('Location: ' . url('login.php'));
+    }
+    exit;
+}
+
 $user = current_user();
 if ($user) {
     header('Location: ' . url($user['role'] === 'admin' ? 'admin/dashboard.php' : 'student/dashboard.php'));
