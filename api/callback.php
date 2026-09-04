@@ -18,6 +18,12 @@
  * `state` would never be visible here to check), and the token itself must
  * independently verify against ONE-RVC's own endpoint via SsoAuth::verifyToken() —
  * token_id is never trusted just because it looks well-formed.
+ *
+ * The whole POST branch runs inside one try/catch: this endpoint only ever receives
+ * genuinely new, previously-unexercised traffic (each request carries a one-time
+ * token from a real external system we don't control), so nothing here is allowed to
+ * surface as a raw PHP fatal — every failure degrades to a Thai flash message plus a
+ * logged exception (class + message only, never $tokenId/$tokenKey/$ssoUser) instead.
  */
 require_once __DIR__ . '/../bootstrap.php';
 
@@ -27,16 +33,38 @@ function sso_profile_path(?array $user): string
     return ($user && $user['role'] === 'admin') ? 'admin/profile.php' : 'student/profile.php';
 }
 
+/** Logs an SSO failure server-side without ever touching token or user data. */
+function sso_log_failure(string $where, Throwable $e): void
+{
+    error_log('[SsoAuth callback] ' . $where . ': ' . get_class($e) . ': ' . $e->getMessage()
+        . ' at ' . $e->getFile() . ':' . $e->getLine());
+}
+
+// A PHP fatal error (not everything is a catchable Throwable — e.g. exhausting the
+// memory limit) would otherwise leave Apache to serve a bare, unlogged 500. This is
+// the last line of defense: log whatever PHP's own error handler recorded.
+register_shutdown_function(function (): void {
+    $err = error_get_last();
+    if ($err !== null && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        error_log('[SsoAuth callback] fatal: ' . $err['message'] . ' at ' . $err['file'] . ':' . $err['line']);
+    }
+});
+
 // ---- GET: the user declined at ONE-RVC, or otherwise arrived with no token ----
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $linkUserId = isset($_SESSION['sso_link_user_id']) ? (int) $_SESSION['sso_link_user_id'] : null;
-    unset($_SESSION['sso_state'], $_SESSION['sso_link_user_id']);
+    try {
+        $linkUserId = isset($_SESSION['sso_link_user_id']) ? (int) $_SESSION['sso_link_user_id'] : null;
+        unset($_SESSION['sso_state'], $_SESSION['sso_link_user_id']);
 
-    if ($linkUserId !== null) {
-        flash_set('err', 'คุณยกเลิกการผูกบัญชีกับ ONE-RVC');
-        header('Location: ' . url(sso_profile_path(Auth::findById($linkUserId))));
-    } else {
-        flash_set('err', 'คุณยกเลิกการเข้าสู่ระบบผ่าน ONE-RVC');
+        if ($linkUserId !== null) {
+            flash_set('err', 'คุณยกเลิกการผูกบัญชีกับ ONE-RVC');
+            header('Location: ' . url(sso_profile_path(Auth::findById($linkUserId))));
+        } else {
+            flash_set('err', 'คุณยกเลิกการเข้าสู่ระบบผ่าน ONE-RVC');
+            header('Location: ' . url('login.php'));
+        }
+    } catch (Throwable $e) {
+        sso_log_failure('GET/decline', $e);
         header('Location: ' . url('login.php'));
     }
     exit;
@@ -48,39 +76,31 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit('Method Not Allowed');
 }
 
-// ---- POST: state must match this session (CSRF guard) ----
-$state         = (string) ($_POST['state'] ?? '');
-$expectedState = (string) ($_SESSION['sso_state'] ?? '');
-$linkUserId    = isset($_SESSION['sso_link_user_id']) ? (int) $_SESSION['sso_link_user_id'] : null;
-unset($_SESSION['sso_state'], $_SESSION['sso_link_user_id']);
-
-if ($expectedState === '' || !hash_equals($expectedState, $state)) {
-    http_response_code(400);
-    header('Content-Type: text/plain; charset=utf-8');
-    exit('Invalid or missing state.');
-}
-
-// token_id / token_key must never be logged — not here, not inside SsoAuth::verifyToken().
-$tokenId  = (string) ($_POST['token_id'] ?? '');
-$tokenKey = (string) ($_POST['token_key'] ?? '');
-
-$result = SsoAuth::verifyToken($tokenId, $tokenKey);
-if (!$result['ok']) {
-    http_response_code(401);
-    header('Content-Type: text/plain; charset=utf-8');
-    exit('SSO token verification failed.');
-}
-$ssoUser = $result['user'];
-
-// Everything from here on touches the database in a brand-new way (users.sso_user_id /
-// sso_linked_at) that no earlier request on this server has ever exercised — this is
-// the very first real, successfully-verified ONE-RVC token this app has ever received.
-// If migrate_sso_login.sql hasn't actually been applied here, every query below throws
-// a raw PDOException; catch that (and anything else unexpected) so a deploy/ops issue
-// degrades to a Thai error message instead of a blank HTTP 500. The exception is logged
-// server-side (class + message only — never $tokenId/$tokenKey, never $ssoUser) so
-// whoever has log access can see exactly what broke.
 try {
+    // ---- state must match this session (CSRF guard) ----
+    $state         = (string) ($_POST['state'] ?? '');
+    $expectedState = (string) ($_SESSION['sso_state'] ?? '');
+    $linkUserId    = isset($_SESSION['sso_link_user_id']) ? (int) $_SESSION['sso_link_user_id'] : null;
+    unset($_SESSION['sso_state'], $_SESSION['sso_link_user_id']);
+
+    if ($expectedState === '' || !hash_equals($expectedState, $state)) {
+        http_response_code(400);
+        header('Content-Type: text/plain; charset=utf-8');
+        exit('Invalid or missing state.');
+    }
+
+    // token_id / token_key must never be logged — not here, not inside SsoAuth::verifyToken().
+    $tokenId  = (string) ($_POST['token_id'] ?? '');
+    $tokenKey = (string) ($_POST['token_key'] ?? '');
+
+    $result = SsoAuth::verifyToken($tokenId, $tokenKey);
+    if (!$result['ok']) {
+        http_response_code(401);
+        header('Content-Type: text/plain; charset=utf-8');
+        exit('SSO token verification failed.');
+    }
+    $ssoUser = $result['user'];
+
     // ---- Linking mode: attach this ONE-RVC identity to the account that started the flow ----
     if ($linkUserId !== null) {
         $current = current_user();
@@ -118,8 +138,8 @@ try {
     header('Location: ' . url($user['role'] === 'admin' ? 'admin/dashboard.php' : 'student/dashboard.php'));
     exit;
 } catch (Throwable $e) {
-    error_log('[SsoAuth callback] ' . get_class($e) . ': ' . $e->getMessage());
+    sso_log_failure('POST', $e);
     flash_set('err', 'เกิดข้อผิดพลาดขณะเข้าสู่ระบบผ่าน ONE-RVC กรุณาลองใหม่อีกครั้ง หรือติดต่อผู้ดูแลระบบหากยังไม่สำเร็จ');
-    header('Location: ' . url($linkUserId !== null ? sso_profile_path(current_user()) : 'login.php'));
+    header('Location: ' . url(($linkUserId ?? null) !== null ? sso_profile_path(current_user()) : 'login.php'));
     exit;
 }
