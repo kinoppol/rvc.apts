@@ -16,8 +16,19 @@ final class SlotSettings
         return !empty($settings['allow_current_slot']);
     }
 
+    /**
+     * True when admins have switched on "high demand" mode to spread limited capacity across more
+     * students: no early access, no back-to-back slots, and a hard daily booking cap
+     * (see Booking::HIGH_DEMAND_DAILY_LIMIT and the early-access gates in Booking).
+     */
+    public static function isHighDemandMode(?array $settings = null): bool
+    {
+        $settings ??= self::get();
+        return !empty($settings['high_demand_mode']);
+    }
+
     /** @return array{ok:bool,error?:string} */
-    public static function update(int $slotHours, int $slotsPerDay, int $weeklyQuota, int $maxAdvanceDays, string $dayStartTime, bool $allowCurrentSlot = false): array
+    public static function update(int $slotHours, int $slotsPerDay, int $weeklyQuota, int $maxAdvanceDays, string $dayStartTime, bool $allowCurrentSlot = false, bool $highDemandMode = false): array
     {
         if ($slotHours < 1 || $slotsPerDay < 1 || $weeklyQuota < 1 || $maxAdvanceDays < 1) {
             return ['ok' => false, 'error' => 'ค่าที่กรอกต้องเป็นจำนวนเต็มบวก'];
@@ -33,9 +44,9 @@ final class SlotSettings
         }
 
         $stmt = Database::pdo()->prepare(
-            'UPDATE slot_settings SET slot_hours = ?, slots_per_day = ?, weekly_quota = ?, max_advance_days = ?, day_start_time = ?, allow_current_slot = ? WHERE id = 1'
+            'UPDATE slot_settings SET slot_hours = ?, slots_per_day = ?, weekly_quota = ?, max_advance_days = ?, day_start_time = ?, allow_current_slot = ?, high_demand_mode = ? WHERE id = 1'
         );
-        $stmt->execute([$slotHours, $slotsPerDay, $weeklyQuota, $maxAdvanceDays, $m[1] . ':' . $m[2] . ':00', $allowCurrentSlot ? 1 : 0]);
+        $stmt->execute([$slotHours, $slotsPerDay, $weeklyQuota, $maxAdvanceDays, $m[1] . ':' . $m[2] . ':00', $allowCurrentSlot ? 1 : 0, $highDemandMode ? 1 : 0]);
 
         return ['ok' => true];
     }

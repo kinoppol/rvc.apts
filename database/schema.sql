@@ -101,6 +101,7 @@ CREATE TABLE slot_settings (
     max_advance_days  SMALLINT UNSIGNED NOT NULL DEFAULT 14,
     day_start_time    TIME NOT NULL DEFAULT '08:00:00',
     allow_current_slot TINYINT(1) NOT NULL DEFAULT 0,              -- 1 = students may still book the slot that is in progress right now
+    high_demand_mode  TINYINT(1) NOT NULL DEFAULT 0,               -- 1 = spread-the-load rules are active (no early access, no back-to-back slots, daily cap) — see Booking::HIGH_DEMAND_DAILY_LIMIT
     terms_file        VARCHAR(255) NULL DEFAULT NULL,              -- filename of the active terms-of-service PDF (NULL = no terms required)
     institution_name  VARCHAR(200) NOT NULL DEFAULT 'วิทยาลัย RVC', -- shown on the login/landing pages; admin-editable
     sso_verify_ip     VARCHAR(45) NULL DEFAULT NULL,               -- optional private IP override for the server-to-server ONE-RVC token-verify call (see includes/SsoAuth.php); NULL = resolve ONE_RVC_VERIFY_URL's hostname normally

@@ -69,7 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         (int) ($_POST['weekly_quota'] ?? 0),
         (int) ($_POST['max_advance_days'] ?? 0),
         (string) ($_POST['day_start_time'] ?? ''),
-        !empty($_POST['allow_current_slot'])
+        !empty($_POST['allow_current_slot']),
+        !empty($_POST['high_demand_mode'])
     );
     flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกการตั้งค่าเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
     header('Location: ' . url('admin/slots.php'));
@@ -98,6 +99,19 @@ require __DIR__ . '/../includes/header.php';
       <label for="allow_current_slot" style="cursor:pointer">
         <span style="font-size:13px;font-weight:600;color:var(--bs-body-color);display:block">เปิดให้จอง Slot ของเวลาปัจจุบัน</span>
         <span style="font-size:11px;color:var(--bs-secondary-color)">เมื่อเปิด นักศึกษาจะจองช่วงเวลาที่กำลังดำเนินอยู่ได้ (ถ้า Pool ยังไม่เต็ม) และเช็คอินได้ทันทีภายใน 15 นาทีหลังจอง · เมื่อปิด ช่วงเวลาปัจจุบันจะแสดงเป็น “ปิด” เหมือนเดิม</span>
+      </label>
+    </div>
+    <div style="border:1px solid #FDBA74;background:#FFF7ED;border-radius:8px;padding:12px 14px;margin-top:12px;max-width:600px;display:flex;gap:10px;align-items:flex-start">
+      <input type="checkbox" name="high_demand_mode" id="high_demand_mode" value="1" class="form-check-input" style="margin:2px 0 0" <?= !empty($settings['high_demand_mode']) ? 'checked' : '' ?>>
+      <label for="high_demand_mode" style="cursor:pointer">
+        <span style="font-size:13px;font-weight:600;color:#92400E;display:block"><i class="bi bi-lightning-charge-fill me-1"></i>เปิดโหมดความต้องการใช้งานสูง (กระจายสิทธิ์การใช้งาน)</span>
+        <span style="font-size:11px;color:#92400E">ใช้เมื่อช่วงเวลานั้นมีผู้ต้องการจองมากผิดปกติ เพื่อไม่ให้ผู้ใช้บางคนใช้ทรัพยากรมากเกินไป เมื่อเปิดจะมีผลทันทีกับการจองใหม่ทุกคน:</span>
+        <ul style="font-size:11px;color:#92400E;margin:6px 0 0;padding-left:18px;line-height:1.6">
+          <li>ปิดสิทธิ์การใช้งานล่วงหน้า (Early Access) — เช็คอินและใช้งานได้เมื่อถึงเวลาที่จองไว้เท่านั้น</li>
+          <li>ห้ามจองช่วงเวลาที่ต่อเนื่องติดกันในวันเดียวกัน (เช่น เช้า + บ่าย ติดกันไม่ได้)</li>
+          <li>จองได้สูงสุด <?= Booking::HIGH_DEMAND_DAILY_LIMIT ?> ช่วงเวลาต่อคนต่อวัน</li>
+          <li>หน้าจองของนักศึกษาจะแสดงข้อความแจ้งเตือนสถานการณ์และกติกาเหล่านี้อย่างชัดเจน</li>
+        </ul>
       </label>
     </div>
     <div style="background:#FFF7ED;border-radius:8px;padding:10px 14px;margin-top:16px;font-size:12px;color:#92400E;display:flex;gap:8px;align-items:flex-start;max-width:600px">

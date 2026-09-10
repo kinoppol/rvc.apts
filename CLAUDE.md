@@ -158,6 +158,24 @@ toast UI.
   `capacity`**. So a `capacity`-N pool hosts up to N early users at once, exactly as it hosts N in a
   normal slot; at `capacity` 1 this reduces to the old "previous slot must be empty" rule. All three
   call sites implement the same count — keep them in sync.
+- **"High demand" mode is a single admin switch (`slot_settings.high_demand_mode`, checkbox on
+  `admin/slots.php`, read via `SlotSettings::isHighDemandMode()`) that layers three extra restrictions
+  onto every *new* booking, to spread limited capacity across more students:**
+  1. Early access is suppressed outright — the `'early'` branch in `getWeekGrid()`, the early-access
+     query in `earlyAccessForUser()` (so it short-circuits to `[]`, which empties the bell/dashboard/
+     my-bookings early-access cards for free — no separate gating needed there), and the early-access
+     branch in `checkIn()` are all gated on `!SlotSettings::isHighDemandMode()`. A booking is only
+     usable from its own booked start time.
+  2. No two of a user's `'upcoming'` bookings on the same `booking_date` may sit in adjacent
+     `slot_index` values (`Booking::dailySlotIndexesUsed()` + an `abs(diff) === 1` check in `create()`).
+  3. At most `Booking::HIGH_DEMAND_DAILY_LIMIT` (2) **distinct `slot_index` values** per user per day —
+     booking a second pool *within an already-held slot* (`max_concurrent` > 1) doesn't count as a new
+     one, since the cap is about time slots, not pool-rows.
+  Both new `create()` checks run pre-transaction (same convention as the weekly-quota check just above
+  them), not inside the `FOR UPDATE` block — they gate the *user's own* history, not a shared resource,
+  so they don't need row locking. `student/booking.php` shows the rules as a banner
+  (`Booking::HIGH_DEMAND_DAILY_LIMIT` interpolated in, so the copy never drifts from the enforced
+  number) whenever the mode is on — that banner is rule 4, not just UI polish.
 - **A pool also has a weekday mask and cost fields.** `ai_accounts.available_days` is a 7-char
   `1`/`0` string, **Monday-first** (`AiAccount::isDayAllowed($account, $isoWeekday)`,
   `packDays()`/`daysSummary()`); a `0` day makes the pool unbookable that weekday just like an expiry

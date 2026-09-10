@@ -20,6 +20,13 @@ final class Booking
 
     /** Days a student has, after a slot ends, to file the usage report before booking is blocked. */
     public const REPORT_DEADLINE_DAYS = 7;
+
+    /**
+     * Under "high demand" mode (SlotSettings::isHighDemandMode()), the most one user may hold in a
+     * single day — counted as distinct slot_index values, not pool-rows, so booking several pools
+     * within the same slot still only counts as one "time slot" against this cap.
+     */
+    public const HIGH_DEMAND_DAILY_LIMIT = 2;
     private const REPORT_ALLOWED = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', 'pdf' => 'application/pdf'];
 
     public static function thaiDate(DateTimeInterface $d): string
@@ -59,6 +66,7 @@ final class Booking
     {
         $settings = self::limitsFor($userId);
         $maxConcurrent = (int) $settings['max_concurrent'];
+        $highDemand = SlotSettings::isHighDemandMode($settings);
         $allowed = self::allowedAccountsFor($userId);
         $start = self::weekStart($weekOffset);
         $end = $start->modify('+6 days');
@@ -154,7 +162,8 @@ final class Booking
                     // the previous slot — i.e. (prev-slot holders still effectively using it) plus
                     // (peers of my own slot who already started early) is below the pool's capacity.
                     // With capacity > 1 that lets as many people start early as the pool can host.
-                    if ($status === 'mine' && $i > 0 && $now < $slotStart) {
+                    // Suppressed entirely under high-demand mode — usable only at the booked start time.
+                    if (!$highDemand && $status === 'mine' && $i > 0 && $now < $slotStart) {
                         $prevRows  = $booked[$dateStr][$i - 1][$aid] ?? [];
                         $prevStart = $slotStart->modify('-' . (int) $settings['slot_hours'] . ' hours');
                         $inNoShowWindow = $now >= $prevStart->modify('+15 minutes');
@@ -378,6 +387,21 @@ final class Booking
     }
 
     /**
+     * Distinct slot_index values the user already holds (upcoming) on $dateStr — used only by the
+     * high-demand-mode checks in create(). Distinct because booking several pools within one slot
+     * (max_concurrent) must still count as a single "time slot" for the daily cap / adjacency rules.
+     * @return int[]
+     */
+    private static function dailySlotIndexesUsed(int $userId, string $dateStr): array
+    {
+        $stmt = Database::pdo()->prepare(
+            "SELECT DISTINCT slot_index FROM bookings WHERE user_id = ? AND booking_date = ? AND status = 'upcoming'"
+        );
+        $stmt->execute([$userId, $dateStr]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /**
      * Books one or more AI pools (checkboxes in the UI) for the same slot in a single all-or-nothing
      * transaction, capped at the user's group max_concurrent. @param int[] $accountIds
      * @return array{ok:bool,error?:string}
@@ -453,6 +477,19 @@ final class Booking
 
         if (self::quotaUsed($userId, $date) + count($accountIds) > $settings['weekly_quota']) {
             return ['ok' => false, 'error' => 'จำนวน Pool ที่เลือกเกินโควต้าคงเหลือของสัปดาห์นี้'];
+        }
+
+        // ── High-demand mode: spread limited capacity across more students ──
+        if (SlotSettings::isHighDemandMode($settings)) {
+            $usedSlots = self::dailySlotIndexesUsed($userId, $dateStr);
+            foreach ($usedSlots as $usedSlot) {
+                if ($usedSlot !== $slotIndex && abs($usedSlot - $slotIndex) === 1) {
+                    return ['ok' => false, 'error' => 'ช่วงความต้องการใช้งานสูง: ไม่สามารถจองช่วงเวลาที่ต่อเนื่องติดกันได้ในวันเดียวกัน'];
+                }
+            }
+            if (!in_array($slotIndex, $usedSlots, true) && count($usedSlots) >= self::HIGH_DEMAND_DAILY_LIMIT) {
+                return ['ok' => false, 'error' => 'ช่วงความต้องการใช้งานสูง: จองได้สูงสุด ' . self::HIGH_DEMAND_DAILY_LIMIT . ' ช่วงเวลาต่อคนต่อวัน'];
+            }
         }
 
         $pdo = Database::pdo();
@@ -903,7 +940,11 @@ final class Booking
      */
     public static function earlyAccessForUser(int $userId): array
     {
-        $slotHours = (int) SlotSettings::get()['slot_hours'];
+        $globalSettings = SlotSettings::get();
+        if (SlotSettings::isHighDemandMode($globalSettings)) {
+            return [];
+        }
+        $slotHours = (int) $globalSettings['slot_hours'];
         $stmt = Database::pdo()->prepare("
             SELECT b.id, b.ai_account_id, b.booking_date, b.slot_index,
                    b.start_datetime, b.end_datetime, b.purpose, b.checked_in_at,
@@ -985,9 +1026,10 @@ final class Booking
 
         $normalWindowOpen = $now >= $anchor->modify('-15 minutes');
         $earlyAccess = false;
+        $globalSettings = SlotSettings::get();
 
-        if (!$normalWindowOpen && (int) $booking['slot_index'] > 0) {
-            $slotHours = (int) SlotSettings::get()['slot_hours'];
+        if (!$normalWindowOpen && (int) $booking['slot_index'] > 0 && !SlotSettings::isHighDemandMode($globalSettings)) {
+            $slotHours = (int) $globalSettings['slot_hours'];
             $prevStart = $start->modify('-' . $slotHours . ' hours');
             if ($now >= $prevStart->modify('+15 minutes')) {
                 // Seats in use during the previous slot: prev-slot holders that are effectively

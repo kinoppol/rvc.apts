@@ -18,6 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $settings = Booking::limitsFor($user['id']);
 $maxConcurrent = (int) $settings['max_concurrent'];
+$highDemand = SlotSettings::isHighDemandMode($settings);
 $restricted = Booking::isRestricted($user['id']);
 $pendingReports = Booking::pendingReportsForUser($user['id']);
 $allowedPools = Booking::allowedAccountsFor($user['id']);
@@ -47,6 +48,20 @@ require __DIR__ . '/../includes/header.php';
     <p style="color:var(--bs-secondary-color);font-size:13px;margin:0">กลุ่มของคุณยังไม่ได้รับสิทธิ์เข้าถึง AI Pool ใด ๆ กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์การจอง</p>
   </div>
 <?php require __DIR__ . '/../includes/footer.php'; exit; ?>
+<?php endif; ?>
+<?php if ($highDemand): ?>
+  <div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:#991B1B;display:flex;gap:10px;align-items:flex-start">
+    <i class="bi bi-lightning-charge-fill" style="flex-shrink:0;font-size:16px;margin-top:1px"></i>
+    <div>
+      <div style="font-weight:700;margin-bottom:4px">ขณะนี้มีความต้องการใช้งานสูงผิดปกติ</div>
+      <p style="margin:0 0 6px">ระบบเปิดใช้มาตรการกระจายสิทธิ์การใช้งานชั่วคราว เพื่อให้ทุกคนมีโอกาสจองได้อย่างทั่วถึง มีผลกับการจองใหม่ทุกรายการ:</p>
+      <ul style="margin:0;padding-left:18px;line-height:1.6">
+        <li>ปิดสิทธิ์การใช้งานล่วงหน้า (Early Access) — เช็คอินและใช้งานได้เมื่อถึงเวลาที่จองไว้เท่านั้น</li>
+        <li>ห้ามจองช่วงเวลาที่ต่อเนื่องติดกันในวันเดียวกัน (เช่น จองช่วงเช้าแล้วจองบ่ายต่อกันไม่ได้)</li>
+        <li>จองได้สูงสุด <?= Booking::HIGH_DEMAND_DAILY_LIMIT ?> ช่วงเวลาต่อคนต่อวัน</li>
+      </ul>
+    </div>
+  </div>
 <?php endif; ?>
 <?php if ($pendingReports): ?>
   <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400E;display:flex;gap:8px;align-items:center">
