@@ -27,8 +27,27 @@ final class SlotSettings
         return !empty($settings['high_demand_mode']);
     }
 
+    /**
+     * The individually toggleable high-demand rules: rule key => slot_settings column.
+     * no_early = no early access · no_adjacent = no back-to-back slots on one day ·
+     * daily_limit = Booking::HIGH_DEMAND_DAILY_LIMIT distinct slots per day · banner = warning on student/booking.php.
+     */
+    public const HIGH_DEMAND_RULES = [
+        'no_early'    => 'hd_no_early',
+        'no_adjacent' => 'hd_no_adjacent',
+        'daily_limit' => 'hd_daily_limit',
+        'banner'      => 'hd_show_banner',
+    ];
+
+    /** True when one high-demand rule is in force: either its own switch is on, or the master mode (which enables every rule). */
+    public static function highDemandRule(string $rule, ?array $settings = null): bool
+    {
+        $settings ??= self::get();
+        return self::isHighDemandMode($settings) || !empty($settings[self::HIGH_DEMAND_RULES[$rule]]);
+    }
+
     /** @return array{ok:bool,error?:string} */
-    public static function update(int $slotHours, int $slotsPerDay, int $weeklyQuota, int $maxAdvanceDays, string $dayStartTime, bool $allowCurrentSlot = false, bool $highDemandMode = false): array
+    public static function update(int $slotHours, int $slotsPerDay, int $weeklyQuota, int $maxAdvanceDays, string $dayStartTime, bool $allowCurrentSlot = false, bool $highDemandMode = false, array $highDemandRules = []): array
     {
         if ($slotHours < 1 || $slotsPerDay < 1 || $weeklyQuota < 1 || $maxAdvanceDays < 1) {
             return ['ok' => false, 'error' => 'ค่าที่กรอกต้องเป็นจำนวนเต็มบวก'];
@@ -43,10 +62,17 @@ final class SlotSettings
             return ['ok' => false, 'error' => 'เวลาเริ่มต้น + (ความยาวช่วงเวลา × จำนวน slots/วัน) ต้องไม่เกิน 30:00 น. (ระบบเวลา 30 ชั่วโมง)'];
         }
 
+        // Column names come from the HIGH_DEMAND_RULES constant, never from input.
+        $ruleSql = '';
+        $ruleVals = [];
+        foreach (self::HIGH_DEMAND_RULES as $rule => $column) {
+            $ruleSql .= ', ' . $column . ' = ?';
+            $ruleVals[] = !empty($highDemandRules[$rule]) ? 1 : 0;
+        }
         $stmt = Database::pdo()->prepare(
-            'UPDATE slot_settings SET slot_hours = ?, slots_per_day = ?, weekly_quota = ?, max_advance_days = ?, day_start_time = ?, allow_current_slot = ?, high_demand_mode = ? WHERE id = 1'
+            'UPDATE slot_settings SET slot_hours = ?, slots_per_day = ?, weekly_quota = ?, max_advance_days = ?, day_start_time = ?, allow_current_slot = ?, high_demand_mode = ?' . $ruleSql . ' WHERE id = 1'
         );
-        $stmt->execute([$slotHours, $slotsPerDay, $weeklyQuota, $maxAdvanceDays, $m[1] . ':' . $m[2] . ':00', $allowCurrentSlot ? 1 : 0, $highDemandMode ? 1 : 0]);
+        $stmt->execute(array_merge([$slotHours, $slotsPerDay, $weeklyQuota, $maxAdvanceDays, $m[1] . ':' . $m[2] . ':00', $allowCurrentSlot ? 1 : 0, $highDemandMode ? 1 : 0], $ruleVals));
 
         return ['ok' => true];
     }

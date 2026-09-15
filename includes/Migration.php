@@ -37,6 +37,7 @@ final class Migration
         'migrate_sso_login.sql',
         'migrate_sso_verify_ip.sql',
         'migrate_high_demand_mode.sql',
+        'migrate_high_demand_rules.sql',
     ];
 
     /** Create the tracking table if it doesn't exist yet. */

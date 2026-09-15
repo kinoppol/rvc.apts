@@ -158,9 +158,11 @@ toast UI.
   `capacity`**. So a `capacity`-N pool hosts up to N early users at once, exactly as it hosts N in a
   normal slot; at `capacity` 1 this reduces to the old "previous slot must be empty" rule. All three
   call sites implement the same count — keep them in sync.
-- **"High demand" mode is a single admin switch (`slot_settings.high_demand_mode`, checkbox on
-  `admin/slots.php`, read via `SlotSettings::isHighDemandMode()`) that layers three extra restrictions
-  onto every *new* booking, to spread limited capacity across more students:**
+- **"High demand" mode layers extra restrictions onto every *new* booking, to spread limited capacity
+  across more students.** Each rule has its own switch (`slot_settings.hd_no_early` / `hd_no_adjacent` /
+  `hd_daily_limit` / `hd_show_banner`, mapped in `SlotSettings::HIGH_DEMAND_RULES`), and the master
+  switch `high_demand_mode` turns all of them on at once. Always check a rule via
+  `SlotSettings::highDemandRule($rule)` (= master OR its own column), never the raw columns. The rules:
   1. Early access is suppressed outright — the `'early'` branch in `getWeekGrid()`, the early-access
      query in `earlyAccessForUser()` (so it short-circuits to `[]`, which empties the bell/dashboard/
      my-bookings early-access cards for free — no separate gating needed there), and the early-access

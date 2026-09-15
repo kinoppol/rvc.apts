@@ -66,7 +66,7 @@ final class Booking
     {
         $settings = self::limitsFor($userId);
         $maxConcurrent = (int) $settings['max_concurrent'];
-        $highDemand = SlotSettings::isHighDemandMode($settings);
+        $highDemand = SlotSettings::highDemandRule('no_early', $settings);
         $allowed = self::allowedAccountsFor($userId);
         $start = self::weekStart($weekOffset);
         $end = $start->modify('+6 days');
@@ -480,14 +480,18 @@ final class Booking
         }
 
         // ── High-demand mode: spread limited capacity across more students ──
-        if (SlotSettings::isHighDemandMode($settings)) {
+        $noAdjacent = SlotSettings::highDemandRule('no_adjacent', $settings);
+        $dailyLimit = SlotSettings::highDemandRule('daily_limit', $settings);
+        if ($noAdjacent || $dailyLimit) {
             $usedSlots = self::dailySlotIndexesUsed($userId, $dateStr);
-            foreach ($usedSlots as $usedSlot) {
-                if ($usedSlot !== $slotIndex && abs($usedSlot - $slotIndex) === 1) {
-                    return ['ok' => false, 'error' => 'ช่วงความต้องการใช้งานสูง: ไม่สามารถจองช่วงเวลาที่ต่อเนื่องติดกันได้ในวันเดียวกัน'];
+            if ($noAdjacent) {
+                foreach ($usedSlots as $usedSlot) {
+                    if ($usedSlot !== $slotIndex && abs($usedSlot - $slotIndex) === 1) {
+                        return ['ok' => false, 'error' => 'ช่วงความต้องการใช้งานสูง: ไม่สามารถจองช่วงเวลาที่ต่อเนื่องติดกันได้ในวันเดียวกัน'];
+                    }
                 }
             }
-            if (!in_array($slotIndex, $usedSlots, true) && count($usedSlots) >= self::HIGH_DEMAND_DAILY_LIMIT) {
+            if ($dailyLimit && !in_array($slotIndex, $usedSlots, true) && count($usedSlots) >= self::HIGH_DEMAND_DAILY_LIMIT) {
                 return ['ok' => false, 'error' => 'ช่วงความต้องการใช้งานสูง: จองได้สูงสุด ' . self::HIGH_DEMAND_DAILY_LIMIT . ' ช่วงเวลาต่อคนต่อวัน'];
             }
         }
@@ -941,7 +945,7 @@ final class Booking
     public static function earlyAccessForUser(int $userId): array
     {
         $globalSettings = SlotSettings::get();
-        if (SlotSettings::isHighDemandMode($globalSettings)) {
+        if (SlotSettings::highDemandRule('no_early', $globalSettings)) {
             return [];
         }
         $slotHours = (int) $globalSettings['slot_hours'];
@@ -1028,7 +1032,7 @@ final class Booking
         $earlyAccess = false;
         $globalSettings = SlotSettings::get();
 
-        if (!$normalWindowOpen && (int) $booking['slot_index'] > 0 && !SlotSettings::isHighDemandMode($globalSettings)) {
+        if (!$normalWindowOpen && (int) $booking['slot_index'] > 0 && !SlotSettings::highDemandRule('no_early', $globalSettings)) {
             $slotHours = (int) $globalSettings['slot_hours'];
             $prevStart = $start->modify('-' . $slotHours . ' hours');
             if ($now >= $prevStart->modify('+15 minutes')) {

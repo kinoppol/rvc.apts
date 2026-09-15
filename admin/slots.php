@@ -70,7 +70,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         (int) ($_POST['max_advance_days'] ?? 0),
         (string) ($_POST['day_start_time'] ?? ''),
         !empty($_POST['allow_current_slot']),
+        !empty($_POST['high_demand_mode']),
+        // While the master mode is on the rule boxes are disabled (not posted) — keep their own saved state.
         !empty($_POST['high_demand_mode'])
+            ? array_map(fn ($col) => !empty(SlotSettings::get()[$col]), SlotSettings::HIGH_DEMAND_RULES)
+            : (array) ($_POST['hd_rules'] ?? [])
     );
     flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกการตั้งค่าเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
     header('Location: ' . url('admin/slots.php'));
@@ -105,15 +109,38 @@ require __DIR__ . '/../includes/header.php';
       <input type="checkbox" name="high_demand_mode" id="high_demand_mode" value="1" class="form-check-input" style="margin:2px 0 0" <?= !empty($settings['high_demand_mode']) ? 'checked' : '' ?>>
       <label for="high_demand_mode" style="cursor:pointer">
         <span style="font-size:13px;font-weight:600;color:#92400E;display:block"><i class="bi bi-lightning-charge-fill me-1"></i>เปิดโหมดความต้องการใช้งานสูง (กระจายสิทธิ์การใช้งาน)</span>
-        <span style="font-size:11px;color:#92400E">ใช้เมื่อช่วงเวลานั้นมีผู้ต้องการจองมากผิดปกติ เพื่อไม่ให้ผู้ใช้บางคนใช้ทรัพยากรมากเกินไป เมื่อเปิดจะมีผลทันทีกับการจองใหม่ทุกคน:</span>
-        <ul style="font-size:11px;color:#92400E;margin:6px 0 0;padding-left:18px;line-height:1.6">
-          <li>ปิดสิทธิ์การใช้งานล่วงหน้า (Early Access) — เช็คอินและใช้งานได้เมื่อถึงเวลาที่จองไว้เท่านั้น</li>
-          <li>ห้ามจองช่วงเวลาที่ต่อเนื่องติดกันในวันเดียวกัน (เช่น เช้า + บ่าย ติดกันไม่ได้)</li>
-          <li>จองได้สูงสุด <?= Booking::HIGH_DEMAND_DAILY_LIMIT ?> ช่วงเวลาต่อคนต่อวัน</li>
-          <li>หน้าจองของนักศึกษาจะแสดงข้อความแจ้งเตือนสถานการณ์และกติกาเหล่านี้อย่างชัดเจน</li>
-        </ul>
+        <span style="font-size:11px;color:#92400E">ใช้เมื่อช่วงเวลานั้นมีผู้ต้องการจองมากผิดปกติ เพื่อไม่ให้ผู้ใช้บางคนใช้ทรัพยากรมากเกินไป เมื่อเปิดจะเปิดทุกมาตรการด้านล่างพร้อมกันและมีผลทันทีกับการจองใหม่ทุกคน · หรือปิดโหมดนี้แล้วเลือกเปิดเฉพาะบางมาตรการได้</span>
       </label>
     </div>
+    <?php
+    $hdMaster = !empty($settings['high_demand_mode']);
+    $hdOptions = [
+        'no_early'    => 'ปิดสิทธิ์การใช้งานล่วงหน้า (Early Access) — เช็คอินและใช้งานได้เมื่อถึงเวลาที่จองไว้เท่านั้น',
+        'no_adjacent' => 'ห้ามจองช่วงเวลาที่ต่อเนื่องติดกันในวันเดียวกัน (เช่น เช้า + บ่าย ติดกันไม่ได้)',
+        'daily_limit' => 'จองได้สูงสุด ' . Booking::HIGH_DEMAND_DAILY_LIMIT . ' ช่วงเวลาต่อคนต่อวัน',
+        'banner'      => 'หน้าจองของนักศึกษาจะแสดงข้อความแจ้งเตือนสถานการณ์และกติกาที่เปิดใช้อย่างชัดเจน',
+    ];
+    ?>
+    <div id="hd_rules" style="border:1px solid #FDBA74;border-top:none;border-radius:0 0 8px 8px;padding:8px 14px 10px 38px;max-width:600px;margin-top:-6px">
+      <?php foreach ($hdOptions as $rule => $text): $col = SlotSettings::HIGH_DEMAND_RULES[$rule]; ?>
+        <div style="display:flex;gap:8px;align-items:flex-start;margin-top:4px">
+          <input type="checkbox" name="hd_rules[<?= e($rule) ?>]" id="hd_<?= e($rule) ?>" value="1" class="form-check-input hd-rule" style="margin:2px 0 0" data-own="<?= !empty($settings[$col]) ? '1' : '0' ?>" <?= ($hdMaster || !empty($settings[$col])) ? 'checked' : '' ?> <?= $hdMaster ? 'disabled' : '' ?>>
+          <label for="hd_<?= e($rule) ?>" style="cursor:pointer;font-size:12px;color:#92400E"><?= e($text) ?></label>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <script>
+      // Master switch turns every rule on: tick + lock the individual boxes, restoring their own saved state when unticked.
+      (function () {
+        var master = document.getElementById('high_demand_mode');
+        master.addEventListener('change', function () {
+          document.querySelectorAll('#hd_rules .hd-rule').forEach(function (cb) {
+            if (master.checked) { cb.dataset.own = cb.checked ? '1' : '0'; cb.checked = true; cb.disabled = true; }
+            else { cb.disabled = false; cb.checked = cb.dataset.own === '1'; }
+          });
+        });
+      })();
+    </script>
     <div style="background:#FFF7ED;border-radius:8px;padding:10px 14px;margin-top:16px;font-size:12px;color:#92400E;display:flex;gap:8px;align-items:flex-start;max-width:600px">
       <i class="bi bi-info-circle-fill" style="margin-top:1px;flex-shrink:0"></i>
       <span>รองรับ<strong>ระบบเวลา 30 ชั่วโมง</strong>แบบญี่ปุ่น — ช่วงเวลาที่เลยเที่ยงคืนจะแสดงเป็น 24:00–30:00 (เช่น 25:00 = ตี 1 ของวันถัดไป) เพื่อให้ยังนับเป็นวันเดียวกัน · เวลาเริ่มต้นของวัน + (ความยาวช่วงเวลา × จำนวน Slots/วัน) ต้องไม่เกิน 30:00 น. · การเปลี่ยนแปลงมีผลกับการจองใหม่เท่านั้น</span>

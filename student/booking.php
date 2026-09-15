@@ -18,7 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $settings = Booking::limitsFor($user['id']);
 $maxConcurrent = (int) $settings['max_concurrent'];
-$highDemand = SlotSettings::isHighDemandMode($settings);
+$hdRules = [];
+foreach (array_keys(SlotSettings::HIGH_DEMAND_RULES) as $rule) {
+    $hdRules[$rule] = SlotSettings::highDemandRule($rule, $settings);
+}
+// The banner is itself a rule, and only shows when there is at least one booking rule to announce.
+$highDemand = $hdRules['banner'] && ($hdRules['no_early'] || $hdRules['no_adjacent'] || $hdRules['daily_limit']);
 $restricted = Booking::isRestricted($user['id']);
 $pendingReports = Booking::pendingReportsForUser($user['id']);
 $allowedPools = Booking::allowedAccountsFor($user['id']);
@@ -56,9 +61,9 @@ require __DIR__ . '/../includes/header.php';
       <div style="font-weight:700;margin-bottom:4px">ขณะนี้มีความต้องการใช้งานสูงผิดปกติ</div>
       <p style="margin:0 0 6px">ระบบเปิดใช้มาตรการกระจายสิทธิ์การใช้งานชั่วคราว เพื่อให้ทุกคนมีโอกาสจองได้อย่างทั่วถึง มีผลกับการจองใหม่ทุกรายการ:</p>
       <ul style="margin:0;padding-left:18px;line-height:1.6">
-        <li>ปิดสิทธิ์การใช้งานล่วงหน้า (Early Access) — เช็คอินและใช้งานได้เมื่อถึงเวลาที่จองไว้เท่านั้น</li>
-        <li>ห้ามจองช่วงเวลาที่ต่อเนื่องติดกันในวันเดียวกัน (เช่น จองช่วงเช้าแล้วจองบ่ายต่อกันไม่ได้)</li>
-        <li>จองได้สูงสุด <?= Booking::HIGH_DEMAND_DAILY_LIMIT ?> ช่วงเวลาต่อคนต่อวัน</li>
+        <?php if ($hdRules['no_early']): ?><li>ปิดสิทธิ์การใช้งานล่วงหน้า (Early Access) — เช็คอินและใช้งานได้เมื่อถึงเวลาที่จองไว้เท่านั้น</li><?php endif; ?>
+        <?php if ($hdRules['no_adjacent']): ?><li>ห้ามจองช่วงเวลาที่ต่อเนื่องติดกันในวันเดียวกัน (เช่น จองช่วงเช้าแล้วจองบ่ายต่อกันไม่ได้)</li><?php endif; ?>
+        <?php if ($hdRules['daily_limit']): ?><li>จองได้สูงสุด <?= Booking::HIGH_DEMAND_DAILY_LIMIT ?> ช่วงเวลาต่อคนต่อวัน</li><?php endif; ?>
       </ul>
     </div>
   </div>
