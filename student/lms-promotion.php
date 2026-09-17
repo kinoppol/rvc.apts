@@ -118,12 +118,57 @@ $statusChip = [
           <input type="hidden" name="action" value="submit_mission">
           <input type="hidden" name="level_id" value="<?= $levelId ?>">
           <div style="padding:20px">
-            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:6px">อธิบายผลงานของคุณ *</label>
-            <textarea name="mission_text" rows="6" required maxlength="5000" class="form-control" style="font-size:13.5px"
+            <?php if ($minMission > 0): ?>
+            <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;font-size:12px;color:#1D4ED8;margin-bottom:14px">
+              <i class="bi bi-info-circle-fill" style="flex-shrink:0;margin-top:1px"></i>
+              <div>
+                <strong>เงื่อนไขการส่งภารกิจ</strong><br>
+                คำอธิบายผลงานต้องมีความยาว<strong>ไม่น้อยกว่า <?= $minMission ?> ตัวอักษร</strong> — กรุณาอธิบายให้ครบว่าคุณทำอะไร ใช้ AI ตัวไหน ใช้ prompt อย่างไร และได้ผลลัพธ์เป็นอย่างไร
+              </div>
+            </div>
+            <?php endif; ?>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);margin:0">อธิบายผลงานของคุณ <span style="color:#EF4444">*</span></label>
+              <?php if ($minMission > 0): ?>
+              <span id="missionCharBadge" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FEF2F2;color:#DC2626;transition:background .2s,color .2s">
+                <span id="missionCharCount">0</span> / <?= $minMission ?> ตัวอักษร
+              </span>
+              <?php endif; ?>
+            </div>
+            <textarea name="mission_text" id="missionTextarea" rows="6" required maxlength="5000" class="form-control" style="font-size:13.5px;transition:border-color .2s"
                       <?= $minMission > 0 ? "minlength=\"{$minMission}\"" : '' ?>
                       placeholder="อธิบายว่าคุณทำอะไร ใช้ AI ตัวไหน ใช้ prompt อย่างไร และปรับแก้ผลลัพธ์อย่างไรบ้าง"></textarea>
             <?php if ($minMission > 0): ?>
-              <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px"><i class="bi bi-info-circle me-1"></i>ต้องอธิบายไม่น้อยกว่า <?= $minMission ?> ตัวอักษร</div>
+            <div style="margin-top:6px">
+              <div style="height:4px;border-radius:2px;background:var(--bs-border-color);overflow:hidden">
+                <div id="missionCharBar" style="height:100%;border-radius:2px;background:#DC2626;transition:width .2s,background .2s;width:0%"></div>
+              </div>
+              <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:3px" id="missionCharHint">กรอกข้อความให้ครบ <?= $minMission ?> ตัวอักษรก่อนส่ง</div>
+            </div>
+            <script>
+            (function() {
+              var ta = document.getElementById("missionTextarea");
+              var min = <?= $minMission ?>;
+              function update() {
+                var len = ta.value.length;
+                var pct = Math.min(100, Math.round(len / min * 100));
+                var ok  = len >= min;
+                document.getElementById("missionCharCount").textContent = len;
+                var badge = document.getElementById("missionCharBadge");
+                badge.style.background = ok ? "#F0FDF4" : "#FEF2F2";
+                badge.style.color = ok ? "#059669" : "#DC2626";
+                var bar = document.getElementById("missionCharBar");
+                bar.style.width = pct + "%";
+                bar.style.background = ok ? "#059669" : (pct > 50 ? "#D97706" : "#DC2626");
+                var hint = document.getElementById("missionCharHint");
+                hint.textContent = ok ? "✓ ความยาวผ่านเกณฑ์แล้ว" : "กรอกข้อความให้ครบ " + min + " ตัวอักษรก่อนส่ง (ขาดอีก " + Math.max(0, min - len) + " ตัว)";
+                hint.style.color = ok ? "#059669" : "var(--bs-tertiary-color)";
+                ta.style.borderColor = ok ? "#86EFAC" : (len > 0 ? "#FCA5A5" : "");
+              }
+              ta.addEventListener("input", update);
+              update();
+            })();
+            </script>
             <?php endif; ?>
 
             <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin:16px 0 6px">

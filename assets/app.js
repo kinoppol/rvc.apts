@@ -456,9 +456,25 @@
       var textarea = modalEl.querySelector("[name=report_text]");
       if (textarea) {
         textarea.value = btn.dataset.reportText || "";
-        var charCountEl = document.getElementById("reportCharCount");
-        if (charCountEl) charCountEl.textContent = textarea.value.length;
-        textarea.oninput = function() { if (charCountEl) charCountEl.textContent = textarea.value.length; };
+        function updateReportCounter() {
+          var len = textarea.value.length;
+          var min = parseInt(textarea.getAttribute("minlength") || "0", 10);
+          var countEl = document.getElementById("reportCharCount");
+          var badgeEl = document.getElementById("reportCharBadge");
+          var barEl   = document.getElementById("reportCharBar");
+          var hintEl  = document.getElementById("reportCharHint");
+          if (countEl) countEl.textContent = len;
+          if (min > 0) {
+            var pct = Math.min(100, Math.round(len / min * 100));
+            var ok  = len >= min;
+            if (badgeEl) { badgeEl.style.background = ok ? "#F0FDF4" : "#FEF2F2"; badgeEl.style.color = ok ? "#059669" : "#DC2626"; }
+            if (barEl)   { barEl.style.width = pct + "%"; barEl.style.background = ok ? "#059669" : (pct > 50 ? "#D97706" : "#DC2626"); }
+            if (hintEl)  { hintEl.textContent = ok ? "✓ ความยาวผ่านเกณฑ์แล้ว" : "กรอกข้อความให้ครบ " + min + " ตัวอักษรก่อนส่ง (ขาดอีก " + Math.max(0, min - len) + " ตัว)"; hintEl.style.color = ok ? "#059669" : "var(--bs-tertiary-color)"; }
+            textarea.style.borderColor = ok ? "#86EFAC" : (len > 0 ? "#FCA5A5" : "");
+          }
+        }
+        updateReportCounter();
+        textarea.oninput = updateReportCounter;
       }
       var fileInput = modalEl.querySelector("[name=report_file]");
       if (fileInput) fileInput.value = ""; // reset file picker; existing file is kept server-side

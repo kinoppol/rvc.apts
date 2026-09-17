@@ -318,16 +318,38 @@ require __DIR__ . '/../includes/header.php';
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
         </div>
         <div class="modal-body" style="padding:20px">
-          <p style="font-size:12px;color:var(--bs-secondary-color);margin:0 0 4px" id="reportModalMeta">—</p>
-          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">กรอกรายละเอียดการใช้งาน<?= $minReportChars > 0 ? " (ไม่น้อยกว่า {$minReportChars} ตัวอักษร)" : '' ?> และ/หรือ แนบไฟล์หลักฐาน (รูปภาพหรือ PDF) อย่างน้อยหนึ่งอย่าง</p>
+          <p style="font-size:12px;color:var(--bs-secondary-color);margin:0 0 10px" id="reportModalMeta">—</p>
+          <?php if ($minReportChars > 0): ?>
+          <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;font-size:12px;color:#1D4ED8;margin-bottom:12px">
+            <i class="bi bi-info-circle-fill" style="flex-shrink:0;margin-top:1px"></i>
+            <div>
+              <strong>เงื่อนไขการส่งรายงาน</strong><br>
+              รายละเอียดการใช้งานต้องมีความยาว<strong>ไม่น้อยกว่า <?= $minReportChars ?> ตัวอักษร</strong> — กรุณาอธิบายกิจกรรมที่ทำ ผลลัพธ์ที่ได้รับ และประโยชน์ที่ได้ให้ครบถ้วน
+            </div>
+          </div>
+          <?php else: ?>
+          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">กรอกรายละเอียดการใช้งาน และ/หรือ แนบไฟล์หลักฐาน (รูปภาพหรือ PDF) อย่างน้อยหนึ่งอย่าง</p>
+          <?php endif; ?>
           <div id="reportRejectionNote" style="display:none;padding:10px 14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;font-size:12px;color:#DC2626;margin-bottom:12px">
             <i class="bi bi-exclamation-circle me-1"></i><strong>เหตุผลที่ถูกปฏิเสธ:</strong> <span id="reportRejectionNoteText"></span>
           </div>
           <div style="margin-bottom:12px">
-            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">รายละเอียดการใช้งาน<?= $minReportChars > 0 ? ' *' : '' ?></label>
-            <textarea name="report_text" id="reportTextarea" rows="4" maxlength="2000" class="form-control" placeholder="อธิบายสิ่งที่ได้ทำ/ผลลัพธ์จากการใช้ AI ในรอบนี้..." style="font-size:13px"<?= $minReportChars > 0 ? " required minlength=\"{$minReportChars}\"" : '' ?>></textarea>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+              <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);margin:0">รายละเอียดการใช้งาน<?= $minReportChars > 0 ? ' <span style="color:#EF4444">*</span>' : '' ?></label>
+              <?php if ($minReportChars > 0): ?>
+              <span id="reportCharBadge" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#FEF2F2;color:#DC2626;transition:background .2s,color .2s">
+                <span id="reportCharCount">0</span> / <?= $minReportChars ?> ตัวอักษร
+              </span>
+              <?php endif; ?>
+            </div>
+            <textarea name="report_text" id="reportTextarea" rows="5" maxlength="2000" class="form-control" placeholder="อธิบายสิ่งที่ได้ทำ เช่น ใช้ AI ช่วยงานอะไร ผลลัพธ์ที่ได้คืออะไร มีประโยชน์อย่างไร..." style="font-size:13px;transition:border-color .2s"<?= $minReportChars > 0 ? " required minlength=\"{$minReportChars}\"" : '' ?>></textarea>
             <?php if ($minReportChars > 0): ?>
-              <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">ต้องมีอย่างน้อย <?= $minReportChars ?> ตัวอักษร (<span id="reportCharCount">0</span>/<?= $minReportChars ?>)</div>
+            <div style="margin-top:6px">
+              <div style="height:4px;border-radius:2px;background:var(--bs-border-color);overflow:hidden">
+                <div id="reportCharBar" style="height:100%;border-radius:2px;background:#DC2626;transition:width .2s,background .2s;width:0%"></div>
+              </div>
+              <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:3px" id="reportCharHint">กรอกข้อความให้ครบ <?= $minReportChars ?> ตัวอักษรก่อนส่ง</div>
+            </div>
             <?php endif; ?>
           </div>
           <div>
