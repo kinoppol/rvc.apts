@@ -1178,6 +1178,15 @@ final class Booking
             case 'report_review':
                 $where[] = "b.report_status = 'pending_review' AND b.reported_at IS NOT NULL";
                 break;
+            case 'report_accepted':
+                $where[] = "b.report_status = 'accepted' AND b.reported_at IS NOT NULL";
+                break;
+            case 'report_rejected':
+                $where[] = "b.report_status = 'rejected' AND b.reported_at IS NOT NULL";
+                break;
+            case 'report_all':
+                $where[] = 'b.reported_at IS NOT NULL';
+                break;
         }
 
         $wc  = $where ? 'WHERE ' . implode(' AND ', $where) : '';

@@ -5,8 +5,9 @@
  */
 $__user = current_user();
 $__isAdmin = $__user['role'] === 'admin';
-$__pendingCount = $__isAdmin ? Member::pendingCount() : 0;
-$__lmsPending   = $__isAdmin ? LmsPromotion::pendingCount() : 0;
+$__pendingCount          = $__isAdmin ? Member::pendingCount() : 0;
+$__lmsPending            = $__isAdmin ? LmsPromotion::pendingCount() : 0;
+$__reportReviewPending   = $__isAdmin ? Booking::pendingReviewCount() : 0;
 $__initial = mb_substr($__user['name'], 0, 1);
 $__roleLabel = $__isAdmin ? 'Admin' : ('นักศึกษา' . (!empty($__user['group_name']) ? ' (กลุ่ม: ' . $__user['group_name'] . ')' : ''));
 $__notifications = Notification::forUser($__user);
@@ -151,6 +152,10 @@ $__institutionName = SlotSettings::get()['institution_name'] ?? 'วิทยา
           <a class="<?= nav_cls('lms-promotions', $activeNav ?? null) ?>" href="<?= url('admin/lms-promotions.php') ?>">
             <i class="bi bi-patch-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">คำขอเลื่อนระดับ</span>
             <?php if ($__lmsPending > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__lmsPending ?></span><?php endif; ?>
+          </a>
+          <a class="<?= nav_cls('report-review', $activeNav ?? null) ?>" href="<?= url('admin/report-review.php') ?>">
+            <i class="bi bi-clipboard2-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ตรวจสอบรายงาน</span>
+            <?php if ($__reportReviewPending > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__reportReviewPending ?></span><?php endif; ?>
           </a>
           <a class="<?= nav_cls('slot-management', $activeNav ?? null) ?>" href="<?= url('admin/slots.php') ?>">
             <i class="bi bi-calendar-range" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการตารางเวลา</span>
