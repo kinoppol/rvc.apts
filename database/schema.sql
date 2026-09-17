@@ -106,6 +106,8 @@ CREATE TABLE slot_settings (
     hd_no_adjacent    TINYINT(1) NOT NULL DEFAULT 0,               -- high-demand rule: no back-to-back slots on one day
     hd_daily_limit    TINYINT(1) NOT NULL DEFAULT 0,               -- high-demand rule: at most Booking::HIGH_DEMAND_DAILY_LIMIT slots per day
     hd_show_banner    TINYINT(1) NOT NULL DEFAULT 0,               -- high-demand rule: warning banner on student/booking.php
+    min_report_chars  SMALLINT UNSIGNED NOT NULL DEFAULT 0,        -- minimum text length for usage reports (0 = no minimum)
+    min_mission_chars SMALLINT UNSIGNED NOT NULL DEFAULT 0,        -- minimum text length for LMS mission submissions (0 = no minimum)
     terms_file        VARCHAR(255) NULL DEFAULT NULL,              -- filename of the active terms-of-service PDF (NULL = no terms required)
     institution_name  VARCHAR(200) NOT NULL DEFAULT 'วิทยาลัย RVC', -- shown on the login/landing pages; admin-editable
     sso_verify_ip     VARCHAR(45) NULL DEFAULT NULL,               -- optional private IP override for the server-to-server ONE-RVC token-verify call (see includes/SsoAuth.php); NULL = resolve ONE_RVC_VERIFY_URL's hostname normally
@@ -127,7 +129,11 @@ CREATE TABLE bookings (
     purpose        VARCHAR(500) NOT NULL DEFAULT '',   -- why the student booked the slot (required at booking time)
     report_text    TEXT NULL,                          -- post-use report body
     report_file    VARCHAR(255) NULL,                  -- optional uploaded evidence (image/PDF) filename
-    reported_at    DATETIME NULL,                      -- when the usage report was submitted (NULL = not yet reported)
+    reported_at        DATETIME NULL,                      -- when the usage report was submitted (NULL = not yet reported)
+    report_status      ENUM('pending_review','accepted','rejected') DEFAULT NULL, -- admin review verdict (NULL = not yet queued)
+    report_review_note TEXT DEFAULT NULL,               -- admin note on accept/reject
+    report_reviewed_by INT UNSIGNED DEFAULT NULL,       -- admin user id who reviewed
+    report_reviewed_at DATETIME DEFAULT NULL,           -- when admin reviewed
     issue_text     TEXT NULL,                          -- problem the student encountered during the slot (NULL = no issue)
     issue_at       DATETIME NULL,                      -- when the issue was reported
     token_start_pct TINYINT UNSIGNED NULL DEFAULT NULL, -- token usage % at start of session (0-100)

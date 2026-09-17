@@ -51,6 +51,10 @@ final class LmsPromotion
         if ($missionText === '') {
             return ['ok' => false, 'error' => 'กรุณาอธิบายผลงาน/ภารกิจของคุณ'];
         }
+        $minMission = SlotSettings::getMinChars()['mission'];
+        if ($minMission > 0 && mb_strlen($missionText) < $minMission) {
+            return ['ok' => false, 'error' => "คำอธิบายผลงานต้องมีความยาวไม่น้อยกว่า {$minMission} ตัวอักษร"];
+        }
 
         $entries = LmsFile::normalizeMultiple($files);
         if (count($entries) > self::MAX_FILES) {

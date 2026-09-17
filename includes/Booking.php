@@ -416,6 +416,9 @@ final class Booking
         if (self::isRestricted($userId)) {
             return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับการจองชั่วคราว เนื่องจากมีรายงานการใช้งานค้างเกิน ' . self::REPORT_DEADLINE_DAYS . ' วัน กรุณารายงานการใช้งานที่ค้างให้ครบก่อน'];
         }
+        if (!self::isScoreOk($userId)) {
+            return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับการจองชั่วคราว เนื่องจากคะแนนความน่าเชื่อถือติดลบ กรุณาแก้ไขรายงานที่ถูกปฏิเสธแล้วรอผู้ดูแลระบบตรวจสอบใหม่'];
+        }
 
         $purpose = trim($purpose);
         if ($purpose === '') {
@@ -667,8 +670,16 @@ final class Booking
             $row['reportDeadlineLabel'] = self::thaiDate($deadline);
             $daysLeft = (int) (new DateTimeImmutable($now->format('Y-m-d')))->diff(new DateTimeImmutable($deadline->format('Y-m-d')))->format('%r%a');
             $row['reportDaysLeft'] = $daysLeft;
+            $reviewStatus = $row['report_status'] ?? null;
+            $row['reportReviewStatus'] = $reviewStatus;
+            $row['reportReviewNote']   = $row['report_review_note'] ?? null;
+            $row['reportAccepted']     = $reviewStatus === 'accepted';
+            $row['canEditReport']      = $reported && !$row['reportAccepted'];
             if ($reported) {
-                $row['reportStatusText'] = 'รายงานแล้ว';
+                if ($reviewStatus === 'accepted')      $row['reportStatusText'] = 'รายงานแล้ว (ยอมรับแล้ว)';
+                elseif ($reviewStatus === 'rejected')  $row['reportStatusText'] = 'รายงานแล้ว (ถูกปฏิเสธ)';
+                elseif ($reviewStatus === 'pending_review') $row['reportStatusText'] = 'รายงานแล้ว (รอตรวจสอบ)';
+                else $row['reportStatusText'] = 'รายงานแล้ว';
             } elseif ($row['needsReport']) {
                 $row['reportStatusText'] = $row['reportOverdue'] ? 'เกินกำหนดรายงาน ' . abs($daysLeft) . ' วัน' : 'ต้องรายงานภายใน ' . $daysLeft . ' วัน';
             } else {
@@ -859,6 +870,9 @@ final class Booking
         if ($b['status'] === 'cancelled') {
             return ['ok' => false, 'error' => 'รายการนี้ถูกยกเลิกแล้ว ไม่ต้องรายงาน'];
         }
+        if (($b['report_status'] ?? null) === 'accepted') {
+            return ['ok' => false, 'error' => 'รายงานนี้ได้รับการยอมรับแล้ว ไม่สามารถแก้ไขได้'];
+        }
         $doneEarly = !empty($b['checked_out_at']);
         if (!$doneEarly && new DateTimeImmutable() < new DateTimeImmutable($b['end_datetime'])) {
             return ['ok' => false, 'error' => 'ยังใช้งานไม่เสร็จ ยังไม่ต้องรายงาน'];
@@ -866,7 +880,12 @@ final class Booking
         $text = trim($text);
         $hasFile = $file && isset($file['error']) && $file['error'] === UPLOAD_ERR_OK;
         $hasExistingFile = !empty($b['report_file']);
-        if ($text === '' && !$hasFile && !$hasExistingFile) {
+        $minChars = SlotSettings::getMinChars()['report'];
+        if ($minChars > 0) {
+            if (mb_strlen($text) < $minChars) {
+                return ['ok' => false, 'error' => "รายละเอียดการใช้งานต้องมีความยาวไม่น้อยกว่า {$minChars} ตัวอักษร"];
+            }
+        } elseif ($text === '' && !$hasFile && !$hasExistingFile) {
             return ['ok' => false, 'error' => 'กรุณากรอกรายละเอียดการใช้งาน หรือแนบไฟล์อย่างน้อยหนึ่งอย่าง'];
         }
 
@@ -896,6 +915,8 @@ final class Booking
         $upd = Database::pdo()->prepare(
             'UPDATE bookings SET
                 report_text = ?, report_file = ?, reported_at = NOW(),
+                report_status = \'pending_review\', report_review_note = NULL,
+                report_reviewed_by = NULL, report_reviewed_at = NULL,
                 token_start_pct = ?, token_end_pct = ?, token_reset_at = ?
              WHERE id = ?'
         );
@@ -1154,6 +1175,9 @@ final class Booking
             case 'cancelled':
                 $where[] = "b.status = 'cancelled'";
                 break;
+            case 'report_review':
+                $where[] = "b.report_status = 'pending_review' AND b.reported_at IS NOT NULL";
+                break;
         }
 
         $wc  = $where ? 'WHERE ' . implode(' AND ', $where) : '';
@@ -1206,6 +1230,74 @@ final class Booking
             "UPDATE bookings SET reported_at = NOW(), report_text = COALESCE(report_text, 'ยกเว้นโดยผู้ดูแลระบบ') WHERE id = ?"
         )->execute([$bookingId]);
         return ['ok' => true];
+    }
+
+    /**
+     * Admin reviews a usage report: accepts (+1 score) or rejects (-1 score, reason required).
+     * @param string $verdict 'accepted' | 'rejected'
+     * @return array{ok:bool,error?:string}
+     */
+    public static function reviewReport(int $adminId, int $bookingId, string $verdict, string $note): array
+    {
+        if (!in_array($verdict, ['accepted', 'rejected'], true)) {
+            return ['ok' => false, 'error' => 'การตัดสินไม่ถูกต้อง'];
+        }
+        $note = trim($note);
+        if ($verdict === 'rejected' && $note === '') {
+            return ['ok' => false, 'error' => 'กรุณาระบุเหตุผลการปฏิเสธ'];
+        }
+
+        $stmt = Database::pdo()->prepare('SELECT id, report_status FROM bookings WHERE id = ?');
+        $stmt->execute([$bookingId]);
+        $b = $stmt->fetch();
+        if (!$b) return ['ok' => false, 'error' => 'ไม่พบรายการ'];
+        if (($b['report_status'] ?? null) !== 'pending_review') {
+            return ['ok' => false, 'error' => 'รายงานนี้ไม่อยู่ในสถานะรอตรวจสอบ'];
+        }
+
+        $upd = Database::pdo()->prepare(
+            "UPDATE bookings SET report_status = ?, report_review_note = ?, report_reviewed_by = ?, report_reviewed_at = NOW()
+             WHERE id = ? AND report_status = 'pending_review'"
+        );
+        $upd->execute([$verdict, $note !== '' ? mb_substr($note, 0, 1000) : null, $adminId, $bookingId]);
+        if ($upd->rowCount() !== 1) {
+            return ['ok' => false, 'error' => 'รายงานนี้ถูกตรวจสอบไปแล้ว'];
+        }
+        return ['ok' => true];
+    }
+
+    /**
+     * Reputation score for a user: +1 per accepted report, -1 per currently-rejected report.
+     * A revised (re-submitted) report returns to pending_review and no longer counts as -1.
+     */
+    public static function userScore(int $userId): int
+    {
+        $stmt = Database::pdo()->prepare(
+            "SELECT COALESCE(SUM(CASE WHEN report_status = 'accepted' THEN 1
+                                      WHEN report_status = 'rejected' THEN -1
+                                      ELSE 0 END), 0) AS score
+             FROM bookings WHERE user_id = ?"
+        );
+        $stmt->execute([$userId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /** Score >= 0 means the user may book. Negative score = booking blocked. */
+    public static function isScoreOk(int $userId): bool
+    {
+        return self::userScore($userId) >= 0;
+    }
+
+    /** Count of reports currently awaiting admin review (across all users). */
+    public static function pendingReviewCount(): int
+    {
+        try {
+            return (int) Database::pdo()
+                ->query("SELECT COUNT(*) FROM bookings WHERE report_status = 'pending_review'")
+                ->fetchColumn();
+        } catch (PDOException $e) {
+            return 0;
+        }
     }
 
     /**

@@ -21,6 +21,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'waive_report') {
         $result = Booking::waiveReportForBooking($id);
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'ยกเว้นรายงานเรียบร้อยแล้ว' : ($result['error'] ?? 'ดำเนินการไม่สำเร็จ'));
+    } elseif ($action === 'review_report') {
+        $verdict = $_POST['verdict'] ?? '';
+        $note    = $_POST['review_note'] ?? '';
+        $result  = Booking::reviewReport((int) $user['id'], $id, $verdict, $note);
+        if ($result['ok']) {
+            $msg = $verdict === 'accepted' ? 'ยอมรับรายงานเรียบร้อยแล้ว (+1 คะแนน)' : 'ปฏิเสธรายงานเรียบร้อยแล้ว (-1 คะแนน)';
+            flash_set('ok', $msg);
+        } else {
+            flash_set('err', $result['error'] ?? 'ดำเนินการไม่สำเร็จ');
+        }
     }
     header('Location: ' . bkgs_return_url());
     exit;
@@ -28,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $search       = trim($_GET['search'] ?? '');
 $statusFilter = $_GET['status_filter'] ?? 'all';
-$validSt      = ['all', 'upcoming', 'checked_in', 'now', 'checked_out', 'completed', 'no_show', 'cancelled'];
+$validSt      = ['all', 'upcoming', 'checked_in', 'now', 'checked_out', 'completed', 'no_show', 'cancelled', 'report_review'];
 if (!in_array($statusFilter, $validSt, true)) $statusFilter = 'all';
 $accountId = max(0, (int) ($_GET['account_id'] ?? 0));
 $dateFrom  = $_GET['date_from'] ?? '';
@@ -91,15 +101,17 @@ function bkgs_action_form(int $bookingId, string $action, string $btnCls, string
         . '</form>';
 }
 
+$pendingReviewCount = Booking::pendingReviewCount();
 $statusChips = [
-    'all'         => 'ทั้งหมด',
-    'upcoming'    => 'กำลังจะมาถึง',
-    'checked_in'  => 'ยืนยันแล้ว',
-    'now'         => 'กำลังใช้งาน',
-    'checked_out' => 'เช็คเอาท์แล้ว',
-    'completed'   => 'เสร็จสิ้น',
-    'no_show'     => 'ไม่ได้มา',
-    'cancelled'   => 'ยกเลิก',
+    'all'           => 'ทั้งหมด',
+    'report_review' => 'รอตรวจสอบรายงาน' . ($pendingReviewCount > 0 ? " ({$pendingReviewCount})" : ''),
+    'upcoming'      => 'กำลังจะมาถึง',
+    'checked_in'    => 'ยืนยันแล้ว',
+    'now'           => 'กำลังใช้งาน',
+    'checked_out'   => 'เช็คเอาท์แล้ว',
+    'completed'     => 'เสร็จสิ้น',
+    'no_show'       => 'ไม่ได้มา',
+    'cancelled'     => 'ยกเลิก',
 ];
 
 // Quick date-range shortcuts. These filter on booking_date (the "business day" a slot starts on),
@@ -252,6 +264,18 @@ require __DIR__ . '/../includes/header.php';
               <?php if (!empty($bk['report_file'])): ?>
                 <div style="margin-top:3px"><a href="<?= url('uploads/reports/' . $bk['report_file']) ?>" target="_blank" style="font-size:11px;color:#2563EB;text-decoration:none"><i class="bi bi-paperclip me-1"></i>ไฟล์แนบ</a></div>
               <?php endif; ?>
+              <?php if (!empty($bk['report_status'])): ?>
+                <?php if ($bk['report_status'] === 'pending_review'): ?>
+                  <div style="margin-top:4px"><span class="badge-pend" style="font-size:10px"><i class="bi bi-hourglass-split me-1"></i>รอตรวจสอบ</span></div>
+                <?php elseif ($bk['report_status'] === 'accepted'): ?>
+                  <div style="margin-top:4px"><span class="badge-ok" style="font-size:10px"><i class="bi bi-check-circle-fill me-1"></i>ยอมรับแล้ว (+1)</span></div>
+                <?php elseif ($bk['report_status'] === 'rejected'): ?>
+                  <div style="margin-top:4px"><span class="badge-susp" style="font-size:10px"><i class="bi bi-x-circle-fill me-1"></i>ปฏิเสธ (-1)</span></div>
+                  <?php if (!empty($bk['report_review_note'])): ?>
+                    <div style="font-size:10px;color:#DC2626;margin-top:2px"><?= e(mb_strimwidth($bk['report_review_note'], 0, 60, '…')) ?></div>
+                  <?php endif; ?>
+                <?php endif; ?>
+              <?php endif; ?>
               <?php if ($bk['token_start_pct'] !== null || $bk['token_end_pct'] !== null || !empty($bk['token_reset_at'])): ?>
                 <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
                   <?php if ($bk['token_start_pct'] !== null): ?><span style="font-size:10px;background:var(--bs-secondary-bg);border-radius:4px;padding:2px 5px;color:var(--bs-secondary-color);white-space:nowrap"><i class="bi bi-speedometer2 me-1"></i>ก่อน <?= (int)$bk['token_start_pct'] ?>%</span><?php endif; ?>
@@ -275,7 +299,13 @@ require __DIR__ . '/../includes/header.php';
                 <?php if ($bk['reportOverdue']): ?>
                   <?= bkgs_action_form((int)$bk['id'], 'waive_report', 'action-btn-warn', 'bi-unlock', 'ปลดรายงาน', 'ยกเว้นรายงานค้างของรายการนี้?') ?>
                 <?php endif; ?>
-                <?php if (!$adminCanCancel && !$bk['reportOverdue']): ?>
+                <?php if (($bk['report_status'] ?? null) === 'pending_review'): ?>
+                  <button type="button" class="action-btn-blue" style="white-space:nowrap"
+                    onclick="openReviewModal(<?= (int)$bk['id'] ?>,<?= e(json_encode(mb_strimwidth((string)($bk['report_text']??''), 0, 300, '…'), JSON_UNESCAPED_UNICODE)) ?>,<?= e(json_encode((string)($bk['student_name']??''), JSON_UNESCAPED_UNICODE)) ?>,<?= !empty($bk['report_file']) ? e(json_encode(url('uploads/reports/'.$bk['report_file']), JSON_UNESCAPED_UNICODE)) : 'null' ?>)">
+                    <i class="bi bi-clipboard2-check me-1"></i>ตรวจสอบรายงาน
+                  </button>
+                <?php endif; ?>
+                <?php if (!$adminCanCancel && !$bk['reportOverdue'] && ($bk['report_status'] ?? null) !== 'pending_review'): ?>
                   <span style="font-size:12px;color:var(--bs-tertiary-color)">—</span>
                 <?php endif; ?>
               </div>
@@ -308,4 +338,71 @@ require __DIR__ . '/../includes/header.php';
   </div>
 </div>
 
+<!-- Report Review Modal -->
+<div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post" id="reviewForm">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="review_report">
+        <input type="hidden" name="id" id="reviewBookingId">
+        <?php foreach (['search' => $search, 'status_filter' => $statusFilter, 'account_id' => $accountId, 'date_from' => $dateFrom, 'date_to' => $dateTo, 'page' => $page] as $k => $v): ?>
+          <input type="hidden" name="<?= e($k) ?>" value="<?= e((string)$v) ?>">
+        <?php endforeach; ?>
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-clipboard2-check me-2" style="color:#2563EB"></i>ตรวจสอบรายงานการใช้งาน</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" style="padding:20px">
+          <div style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);margin-bottom:6px" id="reviewStudentName"></div>
+          <div id="reviewReportText" style="font-size:13px;line-height:1.7;padding:10px 14px;background:var(--bs-secondary-bg);border-radius:8px;white-space:pre-wrap;margin-bottom:10px;max-height:200px;overflow-y:auto"></div>
+          <div id="reviewFileLink" style="margin-bottom:14px;display:none">
+            <a id="reviewFileLinkA" href="#" target="_blank" style="font-size:12px;color:#2563EB;text-decoration:none"><i class="bi bi-paperclip me-1"></i>เปิดไฟล์แนบ</a>
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:8px">ผลการตรวจสอบ</label>
+            <div style="display:flex;gap:10px">
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:8px 14px;border:1.5px solid #059669;border-radius:8px;flex:1;justify-content:center" id="labelAccept">
+                <input type="radio" name="verdict" value="accepted" required onchange="toggleReviewNote(this.value)" style="accent-color:#059669">
+                <i class="bi bi-check-circle-fill" style="color:#059669"></i><strong>ยอมรับ</strong> <span style="font-size:11px;color:#059669">(+1 คะแนน)</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:8px 14px;border:1.5px solid #DC2626;border-radius:8px;flex:1;justify-content:center" id="labelReject">
+                <input type="radio" name="verdict" value="rejected" onchange="toggleReviewNote(this.value)" style="accent-color:#DC2626">
+                <i class="bi bi-x-circle-fill" style="color:#DC2626"></i><strong>ปฏิเสธ</strong> <span style="font-size:11px;color:#DC2626">(-1 คะแนน)</span>
+              </label>
+            </div>
+          </div>
+          <div id="reviewNoteWrap">
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">เหตุผล / ความเห็น <span id="reviewNoteRequired" style="color:#EF4444;display:none">*</span></label>
+            <textarea name="review_note" id="reviewNote" rows="3" maxlength="1000" class="form-control" placeholder="ระบุเหตุผลหรือข้อเสนอแนะ..." style="font-size:13px"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none"><i class="bi bi-send me-1"></i>บันทึกผล</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+function openReviewModal(id, text, student, fileUrl) {
+  document.getElementById('reviewBookingId').value = id;
+  document.getElementById('reviewStudentName').textContent = student;
+  document.getElementById('reviewReportText').textContent = text || '(ไม่มีข้อความ)';
+  var fl = document.getElementById('reviewFileLink');
+  var fa = document.getElementById('reviewFileLinkA');
+  if (fileUrl) { fa.href = fileUrl; fl.style.display = ''; } else { fl.style.display = 'none'; }
+  document.querySelectorAll('#reviewForm input[name="verdict"]').forEach(function(r){ r.checked = false; });
+  document.getElementById('reviewNote').value = '';
+  toggleReviewNote('');
+  new bootstrap.Modal(document.getElementById('reviewModal')).show();
+}
+function toggleReviewNote(verdict) {
+  var req = document.getElementById('reviewNoteRequired');
+  var ta  = document.getElementById('reviewNote');
+  if (verdict === 'rejected') { req.style.display=''; ta.required = true; }
+  else { req.style.display='none'; ta.required = false; }
+}
+</script>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

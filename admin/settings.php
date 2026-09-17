@@ -8,6 +8,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'sso_verify_ip') {
         $result = SlotSettings::updateSsoVerifyIp($_POST['sso_verify_ip'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกการตั้งค่า ONE-RVC เรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
+    } elseif ($action === 'min_chars') {
+        $result = SlotSettings::updateMinChars((int) ($_POST['min_report_chars'] ?? 0), (int) ($_POST['min_mission_chars'] ?? 0));
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกความยาวขั้นต่ำเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
     } else {
         $result = SlotSettings::updateInstitutionName($_POST['institution_name'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกชื่อสถานศึกษาเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
@@ -48,6 +51,26 @@ require __DIR__ . '/../includes/header.php';
       ใช้เมื่อเซิร์ฟเวอร์ของระบบนี้เข้าถึงโดเมนของ ONE-RVC โดยตรงไม่ได้ (เช่นอยู่บน internal bridge network เดียวกัน) —
       ระบบจะยังคงใช้ชื่อโดเมนเดิมใน URL/Host header ตามปกติ เพียงแต่เชื่อมต่อ TCP ไปยัง IP นี้แทนการ resolve ชื่อโดเมน
     </div>
+  </form>
+</div>
+<div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;max-width:700px;margin-top:16px">
+  <h6 style="font-weight:700;margin:0 0 14px"><i class="bi bi-text-paragraph me-2" style="color:#2563EB"></i>ความยาวข้อความขั้นต่ำ</h6>
+  <form method="post">
+    <?= Csrf::field() ?>
+    <input type="hidden" name="action" value="min_chars">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">รายงานการใช้งาน (ตัวอักษร)</label>
+        <input type="number" name="min_report_chars" class="form-control" value="<?= (int) ($settings['min_report_chars'] ?? 0) ?>" min="0" max="2000" style="font-size:13px">
+        <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">0 = ไม่กำหนดขั้นต่ำ</div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">คำขอเลื่อนระดับ LMS (ตัวอักษร)</label>
+        <input type="number" name="min_mission_chars" class="form-control" value="<?= (int) ($settings['min_mission_chars'] ?? 0) ?>" min="0" max="5000" style="font-size:13px">
+        <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">0 = ไม่กำหนดขั้นต่ำ</div>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px"><i class="bi bi-save me-1"></i>บันทึก</button>
   </form>
 </div>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

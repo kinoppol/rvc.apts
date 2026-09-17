@@ -91,6 +91,31 @@ final class SlotSettings
         return ['ok' => true];
     }
 
+    /** Minimum character counts for user-submitted text (0 = disabled). */
+    public static function getMinChars(?array $settings = null): array
+    {
+        $settings ??= self::get();
+        return [
+            'report'  => (int) ($settings['min_report_chars']  ?? 0),
+            'mission' => (int) ($settings['min_mission_chars'] ?? 0),
+        ];
+    }
+
+    /** @return array{ok:bool,error?:string} */
+    public static function updateMinChars(int $minReport, int $minMission): array
+    {
+        if ($minReport < 0 || $minMission < 0) {
+            return ['ok' => false, 'error' => 'ค่าต้องไม่ต่ำกว่า 0'];
+        }
+        if ($minReport > 2000 || $minMission > 5000) {
+            return ['ok' => false, 'error' => 'ค่าสูงเกินไป'];
+        }
+        Database::pdo()->prepare(
+            'UPDATE slot_settings SET min_report_chars = ?, min_mission_chars = ? WHERE id = 1'
+        )->execute([$minReport, $minMission]);
+        return ['ok' => true];
+    }
+
     /** Admin-configured private-IP override for the ONE-RVC verify-token call, or null if unset. */
     public static function getSsoVerifyIp(): ?string
     {

@@ -34,9 +34,10 @@ if (!$level || (int) $level['is_published'] !== 1) {
     exit;
 }
 
-$state   = LmsProgress::levelState($uid, $levelId);
-$canSend = LmsProgress::canRequestPromotion($uid, $levelId);
-$history = LmsPromotion::historyFor($uid, $levelId);
+$state        = LmsProgress::levelState($uid, $levelId);
+$canSend      = LmsProgress::canRequestPromotion($uid, $levelId);
+$minMission   = SlotSettings::getMinChars()['mission'];
+$history      = LmsPromotion::historyFor($uid, $levelId);
 $files   = LmsPromotion::filesFor(array_map(fn ($h) => (int) $h['id'], $history));
 $target  = $level['promo_group_id'] !== null ? UserGroup::find((int) $level['promo_group_id']) : null;
 
@@ -119,7 +120,11 @@ $statusChip = [
           <div style="padding:20px">
             <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:6px">อธิบายผลงานของคุณ *</label>
             <textarea name="mission_text" rows="6" required maxlength="5000" class="form-control" style="font-size:13.5px"
+                      <?= $minMission > 0 ? "minlength=\"{$minMission}\"" : '' ?>
                       placeholder="อธิบายว่าคุณทำอะไร ใช้ AI ตัวไหน ใช้ prompt อย่างไร และปรับแก้ผลลัพธ์อย่างไรบ้าง"></textarea>
+            <?php if ($minMission > 0): ?>
+              <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px"><i class="bi bi-info-circle me-1"></i>ต้องอธิบายไม่น้อยกว่า <?= $minMission ?> ตัวอักษร</div>
+            <?php endif; ?>
 
             <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin:16px 0 6px">
               แนบไฟล์ผลงาน (รูปภาพหรือ PDF สูงสุด <?= LmsPromotion::MAX_FILES ?> ไฟล์ ไฟล์ละไม่เกิน 5 MB)

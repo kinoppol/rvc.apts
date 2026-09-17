@@ -454,7 +454,12 @@
       var meta = document.getElementById("reportModalMeta");
       if (meta) meta.textContent = btn.dataset.meta || "";
       var textarea = modalEl.querySelector("[name=report_text]");
-      if (textarea) textarea.value = btn.dataset.reportText || "";
+      if (textarea) {
+        textarea.value = btn.dataset.reportText || "";
+        var charCountEl = document.getElementById("reportCharCount");
+        if (charCountEl) charCountEl.textContent = textarea.value.length;
+        textarea.oninput = function() { if (charCountEl) charCountEl.textContent = textarea.value.length; };
+      }
       var fileInput = modalEl.querySelector("[name=report_file]");
       if (fileInput) fileInput.value = ""; // reset file picker; existing file is kept server-side
       var tsStart = modalEl.querySelector("[name=token_start_pct]");
@@ -463,6 +468,13 @@
       if (tsEnd) tsEnd.value = btn.dataset.tokenEnd || "";
       var tsReset = modalEl.querySelector("[name=token_reset_at]");
       if (tsReset) tsReset.value = btn.dataset.tokenReset || "";
+      var noteEl = document.getElementById("reportRejectionNote");
+      var noteTextEl = document.getElementById("reportRejectionNoteText");
+      if (noteEl && noteTextEl) {
+        var note = btn.dataset.reviewNote || "";
+        if (note) { noteTextEl.textContent = note; noteEl.style.display = ""; }
+        else { noteEl.style.display = "none"; }
+      }
       new bootstrap.Modal(modalEl).show();
     });
   });

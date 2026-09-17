@@ -40,8 +40,12 @@ $filter = $_GET['filter'] ?? 'all';
 if (!isset($filters[$filter])) {
     $filter = 'all';
 }
+$settings = SlotSettings::get();
+$minReportChars = (int) ($settings['min_report_chars'] ?? 0);
 $bookings = Booking::listForUser($user['id'], $filter);
 $restricted = Booking::isRestricted($user['id']);
+$scoreOk = Booking::isScoreOk($user['id']);
+$userScore = Booking::userScore($user['id']);
 $pendingReports = Booking::pendingReportsForUser($user['id']);
 $earlyAccess = Booking::earlyAccessForUser($user['id']);
 $earlyById = array_column($earlyAccess, null, 'id');
@@ -94,10 +98,20 @@ require __DIR__ . '/../includes/header.php';
 </div>
 <?php endforeach; ?>
 
-<?php if ($restricted): ?>
+<?php if (!$scoreOk): ?>
+  <div class="bk-alert-err" style="border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;display:flex;gap:8px;align-items:flex-start">
+    <i class="bi bi-slash-circle-fill" style="flex-shrink:0;margin-top:1px"></i>
+    <span><strong>ถูกระงับการจองชั่วคราว (คะแนนติดลบ)</strong> — คะแนนของคุณอยู่ที่ <?= $userScore ?> คะแนน กรุณาแก้ไขรายงานที่ถูกปฏิเสธ (ปุ่ม "แก้ไขรายงาน") แล้วรอผู้ดูแลตรวจสอบใหม่</span>
+  </div>
+<?php elseif ($restricted): ?>
   <div class="bk-alert-err" style="border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;display:flex;gap:8px;align-items:flex-start">
     <i class="bi bi-slash-circle-fill" style="flex-shrink:0;margin-top:1px"></i>
     <span><strong>ถูกระงับการจองชั่วคราว</strong> — มีรายงานค้างเกินกำหนด <?= Booking::REPORT_DEADLINE_DAYS ?> วัน กรุณากดปุ่ม "รายงาน" ในรายการด้านล่างให้ครบ ระบบจะปลดล็อกให้จองได้อีกครั้งทันที</span>
+  </div>
+<?php elseif ($userScore > 0): ?>
+  <div style="border-radius:10px;padding:10px 16px;margin-bottom:12px;font-size:13px;display:flex;gap:8px;align-items:center;background:#F0FDF4;border:1px solid #BBF7D0">
+    <i class="bi bi-star-fill" style="color:#059669;flex-shrink:0"></i>
+    <span style="color:#059669">คะแนนความน่าเชื่อถือ: <strong><?= $userScore ?> คะแนน</strong></span>
   </div>
 <?php elseif ($pendingReports): ?>
   <div class="bk-alert-warn" style="border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;display:flex;gap:8px;align-items:center">
@@ -231,17 +245,31 @@ require __DIR__ . '/../includes/header.php';
               <?php if ($bk['needsReport']): ?>
                 <span class="<?= $bk['reportOverdue'] ? 'badge-susp' : 'badge-pend' ?>" style="font-size:11px"><?= e($bk['reportStatusText']) ?></span>
               <?php elseif ($bk['reported']): ?>
-                <span class="badge-ok" style="font-size:11px"><i class="bi bi-check-circle me-1"></i>รายงานแล้ว</span>
+                <?php if ($bk['reportReviewStatus'] === 'accepted'): ?>
+                  <span class="badge-ok" style="font-size:11px"><i class="bi bi-check-circle-fill me-1"></i>ยอมรับแล้ว (+1)</span>
+                <?php elseif ($bk['reportReviewStatus'] === 'rejected'): ?>
+                  <span class="badge-susp" style="font-size:11px"><i class="bi bi-x-circle-fill me-1"></i>ถูกปฏิเสธ (-1)</span>
+                <?php elseif ($bk['reportReviewStatus'] === 'pending_review'): ?>
+                  <span class="badge-pend" style="font-size:11px"><i class="bi bi-hourglass-split me-1"></i>รอตรวจสอบ</span>
+                <?php else: ?>
+                  <span class="badge-ok" style="font-size:11px"><i class="bi bi-check-circle me-1"></i>รายงานแล้ว</span>
+                <?php endif; ?>
               <?php endif; ?>
-              <button type="button" class="action-btn-blue" data-report-booking
-                data-id="<?= (int) $bk['id'] ?>"
-                data-meta="<?= e($bk['dateLabel'] . ' · ' . $bk['slotLabel']) ?>"
-                data-report-text="<?= e($bk['report_text'] ?? '') ?>"
-                data-token-start="<?= $bk['token_start_pct'] !== null ? (int) $bk['token_start_pct'] : '' ?>"
-                data-token-end="<?= $bk['token_end_pct'] !== null ? (int) $bk['token_end_pct'] : '' ?>"
-                data-token-reset="<?= !empty($bk['token_reset_at']) ? date('Y-m-d\TH:i', strtotime($bk['token_reset_at'])) : '' ?>">
-                <i class="bi bi-journal-text me-1"></i><?= $bk['reported'] ? 'แก้ไขรายงาน' : 'รายงาน' ?>
-              </button>
+              <?php if ($bk['reportReviewStatus'] === 'rejected' && !empty($bk['reportReviewNote'])): ?>
+                <div style="font-size:11px;color:#DC2626;margin-top:2px;max-width:200px;white-space:normal"><i class="bi bi-exclamation-circle me-1"></i><?= e(mb_strimwidth($bk['reportReviewNote'], 0, 80, '…')) ?></div>
+              <?php endif; ?>
+              <?php if (!$bk['reportAccepted']): ?>
+                <button type="button" class="action-btn-blue" data-report-booking
+                  data-id="<?= (int) $bk['id'] ?>"
+                  data-meta="<?= e($bk['dateLabel'] . ' · ' . $bk['slotLabel']) ?>"
+                  data-report-text="<?= e($bk['report_text'] ?? '') ?>"
+                  data-review-note="<?= e($bk['reportReviewNote'] ?? '') ?>"
+                  data-token-start="<?= $bk['token_start_pct'] !== null ? (int) $bk['token_start_pct'] : '' ?>"
+                  data-token-end="<?= $bk['token_end_pct'] !== null ? (int) $bk['token_end_pct'] : '' ?>"
+                  data-token-reset="<?= !empty($bk['token_reset_at']) ? date('Y-m-d\TH:i', strtotime($bk['token_reset_at'])) : '' ?>">
+                  <i class="bi bi-journal-text me-1"></i><?= $bk['reported'] ? 'แก้ไขรายงาน' : 'รายงาน' ?>
+                </button>
+              <?php endif; ?>
             <?php endif; ?>
             <?php if ($bk['canReportIssue']): ?>
               <?php if ($bk['hasIssue']): ?>
@@ -291,10 +319,16 @@ require __DIR__ . '/../includes/header.php';
         </div>
         <div class="modal-body" style="padding:20px">
           <p style="font-size:12px;color:var(--bs-secondary-color);margin:0 0 4px" id="reportModalMeta">—</p>
-          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">กรอกรายละเอียดการใช้งาน และ/หรือ แนบไฟล์หลักฐาน (รูปภาพหรือ PDF) อย่างน้อยหนึ่งอย่าง</p>
+          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">กรอกรายละเอียดการใช้งาน<?= $minReportChars > 0 ? " (ไม่น้อยกว่า {$minReportChars} ตัวอักษร)" : '' ?> และ/หรือ แนบไฟล์หลักฐาน (รูปภาพหรือ PDF) อย่างน้อยหนึ่งอย่าง</p>
+          <div id="reportRejectionNote" style="display:none;padding:10px 14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;font-size:12px;color:#DC2626;margin-bottom:12px">
+            <i class="bi bi-exclamation-circle me-1"></i><strong>เหตุผลที่ถูกปฏิเสธ:</strong> <span id="reportRejectionNoteText"></span>
+          </div>
           <div style="margin-bottom:12px">
-            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">รายละเอียดการใช้งาน</label>
-            <textarea name="report_text" rows="4" maxlength="2000" class="form-control" placeholder="อธิบายสิ่งที่ได้ทำ/ผลลัพธ์จากการใช้ AI ในรอบนี้..." style="font-size:13px"></textarea>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">รายละเอียดการใช้งาน<?= $minReportChars > 0 ? ' *' : '' ?></label>
+            <textarea name="report_text" id="reportTextarea" rows="4" maxlength="2000" class="form-control" placeholder="อธิบายสิ่งที่ได้ทำ/ผลลัพธ์จากการใช้ AI ในรอบนี้..." style="font-size:13px"<?= $minReportChars > 0 ? " required minlength=\"{$minReportChars}\"" : '' ?>></textarea>
+            <?php if ($minReportChars > 0): ?>
+              <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">ต้องมีอย่างน้อย <?= $minReportChars ?> ตัวอักษร (<span id="reportCharCount">0</span>/<?= $minReportChars ?>)</div>
+            <?php endif; ?>
           </div>
           <div>
             <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">แนบไฟล์ (ไม่บังคับ)</label>
