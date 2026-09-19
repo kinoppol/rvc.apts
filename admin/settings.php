@@ -11,6 +11,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'min_chars') {
         $result = SlotSettings::updateMinChars((int) ($_POST['min_report_chars'] ?? 0), (int) ($_POST['min_mission_chars'] ?? 0));
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกความยาวขั้นต่ำเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
+    } elseif ($action === 'type_add') {
+        $result = AiProvider::add($_POST['type_name'] ?? '', $_POST['type_login_url'] ?? '');
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'เพิ่มประเภท AI เรียบร้อยแล้ว' : ($result['error'] ?? 'เพิ่มประเภทไม่สำเร็จ'));
+    } elseif ($action === 'type_rename') {
+        $result = AiProvider::rename((int) ($_POST['type_id'] ?? 0), $_POST['type_name'] ?? '', $_POST['type_login_url'] ?? '');
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'แก้ไขประเภท AI เรียบร้อยแล้ว' : ($result['error'] ?? 'แก้ไขไม่สำเร็จ'));
+    } elseif ($action === 'type_delete') {
+        $result = AiProvider::delete((int) ($_POST['type_id'] ?? 0));
+        flash_set($result['ok'] ? 'warn' : 'err', $result['ok'] ? 'ลบประเภท AI เรียบร้อยแล้ว' : ($result['error'] ?? 'ลบไม่สำเร็จ'));
     } else {
         $result = SlotSettings::updateInstitutionName($_POST['institution_name'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกชื่อสถานศึกษาเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
@@ -20,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $settings = SlotSettings::get();
+$typeRows  = AiProvider::listWithUsage();
 
 $activeNav = 'system-settings';
 require __DIR__ . '/../includes/header.php';
@@ -71,6 +81,59 @@ require __DIR__ . '/../includes/header.php';
       </div>
     </div>
     <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px"><i class="bi bi-save me-1"></i>บันทึก</button>
+  </form>
+</div>
+<div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;max-width:700px;margin-top:16px">
+  <h6 style="font-weight:700;margin:0 0 14px"><i class="bi bi-tags me-2" style="color:#2563EB"></i>ประเภท AI</h6>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+    <?php foreach ($typeRows as $t): ?>
+      <div style="padding:10px;border:1px solid var(--bs-border-color);border-radius:8px">
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <form method="post" style="display:flex;gap:6px;flex:1;margin:0;flex-wrap:wrap">
+            <?= Csrf::field() ?>
+            <input type="hidden" name="action" value="type_rename">
+            <input type="hidden" name="type_id" value="<?= (int) $t['id'] ?>">
+            <div style="display:flex;gap:6px;width:100%">
+              <input name="type_name" value="<?= e($t['name']) ?>" class="form-control form-control-sm" style="font-size:13px" title="ชื่อประเภท">
+              <button type="submit" class="btn btn-sm btn-outline-primary" style="font-size:12px;white-space:nowrap" title="บันทึก"><i class="bi bi-check-lg"></i></button>
+            </div>
+            <div class="input-group input-group-sm" style="width:100%;margin-top:6px">
+              <span class="input-group-text" style="font-size:11px"><i class="bi bi-box-arrow-up-right"></i></span>
+              <input name="type_login_url" type="url" value="<?= e((string) ($t['login_url'] ?? '')) ?>"
+                     class="form-control form-control-sm" style="font-size:12px"
+                     placeholder="ลิงก์หน้าล็อกอิน เช่น https://claude.ai/login">
+            </div>
+          </form>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding-top:2px">
+            <span style="font-size:11px;color:var(--bs-tertiary-color);white-space:nowrap"><?= (int) $t['usage'] ?> บัญชี</span>
+            <form method="post" style="margin:0" onsubmit="return confirm('ลบประเภทนี้?')">
+              <?= Csrf::field() ?>
+              <input type="hidden" name="action" value="type_delete">
+              <input type="hidden" name="type_id" value="<?= (int) $t['id'] ?>">
+              <button type="submit" class="btn btn-sm btn-outline-danger" style="font-size:12px"
+                      <?= $t['usage'] > 0 ? 'disabled title="มีบัญชีใช้อยู่ ลบไม่ได้"' : '' ?>><i class="bi bi-trash"></i></button>
+            </form>
+          </div>
+        </div>
+      </div>
+    <?php endforeach; ?>
+    <?php if (!$typeRows): ?>
+      <div style="text-align:center;color:var(--bs-tertiary-color);font-size:13px;padding:12px">ยังไม่มีประเภท</div>
+    <?php endif; ?>
+    <div style="font-size:11px;color:var(--bs-tertiary-color);line-height:1.7">
+      <i class="bi bi-info-circle me-1"></i>ลิงก์หน้าล็อกอินจะแสดงเป็นปุ่มบนการ์ดข้อมูลบัญชีของผู้เรียนหลังเช็คอิน — เว้นว่างไว้หากไม่ต้องการให้มีปุ่ม
+    </div>
+  </div>
+  <form method="post" style="border-top:1px solid var(--bs-border-color);padding-top:16px">
+    <?= Csrf::field() ?>
+    <input type="hidden" name="action" value="type_add">
+    <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:6px">เพิ่มประเภทใหม่</label>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input name="type_name" required class="form-control" placeholder="เช่น Google Gemini Advanced" style="font-size:13px">
+      <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px;white-space:nowrap"><i class="bi bi-plus-lg me-1"></i>เพิ่ม</button>
+    </div>
+    <input name="type_login_url" type="url" class="form-control" style="font-size:12px"
+           placeholder="ลิงก์หน้าล็อกอิน (ไม่บังคับ) เช่น https://chatgpt.com/">
   </form>
 </div>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
