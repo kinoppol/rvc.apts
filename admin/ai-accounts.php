@@ -114,6 +114,7 @@ require __DIR__ . '/../includes/header.php';
       <i class="bi bi-arrow-clockwise me-1"></i>รีเซ็ตรหัสผ่านทั้งหมด
     </button>
     <?php endif; ?>
+    <button type="button" id="printSelectedBtn" class="btn btn-outline-secondary" style="font-size:13px;display:none" onclick="aiPoolPrintSelected()"><i class="bi bi-printer me-1"></i>พิมพ์ใบรายชื่อ <span id="printSelectedCount" style="background:#2563EB;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700"></span></button>
     <button type="button" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px" data-bs-toggle="modal" data-bs-target="#addAccountModal"><i class="bi bi-plus-lg me-1"></i>เพิ่มบัญชี AI</button>
   </div>
 </div>
@@ -135,6 +136,7 @@ require __DIR__ . '/../includes/header.php';
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>
         <tr style="background:var(--bs-secondary-bg);border-bottom:2px solid var(--bs-border-color)">
+          <th style="padding:12px 14px;text-align:center;width:40px"><input type="checkbox" id="selectAllAccounts" class="form-check-input" style="margin:0" title="เลือกทั้งหมด"></th>
           <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">บัญชี AI</th>
           <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">ประเภท</th>
           <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">บัญชีเข้าสู่ระบบ</th>
@@ -149,6 +151,13 @@ require __DIR__ . '/../includes/header.php';
         <?php foreach ($accounts as $ac): ?>
           <?php $expiresInput = !empty($ac['expires_at']) ? date('Y-m-d\TH:i', strtotime($ac['expires_at'])) : ''; ?>
           <tr class="ai-pool-row" data-expired="<?= $ac['isExpired'] ? '1' : '0' ?>" style="border-bottom:1px solid var(--bs-border-color)<?= $ac['isExpired'] ? ';opacity:.7' : '' ?>">
+            <td style="padding:10px 14px;text-align:center">
+              <input type="checkbox" class="ai-account-check form-check-input" style="margin:0"
+                     data-name="<?= e($ac['name']) ?>"
+                     data-provider="<?= e($ac['provider']) ?>"
+                     data-email="<?= e($ac['email'] ?? '') ?>"
+                     data-password="<?= e($ac['account_password'] ?? '') ?>">
+            </td>
             <td style="padding:10px 14px">
               <div style="display:flex;align-items:center;gap:9px">
                 <?php if (!empty($ac['avatar_emoji'])): ?>
@@ -209,7 +218,7 @@ require __DIR__ . '/../includes/header.php';
           </tr>
         <?php endforeach; ?>
         <?php if (!$accounts): ?>
-          <tr><td colspan="8" style="padding:32px;text-align:center;color:var(--bs-tertiary-color)">ยังไม่มีบัญชี AI ในระบบ</td></tr>
+          <tr><td colspan="9" style="padding:32px;text-align:center;color:var(--bs-tertiary-color)">ยังไม่มีบัญชี AI ในระบบ</td></tr>
         <?php endif; ?>
       </tbody>
     </table>
@@ -575,6 +584,7 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
 </div>
 <script>
 (function () {
+  /* ── view toggle ── */
   var listBtn = document.querySelector('.ai-pool-view-btn[data-ai-view="list"]');
   var cardBtn = document.querySelector('.ai-pool-view-btn[data-ai-view="card"]');
   function markActive(view) {
@@ -608,6 +618,98 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
   setView(localStorage.getItem('aiPoolView') || 'list');
   document.getElementById('aiPoolShowExpired').checked = localStorage.getItem('aiPoolShowExpired') === '1';
   applyFilter();
+
+  /* ── checkbox + print ── */
+  var selectAll  = document.getElementById('selectAllAccounts');
+  var printBtn   = document.getElementById('printSelectedBtn');
+  var printCount = document.getElementById('printSelectedCount');
+
+  function getChecks() {
+    return document.querySelectorAll('.ai-account-check');
+  }
+  function getChecked() {
+    return document.querySelectorAll('.ai-account-check:checked');
+  }
+  function updatePrintBtn() {
+    var n = getChecked().length;
+    if (printBtn) { printBtn.style.display = n > 0 ? '' : 'none'; }
+    if (printCount) { printCount.textContent = n; }
+    if (selectAll) {
+      var all = getChecks();
+      selectAll.indeterminate = n > 0 && n < all.length;
+      selectAll.checked = all.length > 0 && n === all.length;
+    }
+  }
+
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      getChecks().forEach(function (cb) { cb.checked = selectAll.checked; });
+      updatePrintBtn();
+    });
+  }
+
+  document.addEventListener('change', function (e) {
+    if (e.target && e.target.classList.contains('ai-account-check')) {
+      updatePrintBtn();
+    }
+  });
+
+  window.aiPoolPrintSelected = function () {
+    var rows = [];
+    getChecked().forEach(function (cb) {
+      rows.push({
+        name:     cb.dataset.name     || '',
+        provider: cb.dataset.provider || '',
+        email:    cb.dataset.email    || '',
+        password: cb.dataset.password || ''
+      });
+    });
+    if (!rows.length) return;
+
+    var institution = <?= json_encode($settings['institution_name'] ?? 'AI Pro Time-Sharing', JSON_UNESCAPED_UNICODE) ?>;
+    var now = new Date().toLocaleDateString('th-TH', {year:'numeric',month:'long',day:'numeric'});
+
+    var tableRows = rows.map(function (r, i) {
+      return '<tr>'
+        + '<td style="padding:10px 12px;border:1px solid #d1d5db;text-align:center">' + (i+1) + '</td>'
+        + '<td style="padding:10px 12px;border:1px solid #d1d5db;font-weight:600">' + esc(r.name) + '</td>'
+        + '<td style="padding:10px 12px;border:1px solid #d1d5db;color:#6b7280">' + esc(r.provider) + '</td>'
+        + '<td style="padding:10px 12px;border:1px solid #d1d5db">' + esc(r.email || '—') + '</td>'
+        + '<td style="padding:10px 12px;border:1px solid #d1d5db;font-family:monospace;letter-spacing:.5px">' + esc(r.password || '—') + '</td>'
+        + '</tr>';
+    }).join('');
+
+    var html = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">'
+      + '<title>ใบรายชื่อบัญชี AI</title>'
+      + '<style>'
+      + 'body{font-family:\'Sarabun\',\'Noto Sans Thai\',sans-serif;font-size:13px;color:#111;margin:0;padding:24px}'
+      + 'h2{margin:0 0 4px;font-size:18px}p{margin:0 0 16px;color:#6b7280;font-size:12px}'
+      + 'table{width:100%;border-collapse:collapse;font-size:13px}'
+      + 'thead th{background:#1e3a5f;color:#fff;padding:10px 12px;border:1px solid #1e3a5f;text-align:left}'
+      + 'tbody tr:nth-child(even){background:#f3f4f6}'
+      + '.footer{margin-top:24px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:12px}'
+      + '@media print{body{padding:0}}'
+      + '</style></head><body>'
+      + '<h2>ใบรายชื่อบัญชี AI — ' + esc(institution) + '</h2>'
+      + '<p>วันที่พิมพ์: ' + now + ' · จำนวน ' + rows.length + ' บัญชี</p>'
+      + '<table><thead><tr>'
+      + '<th style="width:40px">ที่</th>'
+      + '<th>ชื่อบัญชี</th>'
+      + '<th>ประเภท</th>'
+      + '<th>อีเมล</th>'
+      + '<th>รหัสผ่าน</th>'
+      + '</tr></thead><tbody>' + tableRows + '</tbody></table>'
+      + '<div class="footer">ระบบ AI Pro Time-Sharing · พิมพ์ด้วยระบบจัดการ AI Account Pool</div>'
+      + '<script>window.onload=function(){window.print()}<\/script>'
+      + '</body></html>';
+
+    var w = window.open('', '_blank', 'width=900,height=650');
+    if (w) { w.document.write(html); w.document.close(); }
+  };
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
 })();
 </script>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
