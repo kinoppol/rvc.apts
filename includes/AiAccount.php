@@ -214,7 +214,9 @@ final class AiAccount
             return ['ok' => false, 'error' => 'ไม่มีบัญชีที่ต้องการรีเซ็ต'];
         }
         $stmt = Database::pdo()->prepare(
-            'UPDATE ai_accounts SET account_password = ?, password_updated_at = NOW() WHERE id = ?'
+            'UPDATE ai_accounts SET account_password = ?, password_updated_at = NOW()
+             WHERE id = ? AND status != \'maintenance\'
+               AND (expires_at IS NULL OR expires_at > NOW())'
         );
         $count = 0;
         foreach ($passwords as $id => $pw) {
@@ -223,7 +225,9 @@ final class AiAccount
                 continue;
             }
             $stmt->execute([$pw, (int) $id]);
-            $count++;
+            if ($stmt->rowCount() > 0) {
+                $count++;
+            }
         }
         return ['ok' => true, 'count' => $count];
     }

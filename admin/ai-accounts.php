@@ -5,7 +5,7 @@ $user = require_role('admin');
 // ── Google Workspace CSV export (GET, read-only, no CSRF needed) ──
 if (($_GET['export'] ?? '') === 'gws') {
     $all = AiAccount::listWithUsage();
-    $rows = array_values(array_filter($all, fn ($ac) => !empty($ac['email']) && !empty($ac['account_password'])));
+    $rows = array_values(array_filter($all, fn ($ac) => !empty($ac['email']) && !empty($ac['account_password']) && !$ac['isExpired'] && $ac['status'] !== 'maintenance'));
 
     $filename = 'ai-pool-gws-' . date('Ymd-His') . '.csv';
     header('Content-Type: text/csv; charset=UTF-8');
@@ -101,7 +101,7 @@ require __DIR__ . '/../includes/header.php';
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button type="button" class="btn btn-outline-secondary" style="font-size:13px" data-bs-toggle="modal" data-bs-target="#manageTypesModal"><i class="bi bi-tags me-1"></i>จัดการประเภท</button>
     <?php
-    $gwsExportCount = count(array_filter($accounts, fn ($ac) => !empty($ac['email']) && !empty($ac['account_password'])));
+    $gwsExportCount = count(array_filter($accounts, fn ($ac) => !empty($ac['email']) && !empty($ac['account_password']) && !$ac['isExpired'] && $ac['status'] !== 'maintenance'));
     if ($gwsExportCount > 0): ?>
     <a href="<?= url('admin/ai-accounts.php') ?>?export=gws" class="btn btn-outline-success" style="font-size:13px">
       <i class="bi bi-cloud-download me-1"></i>Google Workspace CSV
@@ -110,7 +110,7 @@ require __DIR__ . '/../includes/header.php';
     <?php endif; ?>
     <?php if ($accounts): ?>
     <button type="button" id="bulkResetPwBtn" class="btn btn-outline-warning" style="font-size:13px"
-            data-accounts='<?= e(json_encode(array_map(fn ($ac) => ['id' => (int) $ac['id'], 'name' => $ac['name']], $accounts), JSON_UNESCAPED_UNICODE)) ?>'>
+            data-accounts='<?= e(json_encode(array_values(array_map(fn ($ac) => ['id' => (int) $ac['id'], 'name' => $ac['name']], array_filter($accounts, fn ($ac) => !$ac['isExpired'] && $ac['status'] !== 'maintenance'))), JSON_UNESCAPED_UNICODE)) ?>'>
       <i class="bi bi-arrow-clockwise me-1"></i>รีเซ็ตรหัสผ่านทั้งหมด
     </button>
     <?php endif; ?>
