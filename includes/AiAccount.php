@@ -247,6 +247,47 @@ final class AiAccount
         return ['ok' => true];
     }
 
+    /**
+     * Set status for a list of account IDs. Only 'active' and 'maintenance' are accepted.
+     * @param int[] $ids
+     * @return array{ok:bool,count?:int,error?:string}
+     */
+    public static function bulkSetStatus(array $ids, string $status): array
+    {
+        if (!in_array($status, ['active', 'maintenance'], true)) {
+            return ['ok' => false, 'error' => 'สถานะไม่ถูกต้อง'];
+        }
+        $ids = array_filter(array_map('intval', $ids), fn($id) => $id > 0);
+        if (empty($ids)) {
+            return ['ok' => false, 'error' => 'ไม่มีบัญชีที่เลือก'];
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $params = array_values($ids);
+        array_unshift($params, $status);
+        Database::pdo()->prepare("UPDATE ai_accounts SET status = ? WHERE id IN ($placeholders)")->execute($params);
+        return ['ok' => true, 'count' => count($ids)];
+    }
+
+    /**
+     * Set the same password for a list of account IDs.
+     * @param int[] $ids
+     * @return array{ok:bool,count?:int,error?:string}
+     */
+    public static function bulkSetPassword(array $ids, string $password): array
+    {
+        $password = trim($password);
+        if ($password === '') {
+            return ['ok' => false, 'error' => 'กรุณาระบุรหัสผ่าน'];
+        }
+        $ids = array_filter(array_map('intval', $ids), fn($id) => $id > 0);
+        if (empty($ids)) {
+            return ['ok' => false, 'error' => 'ไม่มีบัญชีที่เลือก'];
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        Database::pdo()->prepare("UPDATE ai_accounts SET account_password = ?, password_updated_at = NOW() WHERE id IN ($placeholders)")->execute(array_merge([$password], array_values($ids)));
+        return ['ok' => true, 'count' => count($ids)];
+    }
+
     /** @return array{ok:bool,error?:string} */
     public static function delete(int $id): array
     {

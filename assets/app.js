@@ -218,6 +218,7 @@
     }
     return chars.join("");
   }
+  window.generateSecurePassword = generateSecurePassword;
 
   var changePwModal = document.getElementById("changePwModal");
   if (changePwModal) {

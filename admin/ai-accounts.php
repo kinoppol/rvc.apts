@@ -5,6 +5,14 @@ $user = require_role('admin');
 // ── Google Workspace CSV export (GET, read-only, no CSRF needed) ──
 if (($_GET['export'] ?? '') === 'gws') {
     $all = AiAccount::listWithUsage();
+    // Support ?ids=1,2,3 for selected-only export
+    $filterIds = [];
+    if (!empty($_GET['ids'])) {
+        $filterIds = array_filter(array_map('intval', explode(',', $_GET['ids'])), fn($id) => $id > 0);
+    }
+    if ($filterIds) {
+        $all = array_values(array_filter($all, fn($ac) => in_array((int)$ac['id'], $filterIds, true)));
+    }
     $rows = array_values(array_filter($all, fn ($ac) => !empty($ac['email']) && !empty($ac['account_password']) && !$ac['isExpired'] && $ac['status'] !== 'maintenance'));
 
     $filename = 'ai-pool-gws-' . date('Ymd-His') . '.csv';
@@ -61,6 +69,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'bulk_reset_passwords') {
         $r = AiAccount::bulkResetPasswords($_POST['passwords'] ?? []);
         flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? "รีเซ็ตรหัสผ่านทั้งหมด {$r['count']} บัญชีเรียบร้อยแล้ว" : ($r['error'] ?? 'รีเซ็ตไม่สำเร็จ'));
+    } elseif ($action === 'bulk_set_status') {
+        $ids = array_filter(array_map('intval', explode(',', $_POST['ids'] ?? '')), fn($id) => $id > 0);
+        $r = AiAccount::bulkSetStatus($ids, $_POST['status'] ?? '');
+        $label = ($_POST['status'] ?? '') === 'active' ? 'ใช้งานได้' : 'บำรุงรักษา';
+        flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? "เปลี่ยนสถานะเป็น \"{$label}\" {$r['count']} บัญชีเรียบร้อยแล้ว" : ($r['error'] ?? 'เปลี่ยนสถานะไม่สำเร็จ'));
+    } elseif ($action === 'bulk_set_password') {
+        $ids = array_filter(array_map('intval', explode(',', $_POST['ids'] ?? '')), fn($id) => $id > 0);
+        $r = AiAccount::bulkSetPassword($ids, $_POST['new_password'] ?? '');
+        flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? "อัปเดตรหัสผ่าน {$r['count']} บัญชีเรียบร้อยแล้ว" : ($r['error'] ?? 'อัปเดตรหัสผ่านไม่สำเร็จ'));
     } elseif ($action === 'type_add') {
         $r = AiProvider::add($_POST['type_name'] ?? '', $_POST['type_login_url'] ?? '');
         flash_set($r['ok'] ? 'ok' : 'err', $r['ok'] ? 'เพิ่มประเภทเรียบร้อยแล้ว' : ($r['error'] ?? 'เพิ่มประเภทไม่สำเร็จ'));
@@ -78,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $accounts = AiAccount::listWithUsage();
 $providers = AiProvider::all();
 $typeRows = AiProvider::listWithUsage();
+$settings = SlotSettings::get();
 
 /** Options for the type <select>, marking $selectedId as selected. */
 function provider_options(array $providers, int $selectedId = 0): string
@@ -98,12 +116,12 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
   <h5 style="font-weight:700;margin:0">บัญชี AI Account Pool</h5>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
     <button type="button" class="btn btn-outline-secondary" style="font-size:13px" data-bs-toggle="modal" data-bs-target="#manageTypesModal"><i class="bi bi-tags me-1"></i>จัดการประเภท</button>
     <?php
     $gwsExportCount = count(array_filter($accounts, fn ($ac) => !empty($ac['email']) && !empty($ac['account_password']) && !$ac['isExpired'] && $ac['status'] !== 'maintenance'));
     if ($gwsExportCount > 0): ?>
-    <a href="<?= url('admin/ai-accounts.php') ?>?export=gws" class="btn btn-outline-success" style="font-size:13px">
+    <a id="aiPoolGwsAllBtn" href="<?= url('admin/ai-accounts.php') ?>?export=gws" class="btn btn-outline-success" style="font-size:13px">
       <i class="bi bi-cloud-download me-1"></i>Google Workspace CSV
       <span style="font-size:11px;opacity:.75">(<?= $gwsExportCount ?>)</span>
     </a>
@@ -114,7 +132,30 @@ require __DIR__ . '/../includes/header.php';
       <i class="bi bi-arrow-clockwise me-1"></i>รีเซ็ตรหัสผ่านทั้งหมด
     </button>
     <?php endif; ?>
-    <button type="button" id="printSelectedBtn" class="btn btn-outline-secondary" style="font-size:13px;display:none" onclick="aiPoolPrintSelected()"><i class="bi bi-printer me-1"></i>พิมพ์ใบรายชื่อ <span id="printSelectedCount" style="background:#2563EB;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700"></span></button>
+
+    <!-- Bulk action menu — shown only when rows are selected -->
+    <div id="aiPoolBulkMenu" style="display:none;align-items:center;gap:8px">
+      <span id="aiPoolSelCount" style="font-size:13px;color:var(--bs-secondary-color);white-space:nowrap;font-weight:600"></span>
+      <div class="dropdown">
+        <button class="btn btn-primary dropdown-toggle" type="button" id="aiPoolBulkDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="font-size:13px;background:#2563EB;border-color:#2563EB">
+          <i class="bi bi-lightning-charge me-1"></i>คำสั่งกลุ่ม
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="aiPoolBulkDropdown" style="font-size:13px;min-width:220px">
+          <li><h6 class="dropdown-header" style="font-size:11px">พิมพ์ / ส่งออก</h6></li>
+          <li><button type="button" class="dropdown-item" id="aiPoolBulkPrintBtn"><i class="bi bi-printer me-2"></i>พิมพ์ใบรายชื่อรายการที่เลือก</button></li>
+          <li><button type="button" class="dropdown-item" id="aiPoolBulkGwsBtn"><i class="bi bi-cloud-download me-2"></i>ส่งออก Google Workspace CSV</button></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><h6 class="dropdown-header" style="font-size:11px">รหัสผ่าน</h6></li>
+          <li><button type="button" class="dropdown-item" id="aiPoolBulkResetSelBtn"><i class="bi bi-arrow-clockwise me-2"></i>รีเซตรหัสผ่าน (สุ่มใหม่)</button></li>
+          <li><button type="button" class="dropdown-item" id="aiPoolBulkSetPwBtn"><i class="bi bi-key me-2"></i>อัปเดตรหัสผ่านเดียวกันทุกรายการ</button></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><h6 class="dropdown-header" style="font-size:11px">สถานะ</h6></li>
+          <li><button type="button" class="dropdown-item" data-bulk-status="active"><i class="bi bi-check-circle me-2 text-success"></i>เปลี่ยนเป็น "ใช้งานได้"</button></li>
+          <li><button type="button" class="dropdown-item" data-bulk-status="maintenance"><i class="bi bi-wrench me-2 text-warning"></i>เปลี่ยนเป็น "บำรุงรักษา"</button></li>
+        </ul>
+      </div>
+    </div>
+
     <button type="button" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px" data-bs-toggle="modal" data-bs-target="#addAccountModal"><i class="bi bi-plus-lg me-1"></i>เพิ่มบัญชี AI</button>
   </div>
 </div>
@@ -136,7 +177,7 @@ require __DIR__ . '/../includes/header.php';
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead>
         <tr style="background:var(--bs-secondary-bg);border-bottom:2px solid var(--bs-border-color)">
-          <th style="padding:12px 14px;text-align:center;width:40px"><input type="checkbox" id="selectAllAccounts" class="form-check-input" style="margin:0" title="เลือกทั้งหมด"></th>
+          <th style="padding:12px 14px;width:38px"><input type="checkbox" id="aiPoolSelectAll" class="form-check-input" style="margin:0" title="เลือกทั้งหมด"></th>
           <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">บัญชี AI</th>
           <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">ประเภท</th>
           <th style="padding:12px 14px;text-align:left;font-weight:600;color:var(--bs-secondary-color)">บัญชีเข้าสู่ระบบ</th>
@@ -150,14 +191,15 @@ require __DIR__ . '/../includes/header.php';
       <tbody>
         <?php foreach ($accounts as $ac): ?>
           <?php $expiresInput = !empty($ac['expires_at']) ? date('Y-m-d\TH:i', strtotime($ac['expires_at'])) : ''; ?>
-          <tr class="ai-pool-row" data-expired="<?= $ac['isExpired'] ? '1' : '0' ?>" style="border-bottom:1px solid var(--bs-border-color)<?= $ac['isExpired'] ? ';opacity:.7' : '' ?>">
-            <td style="padding:10px 14px;text-align:center">
-              <input type="checkbox" class="ai-account-check form-check-input" style="margin:0"
-                     data-name="<?= e($ac['name']) ?>"
-                     data-provider="<?= e($ac['provider']) ?>"
-                     data-email="<?= e($ac['email'] ?? '') ?>"
-                     data-password="<?= e($ac['account_password'] ?? '') ?>">
-            </td>
+          <tr class="ai-pool-row" data-expired="<?= $ac['isExpired'] ? '1' : '0' ?>"
+              data-ac-id="<?= (int)$ac['id'] ?>"
+              data-ac-name="<?= e($ac['name']) ?>"
+              data-ac-email="<?= e($ac['email'] ?? '') ?>"
+              data-ac-password="<?= e($ac['account_password'] ?? '') ?>"
+              data-ac-provider="<?= e($ac['provider']) ?>"
+              data-ac-status="<?= e($ac['status']) ?>"
+              style="border-bottom:1px solid var(--bs-border-color)<?= $ac['isExpired'] ? ';opacity:.7' : '' ?>">
+            <td style="padding:10px 14px;width:38px"><input type="checkbox" class="form-check-input ai-pool-cb" data-id="<?= (int)$ac['id'] ?>" style="margin:0"></td>
             <td style="padding:10px 14px">
               <div style="display:flex;align-items:center;gap:9px">
                 <?php if (!empty($ac['avatar_emoji'])): ?>
@@ -556,6 +598,92 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
     </div>
   </div>
 </div>
+<!-- Bulk reset selected passwords modal (same UI as bulkResetPwModal but for selected only) -->
+<div class="modal fade" id="bulkResetSelModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post" id="bulkResetSelForm">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="bulk_reset_passwords">
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-arrow-clockwise me-2" style="color:#D97706"></i>รีเซตรหัสผ่าน — <span id="bulkResetSelTitle"></span></h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+        </div>
+        <div class="modal-body" style="padding:20px">
+          <div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;padding:10px 14px;font-size:13px;color:#92400E;margin-bottom:16px">
+            <i class="bi bi-exclamation-triangle me-2"></i>ระบบสุ่มรหัสผ่านใหม่ให้รายการที่เลือก กรุณาคัดลอกและแจ้งผู้ใช้ก่อนกด "บันทึก"
+          </div>
+          <div id="bulkResetSelTable"></div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color);gap:8px">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" id="bulkResetSelRegenAll" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>สุ่มใหม่ทั้งหมด</button>
+          <button type="submit" class="btn btn-warning btn-sm" style="font-weight:600" onclick="return confirm('ยืนยันรีเซตรหัสผ่านรายการที่เลือก?')"><i class="bi bi-save me-1"></i>บันทึก</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk set same password modal -->
+<div class="modal fade" id="bulkSetPwModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post" id="bulkSetPwForm">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="bulk_set_password">
+        <input type="hidden" name="ids" id="bulkSetPwIds">
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-key me-2" style="color:#2563EB"></i>อัปเดตรหัสผ่านเดียวกัน — <span id="bulkSetPwTitle"></span></h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+        </div>
+        <div class="modal-body" style="padding:20px">
+          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0 0 14px">ตั้งรหัสผ่านเดียวกันสำหรับทุกบัญชีที่เลือก — ใช้ได้เมื่อบัญชีหลายรายการใช้รหัสผ่านร่วมกัน</p>
+          <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">รหัสผ่าน</label>
+          <div style="display:flex;gap:6px">
+            <input type="text" name="new_password" id="bulkSetPwValue" class="form-control" required style="font-family:monospace;font-size:14px" placeholder="รหัสผ่านที่จะใช้ร่วมกัน">
+            <button type="button" class="btn btn-outline-secondary" id="bulkSetPwGenBtn" title="สุ่มรหัสผ่าน"><i class="bi bi-shuffle"></i></button>
+            <button type="button" class="btn btn-outline-secondary" id="bulkSetPwCopyBtn" title="คัดลอก"><i class="bi bi-clipboard"></i></button>
+          </div>
+          <div id="bulkSetPwCopiedHint" style="font-size:11px;color:#059669;margin-top:6px;display:none"><i class="bi bi-check-circle me-1"></i>คัดลอกแล้ว</div>
+          <div id="bulkSetPwAccountList" style="margin-top:14px;font-size:12px;color:var(--bs-secondary-color)"></div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none" onclick="return confirm('ยืนยันอัปเดตรหัสผ่านรายการที่เลือกทั้งหมด?')"><i class="bi bi-save me-1"></i>บันทึก</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk set status form (no modal — direct POST) -->
+<form method="post" id="bulkSetStatusForm" style="display:none">
+  <?= Csrf::field() ?>
+  <input type="hidden" name="action" value="bulk_set_status">
+  <input type="hidden" name="ids" id="bulkSetStatusIds">
+  <input type="hidden" name="status" id="bulkSetStatusValue">
+</form>
+
+<!-- Print roster modal -->
+<div class="modal fade" id="printRosterModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+        <h6 class="modal-title" style="font-weight:700"><i class="bi bi-printer me-2" style="color:#2563EB"></i>ใบรายชื่อบัญชี AI</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+      </div>
+      <div class="modal-body" style="padding:20px">
+        <div id="printRosterContent"></div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ปิด</button>
+        <button type="button" class="btn btn-primary btn-sm" style="background:#2563EB;border:none" id="printRosterExecBtn"><i class="bi bi-printer me-1"></i>พิมพ์</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Bulk reset passwords modal -->
 <div class="modal fade" id="bulkResetPwModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -619,97 +747,238 @@ function account_form_fields(array $providers, array $reminderOpts, string $pref
   document.getElementById('aiPoolShowExpired').checked = localStorage.getItem('aiPoolShowExpired') === '1';
   applyFilter();
 
-  /* ── checkbox + print ── */
-  var selectAll  = document.getElementById('selectAllAccounts');
-  var printBtn   = document.getElementById('printSelectedBtn');
-  var printCount = document.getElementById('printSelectedCount');
+  // ── Checkbox selection & bulk action menu ──
+  var bulkMenu = document.getElementById('aiPoolBulkMenu');
+  var selCountEl = document.getElementById('aiPoolSelCount');
+  var selectAllCb = document.getElementById('aiPoolSelectAll');
 
-  function getChecks() {
-    return document.querySelectorAll('.ai-account-check');
-  }
-  function getChecked() {
-    return document.querySelectorAll('.ai-account-check:checked');
-  }
-  function updatePrintBtn() {
-    var n = getChecked().length;
-    if (printBtn) { printBtn.style.display = n > 0 ? '' : 'none'; }
-    if (printCount) { printCount.textContent = n; }
-    if (selectAll) {
-      var all = getChecks();
-      selectAll.indeterminate = n > 0 && n < all.length;
-      selectAll.checked = all.length > 0 && n === all.length;
-    }
-  }
-
-  if (selectAll) {
-    selectAll.addEventListener('change', function () {
-      getChecks().forEach(function (cb) { cb.checked = selectAll.checked; });
-      updatePrintBtn();
+  function getVisibleRows() {
+    return Array.from(document.querySelectorAll('#aiPoolListView .ai-pool-row')).filter(function (r) {
+      return r.style.display !== 'none';
     });
   }
 
-  document.addEventListener('change', function (e) {
-    if (e.target && e.target.classList.contains('ai-account-check')) {
-      updatePrintBtn();
+  function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.ai-pool-cb:checked')).map(function (cb) {
+      return parseInt(cb.dataset.id, 10);
+    });
+  }
+
+  function getSelectedAccounts() {
+    return Array.from(document.querySelectorAll('.ai-pool-cb:checked')).map(function (cb) {
+      var row = cb.closest('tr');
+      return {
+        id:       parseInt(cb.dataset.id, 10),
+        name:     row ? row.dataset.acName : '',
+        email:    row ? row.dataset.acEmail : '',
+        password: row ? row.dataset.acPassword : '',
+        provider: row ? row.dataset.acProvider : '',
+        status:   row ? row.dataset.acStatus : ''
+      };
+    });
+  }
+
+  function updateBulkUI() {
+    var ids = getSelectedIds();
+    var count = ids.length;
+    if (bulkMenu) bulkMenu.style.display = count > 0 ? 'flex' : 'none';
+    if (selCountEl) selCountEl.textContent = count + ' รายการที่เลือก';
+    if (selectAllCb) {
+      var visible = getVisibleRows();
+      var checkedVisible = visible.filter(function (r) {
+        var cb = r.querySelector('.ai-pool-cb');
+        return cb && cb.checked;
+      });
+      selectAllCb.indeterminate = checkedVisible.length > 0 && checkedVisible.length < visible.length;
+      selectAllCb.checked = visible.length > 0 && checkedVisible.length === visible.length;
     }
+  }
+
+  if (selectAllCb) {
+    selectAllCb.addEventListener('change', function () {
+      getVisibleRows().forEach(function (r) {
+        var cb = r.querySelector('.ai-pool-cb');
+        if (cb) cb.checked = selectAllCb.checked;
+      });
+      updateBulkUI();
+    });
+  }
+
+  document.querySelectorAll('.ai-pool-cb').forEach(function (cb) {
+    cb.addEventListener('change', updateBulkUI);
   });
 
-  window.aiPoolPrintSelected = function () {
-    var rows = [];
-    getChecked().forEach(function (cb) {
-      rows.push({
-        name:     cb.dataset.name     || '',
-        provider: cb.dataset.provider || '',
-        email:    cb.dataset.email    || '',
-        password: cb.dataset.password || ''
-      });
+  // Uncheck hidden rows and sync select-all after filter changes
+  var origApplyFilter = window.aiPoolApplyFilter;
+  window.aiPoolApplyFilter = function () {
+    origApplyFilter();
+    document.querySelectorAll('.ai-pool-row').forEach(function (r) {
+      if (r.style.display === 'none') {
+        var cb = r.querySelector('.ai-pool-cb');
+        if (cb) cb.checked = false;
+      }
     });
-    if (!rows.length) return;
-
-    var institution = <?= json_encode($settings['institution_name'] ?? 'AI Pro Time-Sharing', JSON_UNESCAPED_UNICODE) ?>;
-    var now = new Date().toLocaleDateString('th-TH', {year:'numeric',month:'long',day:'numeric'});
-
-    var tableRows = rows.map(function (r, i) {
-      return '<tr>'
-        + '<td style="padding:10px 12px;border:1px solid #d1d5db;text-align:center">' + (i+1) + '</td>'
-        + '<td style="padding:10px 12px;border:1px solid #d1d5db;font-weight:600">' + esc(r.name) + '</td>'
-        + '<td style="padding:10px 12px;border:1px solid #d1d5db;color:#6b7280">' + esc(r.provider) + '</td>'
-        + '<td style="padding:10px 12px;border:1px solid #d1d5db">' + esc(r.email || '—') + '</td>'
-        + '<td style="padding:10px 12px;border:1px solid #d1d5db;font-family:monospace;letter-spacing:.5px">' + esc(r.password || '—') + '</td>'
-        + '</tr>';
-    }).join('');
-
-    var html = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">'
-      + '<title>ใบรายชื่อบัญชี AI</title>'
-      + '<style>'
-      + 'body{font-family:\'Sarabun\',\'Noto Sans Thai\',sans-serif;font-size:13px;color:#111;margin:0;padding:24px}'
-      + 'h2{margin:0 0 4px;font-size:18px}p{margin:0 0 16px;color:#6b7280;font-size:12px}'
-      + 'table{width:100%;border-collapse:collapse;font-size:13px}'
-      + 'thead th{background:#1e3a5f;color:#fff;padding:10px 12px;border:1px solid #1e3a5f;text-align:left}'
-      + 'tbody tr:nth-child(even){background:#f3f4f6}'
-      + '.footer{margin-top:24px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:12px}'
-      + '@media print{body{padding:0}}'
-      + '</style></head><body>'
-      + '<h2>ใบรายชื่อบัญชี AI — ' + esc(institution) + '</h2>'
-      + '<p>วันที่พิมพ์: ' + now + ' · จำนวน ' + rows.length + ' บัญชี</p>'
-      + '<table><thead><tr>'
-      + '<th style="width:40px">ที่</th>'
-      + '<th>ชื่อบัญชี</th>'
-      + '<th>ประเภท</th>'
-      + '<th>อีเมล</th>'
-      + '<th>รหัสผ่าน</th>'
-      + '</tr></thead><tbody>' + tableRows + '</tbody></table>'
-      + '<div class="footer">ระบบ AI Pro Time-Sharing · พิมพ์ด้วยระบบจัดการ AI Account Pool</div>'
-      + '<script>window.onload=function(){window.print()}<\/script>'
-      + '</body></html>';
-
-    var w = window.open('', '_blank', 'width=900,height=650');
-    if (w) { w.document.write(html); w.document.close(); }
+    updateBulkUI();
   };
 
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
+
+  // ── Print roster (popup window with full styling) ──
+  var printRosterBtn = document.getElementById('aiPoolBulkPrintBtn');
+  if (printRosterBtn) {
+    printRosterBtn.addEventListener('click', function () {
+      var accounts = getSelectedAccounts();
+      if (!accounts.length) return;
+      var institution = <?= json_encode($settings['institution_name'] ?? 'AI Pro Time-Sharing', JSON_UNESCAPED_UNICODE) ?>;
+      var now = new Date().toLocaleDateString('th-TH', {year:'numeric',month:'long',day:'numeric'});
+      var tableRows = accounts.map(function (r, i) {
+        return '<tr>'
+          + '<td style="padding:10px 12px;border:1px solid #d1d5db;text-align:center">' + (i+1) + '</td>'
+          + '<td style="padding:10px 12px;border:1px solid #d1d5db;font-weight:600">' + esc(r.name) + '</td>'
+          + '<td style="padding:10px 12px;border:1px solid #d1d5db;color:#6b7280">' + esc(r.provider) + '</td>'
+          + '<td style="padding:10px 12px;border:1px solid #d1d5db">' + esc(r.email || '—') + '</td>'
+          + '<td style="padding:10px 12px;border:1px solid #d1d5db;font-family:monospace;letter-spacing:.5px">' + esc(r.password || '—') + '</td>'
+          + '</tr>';
+      }).join('');
+      var html = '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">'
+        + '<title>ใบรายชื่อบัญชี AI</title>'
+        + '<style>'
+        + 'body{font-family:\'Sarabun\',\'Noto Sans Thai\',sans-serif;font-size:13px;color:#111;margin:0;padding:24px}'
+        + 'h2{margin:0 0 4px;font-size:18px}p{margin:0 0 16px;color:#6b7280;font-size:12px}'
+        + 'table{width:100%;border-collapse:collapse;font-size:13px}'
+        + 'thead th{background:#1e3a5f;color:#fff;padding:10px 12px;border:1px solid #1e3a5f;text-align:left}'
+        + 'tbody tr:nth-child(even){background:#f3f4f6}'
+        + '.footer{margin-top:24px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:12px}'
+        + '@media print{body{padding:0}}'
+        + '</style></head><body>'
+        + '<h2>ใบรายชื่อบัญชี AI — ' + esc(institution) + '</h2>'
+        + '<p>วันที่พิมพ์: ' + now + ' · จำนวน ' + accounts.length + ' บัญชี</p>'
+        + '<table><thead><tr>'
+        + '<th style="width:40px">ที่</th>'
+        + '<th>ชื่อบัญชี</th>'
+        + '<th>ประเภท</th>'
+        + '<th>อีเมล</th>'
+        + '<th>รหัสผ่าน</th>'
+        + '</tr></thead><tbody>' + tableRows + '</tbody></table>'
+        + '<div class="footer">ระบบ AI Pro Time-Sharing · พิมพ์ด้วยระบบจัดการ AI Account Pool</div>'
+        + '<script>window.onload=function(){window.print()}<\/script>'
+        + '</body></html>';
+      var w = window.open('', '_blank', 'width=900,height=650');
+      if (w) { w.document.write(html); w.document.close(); }
+    });
+  }
+
+  // ── Export GWS CSV for selected ──
+  var gwsSelBtn = document.getElementById('aiPoolBulkGwsBtn');
+  if (gwsSelBtn) {
+    gwsSelBtn.addEventListener('click', function () {
+      var ids = getSelectedIds();
+      if (!ids.length) return;
+      window.location.href = '<?= url('admin/ai-accounts.php') ?>?export=gws&ids=' + ids.join(',');
+    });
+  }
+
+  // ── Bulk reset selected passwords ──
+  var resetSelBtn = document.getElementById('aiPoolBulkResetSelBtn');
+  if (resetSelBtn) {
+    resetSelBtn.addEventListener('click', function () {
+      var accounts = getSelectedAccounts();
+      if (!accounts.length) return;
+      var titleEl = document.getElementById('bulkResetSelTitle');
+      if (titleEl) titleEl.textContent = accounts.length + ' รายการ';
+      buildBulkResetTableFor(accounts, 'bulkResetSelTable');
+      new bootstrap.Modal(document.getElementById('bulkResetSelModal')).show();
+    });
+    var regenSelAll = document.getElementById('bulkResetSelRegenAll');
+    if (regenSelAll) {
+      regenSelAll.addEventListener('click', function () {
+        buildBulkResetTableFor(getSelectedAccounts(), 'bulkResetSelTable');
+      });
+    }
+  }
+
+  function buildBulkResetTableFor(accounts, tableId) {
+    var tableEl = document.getElementById(tableId);
+    if (!tableEl) return;
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<thead><tr>'
+      + '<th style="padding:6px 8px;border-bottom:2px solid var(--bs-border-color);text-align:left;font-size:11px;color:var(--bs-secondary-color)">บัญชี</th>'
+      + '<th style="padding:6px 8px;border-bottom:2px solid var(--bs-border-color);text-align:left;font-size:11px;color:var(--bs-secondary-color)">รหัสผ่านใหม่</th>'
+      + '<th style="width:38px;border-bottom:2px solid var(--bs-border-color)"></th>'
+      + '</tr></thead><tbody>';
+    accounts.forEach(function (ac) {
+      var pw = generateSecurePassword(12);
+      html += '<tr data-bulk-id="' + ac.id + '">'
+        + '<td style="padding:7px 8px;border-bottom:1px solid var(--bs-border-color);font-weight:600">' + esc(ac.name)
+        + '<input type="hidden" name="passwords[' + ac.id + ']" value="' + esc(pw) + '"></td>'
+        + '<td style="padding:7px 8px;border-bottom:1px solid var(--bs-border-color)"><code class="bulk-pw-val" style="font-size:13px;letter-spacing:.3px;word-break:break-all">' + esc(pw) + '</code></td>'
+        + '<td style="padding:7px 4px;border-bottom:1px solid var(--bs-border-color)"><button type="button" class="btn btn-sm btn-outline-secondary bulk-regen-one" title="สุ่มใหม่"><i class="bi bi-arrow-clockwise"></i></button></td>'
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+    tableEl.innerHTML = html;
+    tableEl.querySelectorAll('.bulk-regen-one').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var row = btn.closest('tr');
+        var newPw = generateSecurePassword(12);
+        row.querySelector('input[type=hidden]').value = newPw;
+        row.querySelector('.bulk-pw-val').textContent = newPw;
+      });
+    });
+  }
+
+  // ── Bulk set same password ──
+  var setPwBtn = document.getElementById('aiPoolBulkSetPwBtn');
+  if (setPwBtn) {
+    setPwBtn.addEventListener('click', function () {
+      var accounts = getSelectedAccounts();
+      if (!accounts.length) return;
+      var ids = accounts.map(function (a) { return a.id; });
+      var titleEl = document.getElementById('bulkSetPwTitle');
+      if (titleEl) titleEl.textContent = accounts.length + ' รายการ';
+      var idsInput = document.getElementById('bulkSetPwIds');
+      if (idsInput) idsInput.value = ids.join(',');
+      var listEl = document.getElementById('bulkSetPwAccountList');
+      if (listEl) listEl.textContent = 'บัญชีที่เลือก: ' + accounts.map(function (a) { return a.name; }).join(', ');
+      var pwInput = document.getElementById('bulkSetPwValue');
+      if (pwInput) pwInput.value = generateSecurePassword(12);
+      new bootstrap.Modal(document.getElementById('bulkSetPwModal')).show();
+    });
+  }
+  var setPwGenBtn = document.getElementById('bulkSetPwGenBtn');
+  if (setPwGenBtn) {
+    setPwGenBtn.addEventListener('click', function () {
+      var f = document.getElementById('bulkSetPwValue');
+      if (f) f.value = generateSecurePassword(12);
+    });
+  }
+  var setPwCopyBtn = document.getElementById('bulkSetPwCopyBtn');
+  if (setPwCopyBtn) {
+    setPwCopyBtn.addEventListener('click', function () {
+      var f = document.getElementById('bulkSetPwValue');
+      if (!f) return;
+      navigator.clipboard.writeText(f.value).then(function () {
+        var hint = document.getElementById('bulkSetPwCopiedHint');
+        if (hint) { hint.style.display = ''; setTimeout(function () { hint.style.display = 'none'; }, 2000); }
+      });
+    });
+  }
+
+  // ── Bulk set status ──
+  document.querySelectorAll('[data-bulk-status]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var status = btn.dataset.bulkStatus;
+      var ids = getSelectedIds();
+      if (!ids.length) return;
+      var label = status === 'active' ? 'ใช้งานได้' : 'บำรุงรักษา';
+      if (!confirm('เปลี่ยนสถานะเป็น "' + label + '" สำหรับ ' + ids.length + ' รายการ?')) return;
+      document.getElementById('bulkSetStatusIds').value = ids.join(',');
+      document.getElementById('bulkSetStatusValue').value = status;
+      document.getElementById('bulkSetStatusForm').submit();
+    });
+  });
 })();
 </script>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
