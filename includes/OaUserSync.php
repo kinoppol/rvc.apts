@@ -34,7 +34,45 @@ final class OaUserSync
 
     public static function isConfigured(): bool
     {
-        return ONE_RVC_USERS_URL !== '' && ONE_RVC_CLIENT_ID !== '' && ONE_RVC_CLIENT_SECRET !== '';
+        return ONE_RVC_USERS_URL !== '' && ONE_RVC_CLIENT_ID !== '' && self::secret() !== '';
+    }
+
+    /** Where the active secret comes from: 'db' (admin UI), 'config' (config.local.php / env) or null. */
+    public static function secretSource(): ?string
+    {
+        if (self::dbSecret() !== '') {
+            return 'db';
+        }
+        return ONE_RVC_CLIENT_SECRET !== '' ? 'config' : null;
+    }
+
+    /** Saves (or, with '', clears) the admin-set secret. Never echoed back to any page. */
+    public static function saveSecret(string $secret): array
+    {
+        $secret = trim($secret);
+        if (strlen($secret) > 255) {
+            return ['ok' => false, 'error' => 'client_secret ยาวเกินไป'];
+        }
+        Database::pdo()->prepare('UPDATE slot_settings SET oa_client_secret = ? WHERE id = 1')
+            ->execute([$secret !== '' ? $secret : null]);
+        return ['ok' => true];
+    }
+
+    /** Admin-set secret wins over config.local.php / env. */
+    private static function secret(): string
+    {
+        $db = self::dbSecret();
+        return $db !== '' ? $db : ONE_RVC_CLIENT_SECRET;
+    }
+
+    private static function dbSecret(): string
+    {
+        try {
+            $v = Database::pdo()->query('SELECT oa_client_secret FROM slot_settings WHERE id = 1')->fetchColumn();
+            return is_string($v) ? $v : '';
+        } catch (PDOException $e) {
+            return '';   // column not migrated yet
+        }
     }
 
     /** `since` for the next incremental run, or null = never synced successfully (full sync). */
@@ -120,7 +158,7 @@ final class OaUserSync
         $stats = ['mode' => $mode, 'pages' => 0, 'added' => 0, 'updated' => 0, 'suspended' => 0, 'linked' => 0];
 
         if (!self::isConfigured()) {
-            return ['ok' => false, 'error' => 'ยังไม่ได้ตั้งค่า client_secret ของ ONE-RVC (one_rvc_client_secret ใน config.local.php หรือ OA_CLIENT_SECRET)'] + $stats;
+            return ['ok' => false, 'error' => 'ยังไม่ได้ตั้งค่า client_secret ของ ONE-RVC (ตั้งได้ที่หน้าซิงค์ผู้ใช้ ONE-RVC)'] + $stats;
         }
         if (!function_exists('curl_init')) {
             return ['ok' => false, 'error' => 'เซิร์ฟเวอร์ไม่มีส่วนขยาย PHP curl'] + $stats;
@@ -235,7 +273,7 @@ final class OaUserSync
             curl_setopt_array($ch, [
                 CURLOPT_HTTPGET        => true,
                 CURLOPT_HTTPAUTH       => CURLAUTH_BASIC,
-                CURLOPT_USERPWD        => ONE_RVC_CLIENT_ID . ':' . ONE_RVC_CLIENT_SECRET,
+                CURLOPT_USERPWD        => ONE_RVC_CLIENT_ID . ':' . self::secret(),
                 CURLOPT_HTTPHEADER     => ['Accept: application/json'],
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT        => self::HTTP_TIMEOUT,

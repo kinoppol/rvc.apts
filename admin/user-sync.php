@@ -4,7 +4,16 @@ $user = require_role('admin');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
-    $full = ($_POST['action'] ?? '') === 'sync_full';
+    $action = $_POST['action'] ?? '';
+    if ($action === 'save_secret' || $action === 'clear_secret') {
+        $r = OaUserSync::saveSecret($action === 'clear_secret' ? '' : (string) ($_POST['client_secret'] ?? ''));
+        flash_set($r['ok'] ? 'ok' : 'err', $r['ok']
+            ? ($action === 'clear_secret' ? 'ลบ client_secret ที่ตั้งไว้แล้ว' : 'บันทึก client_secret เรียบร้อยแล้ว')
+            : ($r['error'] ?? 'บันทึกไม่สำเร็จ'));
+        header('Location: ' . url('admin/user-sync.php'));
+        exit;
+    }
+    $full = $action === 'sync_full';
     @set_time_limit(300);
     $r = OaUserSync::run($full);
     $summary = sprintf('เพิ่ม %d · อัปเดต %d · ถูกระงับ %d · ผูกบัญชีอัตโนมัติ %d (%d หน้า)',
@@ -16,7 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$configured = OaUserSync::isConfigured();
+$configured   = OaUserSync::isConfigured();
+$secretSource = OaUserSync::secretSource();
 $since      = OaUserSync::lastSince();
 $stats      = OaUserSync::stats();
 $runs       = OaUserSync::recentRuns(20);
@@ -88,6 +98,33 @@ require __DIR__ . '/../includes/header.php';
     นำ URL นี้ไปกรอกในช่อง “URL เริ่ม SSO ของแอป” ที่หน้าแก้ไขแอปใน ONE-RVC เพื่อให้ไทล์ในหน้า Workspace พาผู้ใช้เข้าระบบได้ในคลิกเดียว
   </div>
   <input class="form-control" readonly value="<?= e($startUrl) ?>" onclick="this.select()" style="font-size:13px;font-family:monospace">
+</div>
+
+<div class="card" style="<?= $card ?>">
+  <h6 style="font-weight:700;margin:0 0 10px"><i class="bi bi-key me-2" style="color:#2563EB"></i>client_secret ของแอป (<?= e(ONE_RVC_CLIENT_ID) ?>)</h6>
+  <div style="font-size:12.5px;color:var(--bs-secondary-color);margin-bottom:10px">
+    <?php if ($secretSource === 'db'): ?>
+      <span class="badge bg-success-subtle text-success-emphasis">ตั้งค่าแล้ว</span> — ตั้งจากหน้านี้ (ระบบไม่แสดงค่าเดิม กรอกใหม่เพื่อเปลี่ยน)
+    <?php elseif ($secretSource === 'config'): ?>
+      <span class="badge bg-success-subtle text-success-emphasis">ตั้งค่าแล้ว</span> — จาก config.local.php / OA_CLIENT_SECRET (ค่าที่กรอกที่นี่จะใช้แทน)
+    <?php else: ?>
+      นำ client_secret ของแอปนี้จากหน้าจัดการแอปใน ONE-RVC มากรอก
+    <?php endif; ?>
+  </div>
+  <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;margin:0">
+    <?= Csrf::field() ?>
+    <input type="hidden" name="action" value="save_secret">
+    <input type="password" name="client_secret" class="form-control" required maxlength="255" autocomplete="new-password"
+           placeholder="<?= $secretSource ? '•••••••• (กรอกใหม่เพื่อเปลี่ยน)' : 'client_secret' ?>" style="flex:1;min-width:260px;font-size:13px">
+    <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px;white-space:nowrap"><i class="bi bi-save me-1"></i>บันทึก</button>
+  </form>
+  <?php if ($secretSource === 'db'): ?>
+    <form method="post" style="margin:8px 0 0" onsubmit="return confirm('ลบ client_secret ที่ตั้งไว้?')">
+      <?= Csrf::field() ?>
+      <input type="hidden" name="action" value="clear_secret">
+      <button type="submit" class="btn btn-link p-0" style="font-size:12px;color:#DC2626;text-decoration:none"><i class="bi bi-trash me-1"></i>ลบค่าที่ตั้งไว้</button>
+    </form>
+  <?php endif; ?>
 </div>
 
 <?php if ($blocked): ?>

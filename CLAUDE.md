@@ -300,7 +300,7 @@ existing email/password login — `Auth::attempt()` and `login.php`'s form are u
 `includes/OaUserSync.php` pulls the ONE-RVC directory via its User-sync API (HTTP Basic
 `ONE_RVC_CLIENT_ID:ONE_RVC_CLIENT_SECRET`; secret from `config.local.php` `one_rvc_client_secret` or env
 `OA_CLIENT_SECRET`, never committed; empty secret = sync disabled) into the **`oa_users` mirror**, upserted
-by ONE-RVC id (= `users.sso_user_id`).
+by ONE-RVC id (= `users.sso_user_id`). The secret may also be set (write-only) on `admin/user-sync.php` → `slot_settings.oa_client_secret`, which wins over config/env.
 
 - It **never creates logins** (same reason SSO doesn't auto-provision). It auto-links an *unlinked* local
   account whose email / google_email matches, and that's the only write to `users`.

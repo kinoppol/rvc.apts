@@ -40,7 +40,8 @@ define('ONE_RVC_VERIFY_IP', $_localCfg['one_rvc_verify_ip'] ?? '');
 
 // ONE-RVC User-sync API (server-to-server directory pull, see includes/OaUserSync.php).
 // client_id is the same registered app id as the SSO client above. The secret is never
-// committed: set 'one_rvc_client_secret' in config.local.php, or the OA_CLIENT_SECRET
+// committed: an admin sets it on admin/user-sync.php (stored in slot_settings, which
+// wins), else 'one_rvc_client_secret' in config.local.php, else the OA_CLIENT_SECRET
 // environment variable. An empty secret simply leaves the sync disabled.
 // 'one_rvc_sync_type' = staff | student | all | '' ('' = every type this app is allowed).
 define('ONE_RVC_USERS_URL',     $_localCfg['one_rvc_users_url']     ?? 'http://workspace.rvc.ac.th/oa/api/users.php');
