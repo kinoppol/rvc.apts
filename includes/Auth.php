@@ -34,7 +34,7 @@ final class Auth
         if ($user['status'] === 'pending') {
             return ['ok' => false, 'error' => 'บัญชีของคุณยังรอการอนุมัติจากผู้ดูแลระบบ'];
         }
-        if ($user['status'] === 'suspended') {
+        if ($user['status'] === 'suspended' || OaUserSync::blocksUser($user)) {
             return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับสิทธิ์การใช้งาน'];
         }
         return ['ok' => true, 'user' => $user];

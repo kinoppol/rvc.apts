@@ -6,6 +6,8 @@
  *
  *   - anonymous  (no ?link) -> "log in with ONE-RVC" from login.php
  *   - logged in  (?link=1)  -> "link my account to ONE-RVC" from the profile page
+ *   - anonymous  (?auto=1)  -> same as the first, but 302s straight to ONE-RVC (the
+ *                              Workspace tile's start URL — see below)
  *
  * This renders a short interstitial with an explicit "ตรวจสอบการเข้าสู่ระบบ ONE-RVC"
  * button rather than issuing an immediate 302, for one specific reason: ONE-RVC's own
@@ -51,6 +53,15 @@ session_regenerate_id(true);
 $state = bin2hex(random_bytes(32));
 $_SESSION['sso_state'] = $state;
 $authUrl = SsoAuth::authorizationUrl($state);
+
+// ?auto=1 skips the interstitial: this is the "URL เริ่ม SSO ของแอป" registered on
+// ONE-RVC's app settings, so the Workspace tile gets the user in with one click. The
+// visitor is coming *from* ONE-RVC there, so the bounce-back ambiguity the
+// interstitial exists for doesn't apply.
+if (isset($_GET['auto']) && !$isLink) {
+    header('Location: ' . $authUrl);
+    exit;
+}
 
 $cancelUrl = $isLink
     ? url($user['role'] === 'admin' ? 'admin/profile.php' : 'student/profile.php')

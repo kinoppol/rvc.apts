@@ -77,6 +77,7 @@ toast UI.
   `flash_get()`, `url()`, `asset()`, `is_impersonating()`, and `e()` (htmlspecialchars).
 - `index.php`, `login.php`, `register.php`, `logout.php` — auth entry / role redirect.
 - `sso-login.php`, `api/callback.php` — ONE-RVC single sign-on (see "### ONE-RVC SSO" below).
+- `sync-users.php` — CLI-only ONE-RVC directory sync for cron (see "### ONE-RVC user sync" below).
 - `install.php` — standalone web installer (imports `schema.sql` + `seed.sql`, with a guarded
   drop-and-reinstall; can also write `config.local.php`). Deliberately does **not** use `bootstrap.php`
   (which selects the not-yet-created DB); it reads only `config.php` and runs each `.sql` file on its
@@ -286,6 +287,34 @@ existing email/password login — `Auth::attempt()` and `login.php`'s form are u
   password keeps working exactly as before — SSO is additive, never the only way in.
 - **Never log `token_id` / `token_key`**, in `SsoAuth::verifyToken()` or its callers — this is
   commented at both.
+- **IdP-initiated login** (the user opens the app from the ONE-RVC Workspace tile): ONE-RVC posts to
+  the callback with an empty `state` and this app never stashed one — `api/callback.php` accepts that
+  combination for *login only* (never linking); a stored state that doesn't match is still a 400.
+  `sso-login.php?auto=1` skips the interstitial and 302s straight to ONE-RVC — that is the
+  "URL เริ่ม SSO ของแอป" registered on ONE-RVC (shown on `admin/user-sync.php`).
+- `SsoAuth::resolvePin($url)` is the shared `CURLOPT_RESOLVE` private-IP pin (`sso_verify_ip`) for
+  *every* server-to-server call to ONE-RVC — verify_token and the User-sync API alike.
+
+### ONE-RVC user sync
+
+`includes/OaUserSync.php` pulls the ONE-RVC directory via its User-sync API (HTTP Basic
+`ONE_RVC_CLIENT_ID:ONE_RVC_CLIENT_SECRET`; secret from `config.local.php` `one_rvc_client_secret` or env
+`OA_CLIENT_SECRET`, never committed; empty secret = sync disabled) into the **`oa_users` mirror**, upserted
+by ONE-RVC id (= `users.sso_user_id`).
+
+- It **never creates logins** (same reason SSO doesn't auto-provision). It auto-links an *unlinked* local
+  account whose email / google_email matches, and that's the only write to `users`.
+- **ONE-RVC "suspended" is derived, not copied**: `OaUserSync::blocksUser()` (admins exempt) is checked
+  in `Auth::attempt()`, `SsoAuth::resolveLogin()` and `current_user()` (kills live sessions too).
+  `users.status` is never touched, so upstream re-activation unblocks automatically. `isSuspended()`
+  fails open if `oa_users` doesn't exist yet (deploy window before `migrate.php`).
+- `since` for the next incremental run = `server_time` of the newest `oa_sync_runs` row with `ok = 1`
+  (the API's clock, never ours); a failed run stores no `server_time`, so it never advances. Pagination
+  follows `next_cursor`; `bad_cursor` restarts the round once; network errors / 5xx retry 3× with backoff;
+  a `GET_LOCK` prevents overlapping runs.
+- Entry points: `php sync-users.php [--full]` (CLI-only, for cron — **cron must be set up by hand on the
+  server**, deploy doesn't install it) and `admin/user-sync.php` (manual incremental / full sync, run
+  history, blocked accounts, SSO start URL).
 
 ### The LMS subsystem
 

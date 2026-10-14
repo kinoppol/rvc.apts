@@ -66,23 +66,8 @@ final class SsoAuth
             CURLOPT_TIMEOUT        => self::HTTP_TIMEOUT,
             CURLOPT_CONNECTTIMEOUT => self::CONNECT_TIMEOUT,
         ];
-        // Production's app server and the SSO gateway share an internal bridge network
-        // where the public hostname doesn't resolve/route server-side (only a visitor's
-        // own browser reaches it, for the auth-redirect step) — CURLOPT_RESOLVE pins
-        // just the TCP connect to a private IP while leaving the URL and Host header
-        // untouched, so name-based virtual hosting on the gateway still routes
-        // correctly. Admin-configurable (admin/settings.php -> SlotSettings), since this
-        // is production network topology, not something to hardcode or redeploy for.
-        // ONE_RVC_VERIFY_IP (config.local.php) is a fallback for when nobody has set it
-        // in the UI yet.
-        $verifyIp = SlotSettings::getSsoVerifyIp() ?? (ONE_RVC_VERIFY_IP !== '' ? ONE_RVC_VERIFY_IP : null);
-        if ($verifyIp !== null) {
-            $host = parse_url(ONE_RVC_VERIFY_URL, PHP_URL_HOST) ?: '';
-            $port = parse_url(ONE_RVC_VERIFY_URL, PHP_URL_PORT) ?: (parse_url(ONE_RVC_VERIFY_URL, PHP_URL_SCHEME) === 'https' ? 443 : 80);
-            if ($host !== '') {
-                $opts[CURLOPT_RESOLVE] = ["{$host}:{$port}:" . $verifyIp];
-            }
-        }
+        // Production's app server can't reach the gateway by its public name — see resolvePin().
+        $opts += self::resolvePin(ONE_RVC_VERIFY_URL);
         curl_setopt_array($ch, $opts);
         $body  = curl_exec($ch);
         $errno = curl_errno($ch);
@@ -101,6 +86,30 @@ final class SsoAuth
         }
 
         return ['ok' => true, 'user' => $data['user'], 'org' => $data['org'] ?? null];
+    }
+
+    /**
+     * CURLOPT_RESOLVE pin for a server-to-server call to ONE-RVC (verify_token, the
+     * User-sync API). Production's app server and the SSO gateway share an internal
+     * bridge network where the public hostname doesn't resolve/route server-side (only
+     * a visitor's own browser reaches it, for the auth-redirect step) — this pins just
+     * the TCP connect to a private IP while leaving the URL and Host header untouched,
+     * so name-based virtual hosting on the gateway still routes correctly.
+     * Admin-configurable (admin/settings.php -> SlotSettings), since this is production
+     * network topology, not something to hardcode or redeploy for; ONE_RVC_VERIFY_IP
+     * (config.local.php) is a fallback for when nobody has set it in the UI yet.
+     *
+     * @return array<int,mixed> curl options to merge (empty = resolve normally)
+     */
+    public static function resolvePin(string $url): array
+    {
+        $ip = SlotSettings::getSsoVerifyIp() ?? (ONE_RVC_VERIFY_IP !== '' ? ONE_RVC_VERIFY_IP : null);
+        $host = parse_url($url, PHP_URL_HOST) ?: '';
+        if ($ip === null || $host === '') {
+            return [];
+        }
+        $port = parse_url($url, PHP_URL_PORT) ?: (parse_url($url, PHP_URL_SCHEME) === 'https' ? 443 : 80);
+        return [CURLOPT_RESOLVE => ["{$host}:{$port}:{$ip}"]];
     }
 
     /** The local account already linked to this ONE-RVC identity, or null. */
@@ -194,7 +203,7 @@ final class SsoAuth
         if ($user['status'] === 'pending') {
             return ['ok' => false, 'error' => 'บัญชีของคุณยังรอการอนุมัติจากผู้ดูแลระบบ'];
         }
-        if ($user['status'] === 'suspended') {
+        if ($user['status'] === 'suspended' || OaUserSync::blocksUser($user)) {
             return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับสิทธิ์การใช้งาน'];
         }
 

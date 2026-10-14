@@ -169,6 +169,9 @@ $__institutionName = SlotSettings::get()['institution_name'] ?? 'วิทยา
           <a class="<?= nav_cls('migrations', $activeNav ?? null) ?>" href="<?= url('admin/migrations.php') ?>">
             <i class="bi bi-database-gear" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">DB Migrations</span>
           </a>
+          <a class="<?= nav_cls('user-sync', $activeNav ?? null) ?>" href="<?= url('admin/user-sync.php') ?>">
+            <i class="bi bi-arrow-repeat" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ซิงค์ผู้ใช้ ONE-RVC</span>
+          </a>
           <a class="<?= nav_cls('system-settings', $activeNav ?? null) ?>" href="<?= url('admin/settings.php') ?>">
             <i class="bi bi-gear" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ตั้งค่าระบบ</span>
           </a>

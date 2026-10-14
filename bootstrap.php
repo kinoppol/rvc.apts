@@ -32,6 +32,7 @@ require_once __DIR__ . '/includes/Database.php';
 require_once __DIR__ . '/includes/Csrf.php';
 require_once __DIR__ . '/includes/Auth.php';
 require_once __DIR__ . '/includes/SsoAuth.php';
+require_once __DIR__ . '/includes/OaUserSync.php';
 require_once __DIR__ . '/includes/SlotSettings.php';
 require_once __DIR__ . '/includes/Booking.php';
 require_once __DIR__ . '/includes/Member.php';
@@ -122,6 +123,12 @@ function current_user(): ?array
         return $user;
     }
     $user = Auth::findById((int) $_SESSION['user_id']);
+    // A linked account whose ONE-RVC identity was suspended by the directory sync loses
+    // its live session too, not just future logins (derived from oa_users each request).
+    if ($user && OaUserSync::blocksUser($user)) {
+        unset($_SESSION['user_id']);
+        $user = null;
+    }
     return $user;
 }
 

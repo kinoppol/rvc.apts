@@ -39,6 +39,7 @@ final class Migration
         'migrate_high_demand_mode.sql',
         'migrate_high_demand_rules.sql',
         'migrate_report_review.sql',
+        'migrate_oa_user_sync.sql',
     ];
 
     /** Create the tracking table if it doesn't exist yet. */

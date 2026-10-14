@@ -313,3 +313,37 @@ CREATE TABLE IF NOT EXISTS lms_promotion_files (
     CONSTRAINT fk_lms_pf_promotion FOREIGN KEY (promotion_id) REFERENCES lms_promotions(id) ON DELETE CASCADE,
     KEY idx_lms_pf_promotion (promotion_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ONE-RVC User-sync API mirror + run log (see database/migrate_oa_user_sync.sql / includes/OaUserSync.php).
+CREATE TABLE IF NOT EXISTS oa_users (
+    oa_user_id        VARCHAR(64)  NOT NULL PRIMARY KEY,
+    first_name        VARCHAR(150) NULL,
+    last_name         VARCHAR(150) NULL,
+    department        VARCHAR(200) NULL,
+    user_type         VARCHAR(20)  NULL,
+    status            VARCHAR(20)  NOT NULL DEFAULT 'active',
+    email             VARCHAR(150) NULL,
+    google_email      VARCHAR(150) NULL,
+    username          VARCHAR(100) NULL,
+    remote_updated_at DATETIME     NULL,
+    synced_at         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_oa_users_email (email),
+    KEY idx_oa_users_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS oa_sync_runs (
+    id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    mode         VARCHAR(12)  NOT NULL,
+    since_used   VARCHAR(40)  NULL,
+    server_time  VARCHAR(40)  NULL,
+    ok           TINYINT(1)   NOT NULL DEFAULT 0,
+    pages        INT UNSIGNED NOT NULL DEFAULT 0,
+    added        INT UNSIGNED NOT NULL DEFAULT 0,
+    updated      INT UNSIGNED NOT NULL DEFAULT 0,
+    suspended    INT UNSIGNED NOT NULL DEFAULT 0,
+    linked       INT UNSIGNED NOT NULL DEFAULT 0,
+    error        VARCHAR(500) NULL,
+    started_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at  DATETIME     NULL,
+    KEY idx_oa_sync_runs_ok (ok, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

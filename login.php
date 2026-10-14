@@ -52,7 +52,7 @@ require __DIR__ . '/includes/guest-header.php';
   <?php endif; ?>
 
   <a href="<?= url('sso-login.php') ?>" class="btn w-100" style="background:#0F172A;color:#fff;font-weight:600;padding:11px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none">
-    <i class="bi bi-shield-lock"></i>ลงชื่อเข้าใช้ผ่านระบบ ONE-RVC
+    <i class="bi bi-shield-lock"></i>ลงชื่อเข้าใช้ผ่านระบบ RVC-ONE
   </a>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
     <hr style="flex:1;margin:0;border-color:var(--bs-border-color)"><span style="font-size:12px;color:var(--bs-secondary-color)">หรือ</span><hr style="flex:1;margin:0;border-color:var(--bs-border-color)">

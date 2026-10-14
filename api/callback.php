@@ -12,7 +12,7 @@
  *                                     an HTML form to this URL
  *
  * Only the POST path can create a session or a link, and only after two independent
- * checks: `state` must match what sso-login.php stashed in this session (the anti-CSRF
+ * checks (the first relaxed only for IdP-initiated login, see below): `state` must match what sso-login.php stashed in this session (the anti-CSRF
  * guard — this is precisely why bootstrap.php sets the session cookie SameSite=None
  * on HTTPS; a cross-site POST navigation would otherwise never carry the cookie, and
  * `state` would never be visible here to check), and the token itself must
@@ -83,7 +83,14 @@ try {
     $linkUserId    = isset($_SESSION['sso_link_user_id']) ? (int) $_SESSION['sso_link_user_id'] : null;
     unset($_SESSION['sso_state'], $_SESSION['sso_link_user_id']);
 
-    if ($expectedState === '' || !hash_equals($expectedState, $state)) {
+    // Two legitimate shapes:
+    //   - SP-initiated (sso-login.php): we stashed a state, it must match exactly.
+    //   - IdP-initiated (the user opened this app from the ONE-RVC Workspace tile):
+    //     we never stashed one and ONE-RVC posts an empty state. Allowed for *login*
+    //     only — the real security gate is verifyToken() below; linking always goes
+    //     through sso-login.php?link=1 and therefore always has a state.
+    $idpInitiated = $expectedState === '' && $state === '' && $linkUserId === null;
+    if (!$idpInitiated && ($expectedState === '' || !hash_equals($expectedState, $state))) {
         http_response_code(400);
         header('Content-Type: text/plain; charset=utf-8');
         exit('Invalid or missing state.');
