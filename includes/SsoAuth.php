@@ -57,11 +57,19 @@ final class SsoAuth
             return ['ok' => false, 'error' => 'เซิร์ฟเวอร์ไม่พร้อมใช้งานการยืนยันตัวตนผ่าน ONE-RVC (ไม่มีส่วนขยาย PHP curl) กรุณาติดต่อผู้ดูแลระบบ'];
         }
 
+        $secret = OaUserSync::secret();
+        if ($secret === '') {
+            // ONE-RVC's verify_token requires HTTP Basic client auth (401 invalid_client without it).
+            return ['ok' => false, 'error' => 'ยังไม่ได้ตั้งค่า client_secret ของ ONE-RVC (ตั้งได้ที่หน้าซิงค์ผู้ใช้ ONE-RVC)'];
+        }
+
         $ch = curl_init(ONE_RVC_VERIFY_URL);
         $opts = [
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => http_build_query(['token_id' => $tokenId, 'token_key' => $tokenKey]),
             CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
+            CURLOPT_HTTPAUTH       => CURLAUTH_BASIC,
+            CURLOPT_USERPWD        => ONE_RVC_CLIENT_ID . ':' . $secret,   // never logged
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => self::HTTP_TIMEOUT,
             CURLOPT_CONNECTTIMEOUT => self::CONNECT_TIMEOUT,

@@ -285,6 +285,9 @@ existing email/password login — `Auth::attempt()` and `login.php`'s form are u
   `SsoAuth::link()` itself refuses to attach an identity already linked to a *different* account.
   Unlinking (`action=sso_unlink` on either profile page) just clears both columns; the account's
   password keeps working exactly as before — SSO is additive, never the only way in.
+- **`verify_token` requires HTTP Basic client auth** (`ONE_RVC_CLIENT_ID:client_secret`, the same secret
+  as the User-sync API via `OaUserSync::secret()`) — without it ONE-RVC answers `401 invalid_client`,
+  so an unset secret breaks SSO login, not just the sync.
 - **Never log `token_id` / `token_key`**, in `SsoAuth::verifyToken()` or its callers — this is
   commented at both.
 - **IdP-initiated login** (the user opens the app from the ONE-RVC Workspace tile): ONE-RVC posts to

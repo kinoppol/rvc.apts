@@ -58,8 +58,11 @@ final class OaUserSync
         return ['ok' => true];
     }
 
-    /** Admin-set secret wins over config.local.php / env. */
-    private static function secret(): string
+    /**
+     * Admin-set secret wins over config.local.php / env. Public because SsoAuth::verifyToken()
+     * authenticates with the same client_id:client_secret pair. Never log or echo it.
+     */
+    public static function secret(): string
     {
         $db = self::dbSecret();
         return $db !== '' ? $db : ONE_RVC_CLIENT_SECRET;
