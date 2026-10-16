@@ -6,6 +6,13 @@ if (current_user()) {
     exit;
 }
 
+// SSO-only mode: no self-registration — SsoAuth::provision() creates accounts on first SSO login.
+if (!SlotSettings::allowsPasswordLogin()) {
+    flash_set('err', 'ระบบเปิดให้เข้าสู่ระบบผ่าน ONE-RVC เท่านั้น — บัญชีจะถูกสร้างให้อัตโนมัติเมื่อเข้าสู่ระบบครั้งแรก');
+    header('Location: ' . url('login.php'));
+    exit;
+}
+
 $majors    = Major::listActive();
 $subjects  = Subject::listActive();
 $error     = null;

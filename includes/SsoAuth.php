@@ -172,12 +172,11 @@ final class SsoAuth
      * Order: an account already linked to this ONE-RVC id, else auto-link an
      * existing *unlinked* account whose email matches the one ONE-RVC returned —
      * this is what lets someone who registered themselves before SSO existed sign
-     * in with ONE-RVC with no extra step, as long as the email matches. Never
-     * creates a new account: registration here requires admin approval and a
-     * major/subject selection that ONE-RVC does not provide, so an unmatched
-     * identity is turned away with guidance instead of being auto-provisioned.
+     * in with ONE-RVC with no extra step, as long as the email matches. Else
+     * provision() creates a new, already-approved general member — a verified
+     * ONE-RVC identity is trusted enough to skip the admin approval queue.
      *
-     * @return array{ok:bool,error?:string,user?:array,justLinked?:bool}
+     * @return array{ok:bool,error?:string,user?:array,justLinked?:bool,justCreated?:bool}
      */
     public static function resolveLogin(array $ssoUser): array
     {
@@ -203,10 +202,14 @@ final class SsoAuth
             }
         }
 
+        $justCreated = false;
         if (!$user) {
-            return ['ok' => false, 'error' =>
-                'ไม่พบบัญชีในระบบนี้ที่ตรงกับบัญชี ONE-RVC ของคุณ ' .
-                'กรุณาเข้าสู่ระบบด้วยอีเมล/รหัสผ่านที่เคยสมัครไว้ แล้วผูกบัญชีจากหน้าโปรไฟล์ หรือสมัครสมาชิกใหม่'];
+            $created = self::provision($ssoUser);
+            if (!$created['ok']) {
+                return $created;
+            }
+            $user = $created['user'];
+            $justCreated = true;
         }
         if ($user['status'] === 'pending') {
             return ['ok' => false, 'error' => 'บัญชีของคุณยังรอการอนุมัติจากผู้ดูแลระบบ'];
@@ -215,6 +218,62 @@ final class SsoAuth
             return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับสิทธิ์การใช้งาน'];
         }
 
-        return ['ok' => true, 'user' => $user, 'justLinked' => $justLinked];
+        return ['ok' => true, 'user' => $user, 'justLinked' => $justLinked, 'justCreated' => $justCreated];
+    }
+
+    /**
+     * Creates an approved local account for a verified ONE-RVC identity nobody here
+     * has yet. Role: ONE-RVC staff -> teacher, everyone else -> student (never admin).
+     * Group: the "ทั่วไป" (general) user group if one exists, else none (an admin can
+     * assign one later). Major/subject/student id are left empty — the member can fill
+     * them in on the profile page. The password is a random unusable hash: this
+     * account signs in through ONE-RVC until an admin resets a password for it.
+     *
+     * @return array{ok:bool,error?:string,user?:array}
+     */
+    private static function provision(array $ssoUser): array
+    {
+        $ssoUserId = (string) ($ssoUser['id'] ?? '');
+        $email     = trim((string) ($ssoUser['email'] ?? ''));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'error' => 'บัญชี ONE-RVC ของคุณไม่มีอีเมล จึงสร้างบัญชีในระบบนี้ให้อัตโนมัติไม่ได้ กรุณาสมัครสมาชิกใหม่'];
+        }
+        if (Auth::findByEmail($email)) {
+            // Same email, but already linked to a different ONE-RVC identity.
+            return ['ok' => false, 'error' => 'อีเมลของบัญชี ONE-RVC นี้ถูกใช้กับบัญชีอื่นในระบบแล้ว กรุณาติดต่อผู้ดูแลระบบ'];
+        }
+
+        $name = trim((string) ($ssoUser['name'] ?? ''));
+        if ($name === '') {
+            $name = trim(((string) ($ssoUser['first_name'] ?? '')) . ' ' . ((string) ($ssoUser['last_name'] ?? '')));
+        }
+        $name = mb_substr($name !== '' ? $name : $email, 0, 150);
+
+        $type = strtolower((string) ($ssoUser['user_type'] ?? $ssoUser['type'] ?? ''));
+        if ($type === '') {
+            try {
+                $stmt = Database::pdo()->prepare('SELECT user_type FROM oa_users WHERE oa_user_id = ?');
+                $stmt->execute([$ssoUserId]);
+                $type = strtolower((string) $stmt->fetchColumn());
+            } catch (PDOException $e) {
+                $type = '';   // oa_users not migrated yet
+            }
+        }
+        $role = in_array($type, ['staff', 'teacher'], true) ? 'teacher' : 'student';
+
+        $groupId = Database::pdo()
+            ->query("SELECT id FROM user_groups WHERE name LIKE '%ทั่วไป%' ORDER BY id LIMIT 1")
+            ->fetchColumn();
+
+        Database::pdo()->prepare(
+            "INSERT INTO users (role, name, email, group_id, password_hash, sso_user_id, sso_linked_at, status)
+             VALUES (?, ?, ?, ?, ?, ?, NOW(), 'approved')"
+        )->execute([
+            $role, $name, $email, $groupId !== false ? (int) $groupId : null,
+            password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT), $ssoUserId,
+        ]);
+
+        $user = self::findByExternalId($ssoUserId);
+        return $user ? ['ok' => true, 'user' => $user] : ['ok' => false, 'error' => 'สร้างบัญชีจาก ONE-RVC ไม่สำเร็จ'];
     }
 }

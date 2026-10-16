@@ -129,9 +129,11 @@ require __DIR__ . '/../includes/header.php';
         <p style="font-size:12.5px;color:var(--bs-secondary-color);margin:0 0 14px">
           ผูกบัญชีของคุณกับ ONE-RVC เพื่อเข้าสู่ระบบด้วยบัญชีเดียวกับระบบอื่นของวิทยาลัยได้ในครั้งถัดไป
         </p>
+        <?php if (SlotSettings::allowsSsoLogin()): ?>
         <a href="<?= url('sso-login.php') ?>?link=1" class="btn" style="background:#0F172A;color:#fff;font-size:13px;text-decoration:none">
           <i class="bi bi-shield-lock me-1"></i>ผูกบัญชีกับ ONE-RVC
         </a>
+        <?php endif; ?>
       <?php endif; ?>
     </div>
   </div>

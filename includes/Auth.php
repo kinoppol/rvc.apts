@@ -37,6 +37,10 @@ final class Auth
         if ($user['status'] === 'suspended' || OaUserSync::blocksUser($user)) {
             return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับสิทธิ์การใช้งาน'];
         }
+        // SSO-only mode: password sign-in stays open to admins only (fallback when ONE-RVC is down).
+        if ($user['role'] !== 'admin' && !SlotSettings::allowsPasswordLogin()) {
+            return ['ok' => false, 'error' => 'ระบบเปิดให้เข้าสู่ระบบผ่าน ONE-RVC เท่านั้น'];
+        }
         return ['ok' => true, 'user' => $user];
     }
 

@@ -116,6 +116,43 @@ final class SlotSettings
         return ['ok' => true];
     }
 
+    public const LOGIN_METHODS = ['both', 'password', 'sso'];
+
+    /**
+     * Allowed sign-in methods: 'both' | 'password' | 'sso'. In 'sso' mode admins may
+     * still sign in with a password (the fallback for when ONE-RVC is down).
+     * Fails open to 'both' before the column is migrated.
+     */
+    public static function loginMethods(): string
+    {
+        try {
+            $v = Database::pdo()->query('SELECT login_methods FROM slot_settings WHERE id = 1')->fetchColumn();
+        } catch (PDOException $e) {
+            return 'both';
+        }
+        return in_array($v, self::LOGIN_METHODS, true) ? $v : 'both';
+    }
+
+    public static function allowsPasswordLogin(): bool
+    {
+        return self::loginMethods() !== 'sso';
+    }
+
+    public static function allowsSsoLogin(): bool
+    {
+        return self::loginMethods() !== 'password';
+    }
+
+    /** @return array{ok:bool,error?:string} */
+    public static function updateLoginMethods(string $mode): array
+    {
+        if (!in_array($mode, self::LOGIN_METHODS, true)) {
+            return ['ok' => false, 'error' => 'วิธีเข้าสู่ระบบไม่ถูกต้อง'];
+        }
+        Database::pdo()->prepare('UPDATE slot_settings SET login_methods = ? WHERE id = 1')->execute([$mode]);
+        return ['ok' => true];
+    }
+
     /** Admin-configured private-IP override for the ONE-RVC verify-token call, or null if unset. */
     public static function getSsoVerifyIp(): ?string
     {

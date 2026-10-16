@@ -41,6 +41,7 @@ final class Migration
         'migrate_report_review.sql',
         'migrate_oa_user_sync.sql',
         'migrate_oa_client_secret.sql',
+        'migrate_login_methods.sql',
     ];
 
     /** Create the tracking table if it doesn't exist yet. */

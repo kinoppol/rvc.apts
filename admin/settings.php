@@ -5,7 +5,10 @@ $user = require_role('admin');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     Csrf::check();
     $action = $_POST['action'] ?? 'institution_name';
-    if ($action === 'sso_verify_ip') {
+    if ($action === 'login_methods') {
+        $result = SlotSettings::updateLoginMethods($_POST['login_methods'] ?? '');
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกวิธีเข้าสู่ระบบเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
+    } elseif ($action === 'sso_verify_ip') {
         $result = SlotSettings::updateSsoVerifyIp($_POST['sso_verify_ip'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกการตั้งค่า ONE-RVC เรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
     } elseif ($action === 'min_chars') {
@@ -29,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $settings = SlotSettings::get();
+$loginMethods = SlotSettings::loginMethods();
 $typeRows  = AiProvider::listWithUsage();
 
 $activeNav = 'system-settings';
@@ -45,6 +49,27 @@ require __DIR__ . '/../includes/header.php';
       <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px;white-space:nowrap"><i class="bi bi-save me-1"></i>บันทึก</button>
     </div>
     <div style="font-size:11px;color:var(--bs-secondary-color);margin-top:6px">แสดงบนหน้าเข้าสู่ระบบและหน้าแรกของระบบ</div>
+  </form>
+</div>
+<div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;max-width:700px;margin-top:16px">
+  <h6 style="font-weight:700;margin:0 0 14px"><i class="bi bi-door-open me-2" style="color:#2563EB"></i>วิธีเข้าสู่ระบบ</h6>
+  <form method="post">
+    <?= Csrf::field() ?>
+    <input type="hidden" name="action" value="login_methods">
+    <?php foreach ([
+        'both'     => ['รหัสผ่าน และ ONE-RVC SSO', 'ผู้ใช้เลือกได้ทั้งสองวิธี และสมัครสมาชิกเองได้'],
+        'password' => ['เฉพาะรหัสผ่าน', 'ซ่อนปุ่ม ONE-RVC และปิดการเข้าสู่ระบบ/ผูกบัญชีผ่าน SSO'],
+        'sso'      => ['เฉพาะ ONE-RVC SSO', 'ปิดการสมัครสมาชิกเอง (บัญชีถูกสร้างอัตโนมัติเมื่อเข้าสู่ระบบผ่าน ONE-RVC ครั้งแรก) — ผู้ดูแลระบบยังเข้าด้วยรหัสผ่านได้จากลิงก์ "ผู้ดูแลระบบ" ในหน้าเข้าสู่ระบบ สำหรับกรณี SSO ล่ม'],
+    ] as $val => [$label, $hint]): ?>
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--bs-border-color);border-radius:8px;margin-bottom:8px;cursor:pointer">
+        <input type="radio" name="login_methods" value="<?= $val ?>" class="form-check-input" style="margin-top:3px;flex-shrink:0" <?= $loginMethods === $val ? 'checked' : '' ?>>
+        <span><span style="font-size:13px;font-weight:600"><?= e($label) ?></span><br><span style="font-size:11.5px;color:var(--bs-secondary-color)"><?= e($hint) ?></span></span>
+      </label>
+    <?php endforeach; ?>
+    <div style="font-size:11.5px;color:var(--bs-secondary-color);margin:6px 0 12px">
+      <i class="bi bi-info-circle me-1"></i>ลิงก์สำรองสำหรับผู้ดูแลระบบ: <code><?= e(url('login.php')) ?>?admin=1</code>
+    </div>
+    <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px"><i class="bi bi-save me-1"></i>บันทึก</button>
   </form>
 </div>
 <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;max-width:700px;margin-top:16px">

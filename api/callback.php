@@ -77,6 +77,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
+    // Admin turned SSO off (password-only mode) — also covers IdP-initiated posts.
+    if (!SlotSettings::allowsSsoLogin()) {
+        unset($_SESSION['sso_state'], $_SESSION['sso_link_user_id']);
+        flash_set('err', 'ระบบปิดการเข้าสู่ระบบผ่าน ONE-RVC อยู่ในขณะนี้');
+        header('Location: ' . url('login.php'));
+        exit;
+    }
+
     // ---- state must match this session (CSRF guard) ----
     $state         = (string) ($_POST['state'] ?? '');
     $expectedState = (string) ($_SESSION['sso_state'] ?? '');
@@ -143,7 +151,9 @@ try {
     session_regenerate_id(true);
     $_SESSION['user_id'] = $user['id'];
 
-    if (!empty($resolved['justLinked'])) {
+    if (!empty($resolved['justCreated'])) {
+        flash_set('ok', 'สร้างบัญชีจาก ONE-RVC และเข้าสู่ระบบเรียบร้อยแล้ว กรุณาตรวจสอบข้อมูลในหน้าโปรไฟล์');
+    } elseif (!empty($resolved['justLinked'])) {
         flash_set('ok', 'เข้าสู่ระบบสำเร็จ และผูกบัญชี ONE-RVC ให้อัตโนมัติแล้ว (พบอีเมลที่ตรงกับบัญชีเดิมของคุณ)');
     }
 

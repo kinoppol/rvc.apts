@@ -23,6 +23,12 @@
  */
 require_once __DIR__ . '/bootstrap.php';
 
+if (!SlotSettings::allowsSsoLogin()) {
+    flash_set('err', 'ระบบปิดการเข้าสู่ระบบผ่าน ONE-RVC อยู่ในขณะนี้');
+    header('Location: ' . url(current_user() ? 'index.php' : 'login.php'));
+    exit;
+}
+
 $isLink = isset($_GET['link']);
 $user   = null;
 

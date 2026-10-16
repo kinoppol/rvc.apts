@@ -272,9 +272,11 @@ existing email/password login — `Auth::attempt()` and `login.php`'s form are u
   *login* flow, `sso-login.php` with no `?link=1`) resolves in order: an account already linked by
   `sso_user_id`, else auto-link an existing **unlinked** account whose email matches what ONE-RVC
   returned (this is what lets someone who self-registered before SSO existed sign in with no extra
-  step). It never creates a new account — registration here requires admin approval plus a
-  major/subject selection ONE-RVC doesn't provide — an unmatched identity is turned away with a
-  Thai message pointing at password login + the profile page's link button, or at `register.php`.
+  step), else `SsoAuth::provision()` creates a new **already-approved** account (ONE-RVC staff →
+  `teacher`, else `student`; the first `user_groups` row whose name contains "ทั่วไป", else no group;
+  major/subject/student id left empty for the profile page; random unusable password). Only an
+  identity with no email, or whose email belongs to an account linked to a *different* ONE-RVC id,
+  is turned away.
 - **Explicit linking** (`sso-login.php?link=1`, surfaced as a "ผูกบัญชีกับ ONE-RVC" card on both
   `student/profile.php` and `admin/profile.php`) is a different code path from login-time auto-link:
   it requires being logged in already (`require_login()`), stashes the acting user's id as
@@ -288,6 +290,11 @@ existing email/password login — `Auth::attempt()` and `login.php`'s form are u
 - **`verify_token` requires HTTP Basic client auth** (`ONE_RVC_CLIENT_ID:client_secret`, the same secret
   as the User-sync API via `OaUserSync::secret()`) — without it ONE-RVC answers `401 invalid_client`,
   so an unset secret breaks SSO login, not just the sync.
+- **Admin picks the allowed sign-in methods** (`slot_settings.login_methods` = `both` | `password` |
+  `sso`, on `admin/settings.php`, read via `SlotSettings::allowsPasswordLogin()/allowsSsoLogin()`).
+  `password` blocks `sso-login.php` + `api/callback.php`; `sso` hides the password form and
+  `register.php`, and `Auth::attempt()` rejects non-admins — admins keep password login behind
+  `login.php?admin=1` as the fallback for when ONE-RVC is down. Enforced server-side, not just hidden.
 - **Never log `token_id` / `token_key`**, in `SsoAuth::verifyToken()` or its callers — this is
   commented at both.
 - **IdP-initiated login** (the user opens the app from the ONE-RVC Workspace tile): ONE-RVC posts to

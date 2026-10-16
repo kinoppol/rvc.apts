@@ -9,6 +9,13 @@ if (current_user()) {
 $error = null;
 $notice = null;
 
+$allowPassword = SlotSettings::allowsPasswordLogin();
+$allowSso      = SlotSettings::allowsSsoLogin();
+// SSO-only mode hides the password form, except behind ?admin=1 — the admin's way in
+// when ONE-RVC is down (Auth::attempt() rejects non-admins in that mode regardless).
+$adminFallback = !$allowPassword && isset($_GET['admin']);
+$showPassword  = $allowPassword || $adminFallback;
+
 // api/callback.php redirects failures/successes here via flash — this guest shell has
 // no toast system (that's authenticated-only, see includes/footer.php), so fold the
 // flash into the same inline alerts the password form already uses.
@@ -21,7 +28,7 @@ if ($ssoFlash) {
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $showPassword) {
     Csrf::check();
     $result = Auth::attempt(trim($_POST['email'] ?? ''), $_POST['password'] ?? '');
     if ($result['ok']) {
@@ -51,13 +58,18 @@ require __DIR__ . '/includes/guest-header.php';
     <div class="alert alert-success" style="font-size:13px"><?= e($notice) ?></div>
   <?php endif; ?>
 
+  <?php if ($allowSso): ?>
   <a href="<?= url('sso-login.php') ?>" class="btn w-100" style="background:#0F172A;color:#fff;font-weight:600;padding:11px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none">
     <i class="bi bi-shield-lock"></i>ลงชื่อเข้าใช้ผ่านระบบ RVC-ONE
   </a>
+  <?php endif; ?>
+  <?php if ($allowSso && $showPassword): ?>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-    <hr style="flex:1;margin:0;border-color:var(--bs-border-color)"><span style="font-size:12px;color:var(--bs-secondary-color)">หรือ</span><hr style="flex:1;margin:0;border-color:var(--bs-border-color)">
+    <hr style="flex:1;margin:0;border-color:var(--bs-border-color)"><span style="font-size:12px;color:var(--bs-secondary-color)"><?= $adminFallback ? 'ผู้ดูแลระบบ' : 'หรือ' ?></span><hr style="flex:1;margin:0;border-color:var(--bs-border-color)">
   </div>
+  <?php endif; ?>
 
+  <?php if ($showPassword): ?>
   <form method="post">
     <?= Csrf::field() ?>
     <div style="margin-bottom:14px">
@@ -72,8 +84,19 @@ require __DIR__ . '/includes/guest-header.php';
       <i class="bi bi-box-arrow-in-right me-2"></i>เข้าสู่ระบบ
     </button>
   </form>
+  <?php endif; ?>
+  <?php if ($allowPassword): ?>
   <p style="text-align:center;font-size:13px;color:var(--bs-secondary-color);margin:0">
     ยังไม่มีบัญชี? <a href="<?= url('register.php') ?>" style="color:#2563EB;font-weight:600;text-decoration:none">สมัครสมาชิก</a>
   </p>
+  <?php elseif ($adminFallback): ?>
+  <p style="text-align:center;font-size:12px;margin:0">
+    <a href="<?= url('login.php') ?>" style="color:var(--bs-secondary-color);text-decoration:none"><i class="bi bi-arrow-left me-1"></i>กลับไปเข้าสู่ระบบผ่าน ONE-RVC</a>
+  </p>
+  <?php else: ?>
+  <p style="text-align:center;font-size:12px;margin:4px 0 0">
+    <a href="<?= url('login.php') ?>?admin=1" style="color:var(--bs-secondary-color);text-decoration:none"><i class="bi bi-key me-1"></i>ผู้ดูแลระบบ: เข้าสู่ระบบด้วยรหัสผ่าน</a>
+  </p>
+  <?php endif; ?>
 </div>
 <?php require __DIR__ . '/includes/guest-footer.php'; ?>
