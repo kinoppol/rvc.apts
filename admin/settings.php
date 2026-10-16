@@ -27,9 +27,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = SlotSettings::updateInstitutionName($_POST['institution_name'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกชื่อสถานศึกษาเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
     }
-    header('Location: ' . url('admin/settings.php'));
+    $tabOf = ['login_methods' => 'login', 'sso_verify_ip' => 'login', 'type_add' => 'ai-types', 'type_rename' => 'ai-types', 'type_delete' => 'ai-types'];
+    header('Location: ' . url('admin/settings.php') . '?tab=' . ($tabOf[$action] ?? 'general'));
     exit;
 }
+
+$tabs = [
+    'general'  => ['bi-building', 'ทั่วไป'],
+    'login'    => ['bi-door-open', 'การเข้าสู่ระบบ'],
+    'ai-types' => ['bi-tags', 'ประเภท AI'],
+];
+$tab = isset($tabs[$_GET['tab'] ?? '']) ? $_GET['tab'] : 'general';
 
 $settings = SlotSettings::get();
 $loginMethods = SlotSettings::loginMethods();
@@ -38,7 +46,17 @@ $typeRows  = AiProvider::listWithUsage();
 $activeNav = 'system-settings';
 require __DIR__ . '/../includes/header.php';
 ?>
-<h5 style="font-weight:700;margin:0 0 20px">ตั้งค่าระบบ</h5>
+<h5 style="font-weight:700;margin:0 0 16px">ตั้งค่าระบบ</h5>
+<div style="display:flex;gap:0;border-bottom:2px solid var(--bs-border-color);margin-bottom:20px;flex-wrap:wrap">
+  <?php foreach ($tabs as $key => [$icon, $label]): ?>
+    <a href="<?= url('admin/settings.php') ?>?tab=<?= $key ?>"
+       style="text-decoration:none;padding:9px 20px;font-size:13px;font-weight:600;<?= $tab === $key ? 'color:#2563EB;border-bottom:2px solid #2563EB;margin-bottom:-2px' : 'color:var(--bs-secondary-color)' ?>">
+      <i class="bi <?= $icon ?> me-2"></i><?= e($label) ?>
+    </a>
+  <?php endforeach; ?>
+</div>
+
+<?php if ($tab === 'general'): ?>
 <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;max-width:700px">
   <h6 style="font-weight:700;margin:0 0 14px">ข้อมูลสถานศึกษา</h6>
   <form method="post">
@@ -52,6 +70,27 @@ require __DIR__ . '/../includes/header.php';
   </form>
 </div>
 <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;max-width:700px;margin-top:16px">
+  <h6 style="font-weight:700;margin:0 0 14px"><i class="bi bi-text-paragraph me-2" style="color:#2563EB"></i>ความยาวข้อความขั้นต่ำ</h6>
+  <form method="post">
+    <?= Csrf::field() ?>
+    <input type="hidden" name="action" value="min_chars">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">รายงานการใช้งาน (ตัวอักษร)</label>
+        <input type="number" name="min_report_chars" class="form-control" value="<?= (int) ($settings['min_report_chars'] ?? 0) ?>" min="0" max="2000" style="font-size:13px">
+        <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">0 = ไม่กำหนดขั้นต่ำ</div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">คำขอเลื่อนระดับ LMS (ตัวอักษร)</label>
+        <input type="number" name="min_mission_chars" class="form-control" value="<?= (int) ($settings['min_mission_chars'] ?? 0) ?>" min="0" max="5000" style="font-size:13px">
+        <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">0 = ไม่กำหนดขั้นต่ำ</div>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px"><i class="bi bi-save me-1"></i>บันทึก</button>
+  </form>
+</div>
+<?php elseif ($tab === 'login'): ?>
+<div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;max-width:700px">
   <h6 style="font-weight:700;margin:0 0 14px"><i class="bi bi-door-open me-2" style="color:#2563EB"></i>วิธีเข้าสู่ระบบ</h6>
   <form method="post">
     <?= Csrf::field() ?>
@@ -88,27 +127,8 @@ require __DIR__ . '/../includes/header.php';
     </div>
   </form>
 </div>
-<div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;max-width:700px;margin-top:16px">
-  <h6 style="font-weight:700;margin:0 0 14px"><i class="bi bi-text-paragraph me-2" style="color:#2563EB"></i>ความยาวข้อความขั้นต่ำ</h6>
-  <form method="post">
-    <?= Csrf::field() ?>
-    <input type="hidden" name="action" value="min_chars">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px">
-      <div>
-        <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">รายงานการใช้งาน (ตัวอักษร)</label>
-        <input type="number" name="min_report_chars" class="form-control" value="<?= (int) ($settings['min_report_chars'] ?? 0) ?>" min="0" max="2000" style="font-size:13px">
-        <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">0 = ไม่กำหนดขั้นต่ำ</div>
-      </div>
-      <div>
-        <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">คำขอเลื่อนระดับ LMS (ตัวอักษร)</label>
-        <input type="number" name="min_mission_chars" class="form-control" value="<?= (int) ($settings['min_mission_chars'] ?? 0) ?>" min="0" max="5000" style="font-size:13px">
-        <div style="font-size:11px;color:var(--bs-tertiary-color);margin-top:4px">0 = ไม่กำหนดขั้นต่ำ</div>
-      </div>
-    </div>
-    <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px"><i class="bi bi-save me-1"></i>บันทึก</button>
-  </form>
-</div>
-<div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;max-width:700px;margin-top:16px">
+<?php else: ?>
+<div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;max-width:700px">
   <h6 style="font-weight:700;margin:0 0 14px"><i class="bi bi-tags me-2" style="color:#2563EB"></i>ประเภท AI</h6>
   <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
     <?php foreach ($typeRows as $t): ?>
@@ -161,4 +181,5 @@ require __DIR__ . '/../includes/header.php';
            placeholder="ลิงก์หน้าล็อกอิน (ไม่บังคับ) เช่น https://chatgpt.com/">
   </form>
 </div>
+<?php endif; ?>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
