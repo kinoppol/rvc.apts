@@ -275,6 +275,56 @@ final class Member
         return ['ok' => true];
     }
 
+    /** All admin accounts, oldest first (for the "ผู้ดูแลระบบ" card on admin/members.php). */
+    public static function listAdmins(): array
+    {
+        return Database::pdo()->query(
+            "SELECT id, name, email, subject_id, major_id, created_at FROM users WHERE role = 'admin' ORDER BY created_at ASC, id ASC"
+        )->fetchAll();
+    }
+
+    /** Appoints an approved student/teacher as admin. @return array{ok:bool,error?:string} */
+    public static function promoteToAdmin(int $id): array
+    {
+        $stmt = Database::pdo()->prepare(
+            "UPDATE users SET role = 'admin' WHERE id = ? AND role IN ('student','teacher') AND status = 'approved'"
+        );
+        $stmt->execute([$id]);
+        if ($stmt->rowCount() === 0) {
+            return ['ok' => false, 'error' => 'แต่งตั้งได้เฉพาะสมาชิกที่อนุมัติแล้วเท่านั้น'];
+        }
+        return ['ok' => true];
+    }
+
+    /**
+     * Returns an admin to a regular member role. An admin can't demote themself, and the
+     * last remaining admin can't be demoted, so the system is never left without one.
+     * @return array{ok:bool,error?:string}
+     */
+    public static function demoteAdmin(int $id, int $actingAdminId, string $role): array
+    {
+        if ($id === $actingAdminId) {
+            return ['ok' => false, 'error' => 'ไม่สามารถถอดสิทธิ์ผู้ดูแลระบบของตนเองได้'];
+        }
+        if (!in_array($role, ['student', 'teacher'], true)) {
+            return ['ok' => false, 'error' => 'ประเภทผู้ใช้ไม่ถูกต้อง'];
+        }
+        $pdo = Database::pdo();
+        $pdo->beginTransaction();
+        $count = (int) $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'admin' FOR UPDATE")->fetchColumn();
+        if ($count <= 1) {
+            $pdo->rollBack();
+            return ['ok' => false, 'error' => 'ต้องมีผู้ดูแลระบบอย่างน้อย 1 คน'];
+        }
+        $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE id = ? AND role = 'admin'");
+        $stmt->execute([$role, $id]);
+        $pdo->commit();
+        if ($stmt->rowCount() === 0) {
+            return ['ok' => false, 'error' => 'ไม่พบผู้ดูแลระบบที่เลือก'];
+        }
+        return ['ok' => true];
+    }
+
     public static function approve(int $id): void
     {
         Database::pdo()->prepare("UPDATE users SET status = 'approved' WHERE id = ? AND role IN ('student','teacher')")->execute([$id]);

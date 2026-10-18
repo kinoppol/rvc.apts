@@ -237,6 +237,9 @@ toast UI.
 - **Registration collects a major (students) or subjects (teachers)** via `Major` / `Subject`, managed
   on `admin/majors.php`. Teachers can add a new subject inline from the registration autocomplete
   (`Subject::addAndGetId`).
+- Admins can **appoint** an approved student/teacher as admin (`Member::promoteToAdmin`, "ตั้งเป็น Admin"
+  on `admin/members.php`) and demote one back via the "ผู้ดูแลระบบ" card (`Member::demoteAdmin` — never
+  yourself, never the last admin). Role is re-read from the DB every request, so changes apply at once.
 - Admins can **impersonate** a member from `admin/members.php` (`$_SESSION['impersonating']` +
   `admin_id`; `is_impersonating()` drives the banner in `header.php`, and `logout.php` restores the
   admin session rather than logging out). Impersonation blocks LMS quizzes and mission submissions

@@ -126,32 +126,19 @@ $__institutionName = SlotSettings::get()['institution_name'] ?? 'วิทยา
             <i class="bi bi-person-circle" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">โปรไฟล์</span>
           </a>
         <?php else: ?>
-          <div class="section-title"><span class="sb-label">ผู้ดูแลระบบ</span></div>
+          <div class="section-title"><span class="sb-label">ภาพรวม</span></div>
           <a class="<?= nav_cls('admin-dashboard', $activeNav ?? null) ?>" href="<?= url('admin/dashboard.php') ?>">
             <i class="bi bi-bar-chart-line" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ภาพรวมระบบ</span>
           </a>
-          <a class="<?= nav_cls('member-management', $activeNav ?? null) ?>" href="<?= url('admin/members.php') ?>">
-            <i class="bi bi-people" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการสมาชิก</span>
-            <?php if ($__pendingCount > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__pendingCount ?></span><?php endif; ?>
+          <a class="<?= nav_cls('reports', $activeNav ?? null) ?>" href="<?= url('admin/reports.php') ?>">
+            <i class="bi bi-file-earmark-bar-graph" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">รายงานสถิติ</span>
           </a>
+          <div class="section-title"><span class="sb-label">การจอง</span></div>
           <a class="<?= nav_cls('booking-management', $activeNav ?? null) ?>" href="<?= url('admin/bookings.php') ?>">
             <i class="bi bi-calendar-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการการจอง</span>
           </a>
           <a class="<?= nav_cls('calendar', $activeNav ?? null) ?>" href="<?= url('admin/calendar.php') ?>">
             <i class="bi bi-calendar3" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ปฏิทินการจอง</span>
-          </a>
-          <a class="<?= nav_cls('majors', $activeNav ?? null) ?>" href="<?= url('admin/majors.php') ?>">
-            <i class="bi bi-mortarboard" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">สาขา / วิชาสอน</span>
-          </a>
-          <a class="<?= nav_cls('groups', $activeNav ?? null) ?>" href="<?= url('admin/groups.php') ?>">
-            <i class="bi bi-diagram-3" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการกลุ่มผู้ใช้</span>
-          </a>
-          <a class="<?= nav_cls('lms-content', $activeNav ?? null) ?>" href="<?= url('admin/lms.php') ?>">
-            <i class="bi bi-book" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการบทเรียน</span>
-          </a>
-          <a class="<?= nav_cls('lms-promotions', $activeNav ?? null) ?>" href="<?= url('admin/lms-promotions.php') ?>">
-            <i class="bi bi-patch-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">คำขอเลื่อนระดับ</span>
-            <?php if ($__lmsPending > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__lmsPending ?></span><?php endif; ?>
           </a>
           <a class="<?= nav_cls('report-review', $activeNav ?? null) ?>" href="<?= url('admin/report-review.php') ?>">
             <i class="bi bi-clipboard2-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ตรวจสอบรายงาน</span>
@@ -163,17 +150,34 @@ $__institutionName = SlotSettings::get()['institution_name'] ?? 'วิทยา
           <a class="<?= nav_cls('ai-accounts', $activeNav ?? null) ?>" href="<?= url('admin/ai-accounts.php') ?>">
             <i class="bi bi-cpu" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">บัญชี AI Pool</span>
           </a>
-          <a class="<?= nav_cls('reports', $activeNav ?? null) ?>" href="<?= url('admin/reports.php') ?>">
-            <i class="bi bi-file-earmark-bar-graph" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">รายงานสถิติ</span>
+          <div class="section-title"><span class="sb-label">สมาชิก</span></div>
+          <a class="<?= nav_cls('member-management', $activeNav ?? null) ?>" href="<?= url('admin/members.php') ?>">
+            <i class="bi bi-people" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการสมาชิก</span>
+            <?php if ($__pendingCount > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__pendingCount ?></span><?php endif; ?>
           </a>
-          <a class="<?= nav_cls('migrations', $activeNav ?? null) ?>" href="<?= url('admin/migrations.php') ?>">
-            <i class="bi bi-database-gear" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">DB Migrations</span>
+          <a class="<?= nav_cls('groups', $activeNav ?? null) ?>" href="<?= url('admin/groups.php') ?>">
+            <i class="bi bi-diagram-3" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการกลุ่มผู้ใช้</span>
+          </a>
+          <a class="<?= nav_cls('majors', $activeNav ?? null) ?>" href="<?= url('admin/majors.php') ?>">
+            <i class="bi bi-mortarboard" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">สาขา / วิชาสอน</span>
           </a>
           <a class="<?= nav_cls('user-sync', $activeNav ?? null) ?>" href="<?= url('admin/user-sync.php') ?>">
             <i class="bi bi-arrow-repeat" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ซิงค์ผู้ใช้ ONE-RVC</span>
           </a>
+          <div class="section-title"><span class="sb-label">บทเรียน AI</span></div>
+          <a class="<?= nav_cls('lms-content', $activeNav ?? null) ?>" href="<?= url('admin/lms.php') ?>">
+            <i class="bi bi-book" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการบทเรียน</span>
+          </a>
+          <a class="<?= nav_cls('lms-promotions', $activeNav ?? null) ?>" href="<?= url('admin/lms-promotions.php') ?>">
+            <i class="bi bi-patch-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">คำขอเลื่อนระดับ</span>
+            <?php if ($__lmsPending > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__lmsPending ?></span><?php endif; ?>
+          </a>
+          <div class="section-title"><span class="sb-label">ระบบ</span></div>
           <a class="<?= nav_cls('system-settings', $activeNav ?? null) ?>" href="<?= url('admin/settings.php') ?>">
             <i class="bi bi-gear" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ตั้งค่าระบบ</span>
+          </a>
+          <a class="<?= nav_cls('migrations', $activeNav ?? null) ?>" href="<?= url('admin/migrations.php') ?>">
+            <i class="bi bi-database-gear" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">DB Migrations</span>
           </a>
           <a class="<?= nav_cls('admin-profile', $activeNav ?? null) ?>" href="<?= url('admin/profile.php') ?>">
             <i class="bi bi-person-circle" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">โปรไฟล์</span>

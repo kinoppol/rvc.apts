@@ -109,6 +109,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'waive') {
         $n = Booking::waiveOverdueForUser($id);
         flash_set('ok', 'ปลดการระงับเรียบร้อยแล้ว (ยกเว้นรายงานค้าง ' . $n . ' รายการ)');
+    } elseif ($action === 'promote_admin') {
+        $result = Member::promoteToAdmin($id);
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'แต่งตั้งเป็นผู้ดูแลระบบเรียบร้อยแล้ว' : ($result['error'] ?? 'แต่งตั้งไม่สำเร็จ'));
+    } elseif ($action === 'demote_admin') {
+        $result = Member::demoteAdmin($id, (int) $user['id'], $_POST['role'] ?? '');
+        flash_set($result['ok'] ? 'warn' : 'err', $result['ok'] ? 'ถอดสิทธิ์ผู้ดูแลระบบเรียบร้อยแล้ว' : ($result['error'] ?? 'ถอดสิทธิ์ไม่สำเร็จ'));
     } elseif ($action === 'impersonate') {
         $target = Member::find($id);
         if ($target && $target['role'] === 'student' && $target['status'] === 'approved') {
@@ -148,6 +154,8 @@ $totalPages = max(1, (int) ceil($data['total'] / $perPage));
 $page = min($page, $totalPages);
 $shownFrom = $data['total'] > 0 ? ($page - 1) * $perPage + 1 : 0;
 $shownTo = min($page * $perPage, $data['total']);
+
+$admins = Member::listAdmins();
 
 $editId     = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;
 $editMember = $editId ? Member::find($editId) : null;
@@ -202,6 +210,44 @@ require __DIR__ . '/../includes/header.php';
     <p style="color:var(--bs-secondary-color);font-size:14px;margin:4px 0 0"><?= (int) $data['totalMembers'] ?> สมาชิก · <?= (int) $data['pendingCount'] ?> รออนุมัติ</p>
   </div>
   <button type="button" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px" data-bs-toggle="modal" data-bs-target="#addMemberModal"><i class="bi bi-person-plus me-1"></i>เพิ่มสมาชิก</button>
+</div>
+
+<div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);margin-bottom:14px">
+  <div class="card-body" style="padding:16px">
+    <div style="font-weight:700;font-size:14px;margin-bottom:10px"><i class="bi bi-shield-lock me-2" style="color:#7C3AED"></i>ผู้ดูแลระบบ (<?= count($admins) ?>)</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <?php foreach ($admins as $a): ?>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--bs-border-color);border-radius:10px">
+          <div style="width:32px;height:32px;border-radius:50%;background:rgba(124,58,237,.1);display:flex;align-items:center;justify-content:center;font-weight:700;color:#7C3AED;font-size:13px;flex-shrink:0"><?= e(mb_substr($a['name'], 0, 1)) ?></div>
+          <div style="flex:1;min-width:160px">
+            <div style="font-weight:600;font-size:13px"><?= e($a['name']) ?><?php if ((int) $a['id'] === (int) $user['id']): ?> <span style="font-size:11px;color:var(--bs-tertiary-color);font-weight:400">(คุณ)</span><?php endif; ?></div>
+            <div style="font-size:11px;color:var(--bs-tertiary-color)"><?= e($a['email']) ?></div>
+          </div>
+          <?php if ((int) $a['id'] !== (int) $user['id'] && count($admins) > 1): ?>
+            <form method="post" style="margin:0;display:flex;gap:6px;align-items:center"
+                  data-confirm-modal data-confirm-title="ถอดสิทธิ์ผู้ดูแลระบบ"
+                  data-confirm-msg="ถอดสิทธิ์ผู้ดูแลระบบของ <?= e($a['name']) ?> และเปลี่ยนเป็นสมาชิกทั่วไปตามประเภทที่เลือก"
+                  data-confirm-icon="bi-shield-x" data-confirm-color="#DC2626"
+                  data-confirm-btn="ถอดสิทธิ์" data-confirm-btn-cls="btn-danger">
+              <?= Csrf::field() ?>
+              <input type="hidden" name="action" value="demote_admin">
+              <input type="hidden" name="id" value="<?= (int) $a['id'] ?>">
+              <input type="hidden" name="search" value="<?= e($search) ?>">
+              <input type="hidden" name="status" value="<?= e($status) ?>">
+              <input type="hidden" name="group" value="<?= e($group) ?>">
+              <input type="hidden" name="page" value="<?= (int) $page ?>">
+              <input type="hidden" name="per_page" value="<?= (int) $perPage ?>">
+              <select name="role" class="form-select form-select-sm" style="font-size:12px;width:auto">
+                <option value="teacher" <?= $a['subject_id'] !== null || $a['major_id'] === null ? 'selected' : '' ?>>เป็นครูผู้สอน</option>
+                <option value="student" <?= $a['subject_id'] === null && $a['major_id'] !== null ? 'selected' : '' ?>>เป็นนักศึกษา</option>
+              </select>
+              <button type="submit" class="action-btn-err"><i class="bi bi-shield-x me-1"></i>ถอดสิทธิ์</button>
+            </form>
+          <?php endif; ?>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
 </div>
 
 <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);margin-bottom:14px">
@@ -364,6 +410,7 @@ require __DIR__ . '/../includes/header.php';
                     <?= member_action_form($m['id'], 'waive', 'action-btn-warn', 'bi-unlock', 'ปลดระงับ', ['title' => 'ปลดการระงับ', 'msg' => 'ปลดการระงับการจองของ ' . $m['name'] . ' (ยกเว้นรายงานค้างทั้งหมด)', 'icon' => 'bi-unlock', 'color' => '#D97706', 'btn' => 'ปลดระงับ', 'btnCls' => 'btn-warning']) ?>
                   <?php endif; ?>
                   <?= member_action_form($m['id'], 'impersonate', 'action-btn-blue', 'bi-person-badge', 'สวมสิทธิ์', ['title' => 'สวมสิทธิ์', 'msg' => 'ดูระบบในมุมมองของ ' . $m['name'] . ' (นักศึกษา) — กด "คืนสิทธิ์ Admin" บนแถบแจ้งเตือนเพื่อออก', 'icon' => 'bi-person-badge', 'color' => '#2563EB', 'btn' => 'สวมสิทธิ์', 'btnCls' => 'btn-primary']) ?>
+                  <?= member_action_form($m['id'], 'promote_admin', 'action-btn-blue', 'bi-shield-lock', 'ตั้งเป็น Admin', ['title' => 'แต่งตั้งผู้ดูแลระบบ', 'msg' => 'แต่งตั้ง ' . $m['name'] . ' เป็นผู้ดูแลระบบ — จะเข้าถึงเมนูผู้ดูแลระบบได้ทั้งหมด และย้ายไปอยู่ในรายการ "ผู้ดูแลระบบ" ด้านบน', 'icon' => 'bi-shield-lock', 'color' => '#7C3AED', 'btn' => 'แต่งตั้ง', 'btnCls' => 'btn-primary']) ?>
                   <?= member_action_form($m['id'], 'suspend', 'action-btn-warn', 'bi-slash-circle', 'ระงับ', ['title' => 'ระงับสิทธิ์', 'msg' => 'ระงับสิทธิ์ของ ' . $m['name'] . ' — ผู้ใช้จะไม่สามารถเข้าสู่ระบบและจองได้จนกว่าจะเปิดใช้งาน', 'icon' => 'bi-slash-circle', 'color' => '#D97706', 'btn' => 'ระงับ', 'btnCls' => 'btn-warning']) ?>
                   <a href="<?= members_link(['edit' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-pencil-square me-1"></i>แก้ไขข้อมูล</a>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
