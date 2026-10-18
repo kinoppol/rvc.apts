@@ -101,7 +101,7 @@ toast UI.
   shared view partials `header.php` / `footer.php` (authenticated shell) and `guest-header.php` /
   `guest-footer.php` (login/register shell).
 - `uploads/` — student-uploaded usage-report and issue files (image/PDF). Git-ignored except `.gitkeep`.
-- `assets/app.css` (ported from the prototype's `<style>`), `assets/app.js` (sidebar collapse, theme
+- `assets/app.css` (ported from the prototype's `<style>`), `assets/app.js` (sidebar collapse + collapsible admin menu sections, theme
   toggle, booking modal population, AI-account edit modal, `generateSecurePassword`, `initUsageChart`).
 - `database/schema.sql`, `database/seed.sql`, and a series of idempotent `migrate_*.sql` ALTER scripts;
   fresh installs get everything from `schema.sql`. See `database/README.md`.

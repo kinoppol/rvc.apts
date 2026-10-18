@@ -14,6 +14,32 @@
     });
   }
 
+  // ── Collapsible sidebar sections (admin) ──
+  // Closed section keys persist per browser; the section holding the current page always opens.
+  var groups = document.querySelectorAll(".sb-group");
+  if (groups.length) {
+    var closedGroups = [];
+    try { closedGroups = JSON.parse(localStorage.getItem("sidebarGroupsClosed") || "[]") || []; } catch (e) {}
+    var saveGroups = function () {
+      var keys = [];
+      groups.forEach(function (g) { if (g.classList.contains("closed")) keys.push(g.dataset.group); });
+      try { localStorage.setItem("sidebarGroupsClosed", JSON.stringify(keys)); } catch (e) {}
+    };
+    var setGroup = function (g, closed) {
+      g.classList.toggle("closed", closed);
+      g.querySelector(".sb-group-toggle").setAttribute("aria-expanded", closed ? "false" : "true");
+    };
+    sidebar.classList.add("sb-init"); // no slide animation for the initial state
+    groups.forEach(function (g) {
+      setGroup(g, closedGroups.indexOf(g.dataset.group) !== -1 && !g.classList.contains("has-active"));
+      g.querySelector(".sb-group-toggle").addEventListener("click", function () {
+        setGroup(g, !g.classList.contains("closed"));
+        saveGroups();
+      });
+    });
+    requestAnimationFrame(function () { requestAnimationFrame(function () { sidebar.classList.remove("sb-init"); }); });
+  }
+
   // ── Theme ──
   var THEME_SEL_BG = "#2563EB", THEME_SEL_TXT = "white";
   var THEME_IDLE_BG = "transparent", THEME_IDLE_TXT = "var(--bs-secondary-color)";

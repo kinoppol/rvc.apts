@@ -126,62 +126,58 @@ $__institutionName = SlotSettings::get()['institution_name'] ?? 'วิทยา
             <i class="bi bi-person-circle" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">โปรไฟล์</span>
           </a>
         <?php else: ?>
-          <div class="section-title"><span class="sb-label">ภาพรวม</span></div>
-          <a class="<?= nav_cls('admin-dashboard', $activeNav ?? null) ?>" href="<?= url('admin/dashboard.php') ?>">
-            <i class="bi bi-bar-chart-line" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ภาพรวมระบบ</span>
-          </a>
-          <a class="<?= nav_cls('reports', $activeNav ?? null) ?>" href="<?= url('admin/reports.php') ?>">
-            <i class="bi bi-file-earmark-bar-graph" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">รายงานสถิติ</span>
-          </a>
-          <div class="section-title"><span class="sb-label">การจอง</span></div>
-          <a class="<?= nav_cls('booking-management', $activeNav ?? null) ?>" href="<?= url('admin/bookings.php') ?>">
-            <i class="bi bi-calendar-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการการจอง</span>
-          </a>
-          <a class="<?= nav_cls('calendar', $activeNav ?? null) ?>" href="<?= url('admin/calendar.php') ?>">
-            <i class="bi bi-calendar3" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ปฏิทินการจอง</span>
-          </a>
-          <a class="<?= nav_cls('report-review', $activeNav ?? null) ?>" href="<?= url('admin/report-review.php') ?>">
-            <i class="bi bi-clipboard2-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ตรวจสอบรายงาน</span>
-            <?php if ($__reportReviewPending > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__reportReviewPending ?></span><?php endif; ?>
-          </a>
-          <a class="<?= nav_cls('slot-management', $activeNav ?? null) ?>" href="<?= url('admin/slots.php') ?>">
-            <i class="bi bi-calendar-range" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการตารางเวลา</span>
-          </a>
-          <a class="<?= nav_cls('ai-accounts', $activeNav ?? null) ?>" href="<?= url('admin/ai-accounts.php') ?>">
-            <i class="bi bi-cpu" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">บัญชี AI Pool</span>
-          </a>
-          <div class="section-title"><span class="sb-label">สมาชิก</span></div>
-          <a class="<?= nav_cls('member-management', $activeNav ?? null) ?>" href="<?= url('admin/members.php') ?>">
-            <i class="bi bi-people" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการสมาชิก</span>
-            <?php if ($__pendingCount > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__pendingCount ?></span><?php endif; ?>
-          </a>
-          <a class="<?= nav_cls('groups', $activeNav ?? null) ?>" href="<?= url('admin/groups.php') ?>">
-            <i class="bi bi-diagram-3" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการกลุ่มผู้ใช้</span>
-          </a>
-          <a class="<?= nav_cls('majors', $activeNav ?? null) ?>" href="<?= url('admin/majors.php') ?>">
-            <i class="bi bi-mortarboard" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">สาขา / วิชาสอน</span>
-          </a>
-          <a class="<?= nav_cls('user-sync', $activeNav ?? null) ?>" href="<?= url('admin/user-sync.php') ?>">
-            <i class="bi bi-arrow-repeat" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ซิงค์ผู้ใช้ ONE-RVC</span>
-          </a>
-          <div class="section-title"><span class="sb-label">บทเรียน AI</span></div>
-          <a class="<?= nav_cls('lms-content', $activeNav ?? null) ?>" href="<?= url('admin/lms.php') ?>">
-            <i class="bi bi-book" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">จัดการบทเรียน</span>
-          </a>
-          <a class="<?= nav_cls('lms-promotions', $activeNav ?? null) ?>" href="<?= url('admin/lms-promotions.php') ?>">
-            <i class="bi bi-patch-check" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">คำขอเลื่อนระดับ</span>
-            <?php if ($__lmsPending > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__lmsPending ?></span><?php endif; ?>
-          </a>
-          <div class="section-title"><span class="sb-label">ระบบ</span></div>
-          <a class="<?= nav_cls('system-settings', $activeNav ?? null) ?>" href="<?= url('admin/settings.php') ?>">
-            <i class="bi bi-gear" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ตั้งค่าระบบ</span>
-          </a>
-          <a class="<?= nav_cls('migrations', $activeNav ?? null) ?>" href="<?= url('admin/migrations.php') ?>">
-            <i class="bi bi-database-gear" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">DB Migrations</span>
-          </a>
-          <a class="<?= nav_cls('admin-profile', $activeNav ?? null) ?>" href="<?= url('admin/profile.php') ?>">
-            <i class="bi bi-person-circle" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">โปรไฟล์</span>
-          </a>
+          <?php
+            // [nav key, page, icon, label, badge count]; each section collapses/expands, the open
+            // state is kept per browser in localStorage (see the script after </aside>).
+            $__adminNav = [
+                'overview' => ['ภาพรวม', [
+                    ['admin-dashboard', 'admin/dashboard.php', 'bi-bar-chart-line', 'ภาพรวมระบบ', 0],
+                    ['reports', 'admin/reports.php', 'bi-file-earmark-bar-graph', 'รายงานสถิติ', 0],
+                ]],
+                'booking' => ['การจอง', [
+                    ['booking-management', 'admin/bookings.php', 'bi-calendar-check', 'จัดการการจอง', 0],
+                    ['calendar', 'admin/calendar.php', 'bi-calendar3', 'ปฏิทินการจอง', 0],
+                    ['report-review', 'admin/report-review.php', 'bi-clipboard2-check', 'ตรวจสอบรายงาน', $__reportReviewPending],
+                    ['slot-management', 'admin/slots.php', 'bi-calendar-range', 'จัดการตารางเวลา', 0],
+                    ['ai-accounts', 'admin/ai-accounts.php', 'bi-cpu', 'บัญชี AI Pool', 0],
+                ]],
+                'members' => ['สมาชิก', [
+                    ['member-management', 'admin/members.php', 'bi-people', 'จัดการสมาชิก', $__pendingCount],
+                    ['groups', 'admin/groups.php', 'bi-diagram-3', 'จัดการกลุ่มผู้ใช้', 0],
+                    ['majors', 'admin/majors.php', 'bi-mortarboard', 'สาขา / วิชาสอน', 0],
+                    ['user-sync', 'admin/user-sync.php', 'bi-arrow-repeat', 'ซิงค์ผู้ใช้ ONE-RVC', 0],
+                ]],
+                'lms' => ['บทเรียน AI', [
+                    ['lms-content', 'admin/lms.php', 'bi-book', 'จัดการบทเรียน', 0],
+                    ['lms-promotions', 'admin/lms-promotions.php', 'bi-patch-check', 'คำขอเลื่อนระดับ', $__lmsPending],
+                ]],
+                'system' => ['ระบบ', [
+                    ['system-settings', 'admin/settings.php', 'bi-gear', 'ตั้งค่าระบบ', 0],
+                    ['migrations', 'admin/migrations.php', 'bi-database-gear', 'DB Migrations', 0],
+                    ['admin-profile', 'admin/profile.php', 'bi-person-circle', 'โปรไฟล์', 0],
+                ]],
+            ];
+          ?>
+          <?php foreach ($__adminNav as $__gKey => [$__gTitle, $__gItems]):
+            $__gActive = in_array($activeNav ?? null, array_column($__gItems, 0), true);
+            $__gBadge  = array_sum(array_column($__gItems, 4));
+          ?>
+            <div class="sb-group<?= $__gActive ? ' has-active' : '' ?>" data-group="<?= e($__gKey) ?>">
+              <button type="button" class="section-title sb-group-toggle" aria-expanded="true">
+                <span class="sb-label"><?= e($__gTitle) ?></span>
+                <?php if ($__gBadge > 0): ?><span class="sb-group-dot sb-label" title="มีรายการรอดำเนินการ"></span><?php endif; ?>
+                <i class="bi bi-chevron-down sb-group-chevron sb-label"></i>
+              </button>
+              <div class="sb-group-items"><div>
+                <?php foreach ($__gItems as [$__key, $__page, $__icon, $__label, $__badge]): ?>
+                  <a class="<?= nav_cls($__key, $activeNav ?? null) ?>" href="<?= url($__page) ?>">
+                    <i class="bi <?= e($__icon) ?>" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label"><?= e($__label) ?></span>
+                    <?php if ($__badge > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__badge ?></span><?php endif; ?>
+                  </a>
+                <?php endforeach; ?>
+              </div></div>
+            </div>
+          <?php endforeach; ?>
         <?php endif; ?>
       </div>
     </aside>

@@ -112,3 +112,16 @@ html,body{height:100%}
 [data-bs-theme="dark"] .bk-cred-ea{background:#1e293b;border-color:#166534}
 .bk-ea-label{color:#065F46}
 [data-bs-theme="dark"] .bk-ea-label{color:#86efac}
+/* Collapsible admin sidebar sections (includes/header.php + initSidebarGroups in app.js) */
+.sb-group-toggle{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;text-align:left;cursor:pointer}
+.sb-group-toggle:hover{color:var(--bs-body-color)}
+.sb-group-chevron{margin-left:auto;font-size:11px;transition:transform .2s}
+.sb-group.closed .sb-group-chevron{transform:rotate(-90deg)}
+.sb-group-dot{display:none;width:7px;height:7px;border-radius:50%;background:#EF4444;flex-shrink:0}
+.sb-group.closed .sb-group-dot{display:inline-block}
+.sb-group-items{display:grid;grid-template-rows:1fr;transition:grid-template-rows .2s ease}
+.sb-group-items>div{overflow:hidden}
+.sb-group.closed .sb-group-items{grid-template-rows:0fr}
+.sidebar.collapsed .sb-group-items{grid-template-rows:1fr}
+.sidebar.collapsed .sb-group-toggle{pointer-events:none}
+.sidebar.sb-init .sb-group-items,.sidebar.sb-init .sb-group-chevron{transition:none}
