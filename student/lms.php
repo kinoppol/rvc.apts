@@ -81,7 +81,10 @@ require __DIR__ . '/../includes/header.php';
               <i class="bi bi-lock me-1"></i>
               <?php if ($prev): ?>
                 ต้องผ่านแบบทดสอบหลังเรียนของ <strong><?= e($prev['title']) ?></strong>
-                ที่ <?= (int) $prev['pass_percent'] ?>% ขึ้นไปก่อน
+                ที่ <?= (int) $prev['pass_percent'] ?>% ขึ้นไป
+                <?php if ($prev['promo_group_id'] !== null): ?>
+                  และได้รับการอนุมัติเลื่อนระดับจากผู้ดูแลระบบก่อน
+                <?php endif; ?>
               <?php else: ?>
                 ยังไม่เปิดให้เรียน
               <?php endif; ?>

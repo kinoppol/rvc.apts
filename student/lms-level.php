@@ -139,7 +139,7 @@ function quiz_button(int $levelId, string $phase, ?int $topicId, string $label, 
             (ตอนนี้ <?= (int) $state['topicsDone'] ?>/<?= (int) $state['topicsTotal'] ?>)
           </span>
         <?php else: ?>
-          สุ่ม <?= (int) $level['post_question_count'] ?> ข้อจากคลัง — ผ่านแล้วจะปลดล็อกระดับถัดไป
+          สุ่ม <?= (int) $level['post_question_count'] ?> ข้อจากคลัง<?php if ($level['promo_group_id'] !== null): ?> — ผ่านแล้วต้องส่งภารกิจและรอการอนุมัติจากผู้ดูแลเพื่อปลดล็อกระดับถัดไป<?php else: ?> — ผ่านแล้วจะปลดล็อกระดับถัดไป<?php endif; ?>
         <?php endif; ?>
         <?php if ($state['bestPost'] !== null): ?>
           <br><span style="color:<?= $state['postPassed'] ? '#059669' : '#D97706' ?>;font-weight:600">

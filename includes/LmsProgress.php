@@ -122,8 +122,11 @@ final class LmsProgress
 
             // Only a published level can gate the one above it — an unpublished rung
             // in the middle must not strand every level beyond it.
+            // If the level has a promo group wired, the student must have an approved
+            // promotion to unlock the next level; otherwise passing post-test is enough.
             if ((int) $level['is_published'] === 1) {
-                $prevPass = $postPassed;
+                $promoted = $promotion !== null && $promotion['status'] === 'approved';
+                $prevPass = ($level['promo_group_id'] !== null) ? $promoted : $postPassed;
             }
         }
 
