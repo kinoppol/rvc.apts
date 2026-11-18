@@ -48,11 +48,28 @@ CREATE TABLE users (
     sso_user_id   VARCHAR(64) NULL,                    -- ONE-RVC user.id once linked (NULL = not linked)
     sso_linked_at DATETIME NULL,                        -- when the ONE-RVC link was established
     status        ENUM('pending','approved','suspended') NOT NULL DEFAULT 'pending',
+    suspended_reason VARCHAR(500) NULL,                 -- why the member was suspended (shown to them at login)
+    suspended_until  DATETIME NULL,                     -- when the suspension auto-lifts (NULL = indefinite; derived at read time)
+    suspended_at     DATETIME NULL,                     -- when the suspension was applied
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_users_group   FOREIGN KEY (group_id)   REFERENCES user_groups(id) ON DELETE SET NULL,
     CONSTRAINT fk_users_major   FOREIGN KEY (major_id)   REFERENCES majors(id)      ON DELETE SET NULL,
     CONSTRAINT fk_users_subject FOREIGN KEY (subject_id) REFERENCES subjects(id)    ON DELETE SET NULL,
     UNIQUE KEY uniq_users_sso_user_id (sso_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Direct messages an admin sends to a member (see includes/AdminMessage.php).
+CREATE TABLE admin_messages (
+    id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id    INT UNSIGNED NOT NULL,                 -- recipient
+    admin_id   INT UNSIGNED NULL,                     -- sender (NULL if the admin account was later removed)
+    subject    VARCHAR(200) NOT NULL,
+    body       TEXT NOT NULL,
+    read_at    DATETIME NULL,                         -- NULL = unread
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_admin_messages_user  FOREIGN KEY (user_id)  REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_admin_messages_admin FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE SET NULL,
+    KEY idx_admin_messages_user (user_id, read_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Admin-managed list of AI account types (Claude Pro, ChatGPT Plus, ...).

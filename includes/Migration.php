@@ -42,6 +42,8 @@ final class Migration
         'migrate_oa_user_sync.sql',
         'migrate_oa_client_secret.sql',
         'migrate_login_methods.sql',
+        'migrate_scheduled_suspension.sql',
+        'migrate_admin_messages.sql',
     ];
 
     /** Create the tracking table if it doesn't exist yet. */

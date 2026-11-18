@@ -36,6 +36,7 @@ require_once __DIR__ . '/includes/OaUserSync.php';
 require_once __DIR__ . '/includes/SlotSettings.php';
 require_once __DIR__ . '/includes/Booking.php';
 require_once __DIR__ . '/includes/Member.php';
+require_once __DIR__ . '/includes/AdminMessage.php';
 require_once __DIR__ . '/includes/UserGroup.php';
 require_once __DIR__ . '/includes/AiProvider.php';
 require_once __DIR__ . '/includes/AiAccount.php';

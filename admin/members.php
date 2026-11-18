@@ -59,8 +59,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         Member::reject($id);
         flash_set('warn', 'ปฏิเสธคำขอสมัครเรียบร้อยแล้ว');
     } elseif ($action === 'suspend') {
-        Member::suspend($id);
-        flash_set('warn', 'ระงับสิทธิ์สมาชิกเรียบร้อยแล้ว');
+        $result = Member::suspend($id, $_POST['suspend_reason'] ?? '', $_POST['suspend_until'] ?? null);
+        flash_set($result['ok'] ? 'warn' : 'err', $result['ok'] ? 'ระงับสิทธิ์สมาชิกเรียบร้อยแล้ว' : ($result['error'] ?? 'ระงับสิทธิ์ไม่สำเร็จ'));
+    } elseif ($action === 'send_message') {
+        $result = AdminMessage::send((int) $user['id'], $id, $_POST['subject'] ?? '', $_POST['body'] ?? '');
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'ส่งข้อความเรียบร้อยแล้ว' : ($result['error'] ?? 'ส่งข้อความไม่สำเร็จ'));
+    } elseif ($action === 'bulk_send_message') {
+        $result = AdminMessage::sendToMany((int) $user['id'], $_POST['ids'] ?? [], $_POST['subject'] ?? '', $_POST['body'] ?? '');
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? ('ส่งข้อความเรียบร้อยแล้ว (' . ($result['count'] ?? 0) . ' คน)') : ($result['error'] ?? 'ส่งข้อความไม่สำเร็จ'));
     } elseif ($action === 'activate') {
         Member::activate($id);
         flash_set('ok', 'เปิดใช้งานสมาชิกเรียบร้อยแล้ว');
@@ -332,6 +338,7 @@ require __DIR__ . '/../includes/header.php';
       <i class="bi bi-diagram-3 me-1"></i>ย้ายกลุ่ม
     </button>
   </div>
+  <button type="button" class="action-btn-blue" data-bulk-send-msg><i class="bi bi-envelope me-1"></i>ส่งข้อความ</button>
   <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearBulkSelection()" style="margin-left:auto;font-size:12px">
     <i class="bi bi-x-lg me-1"></i>ยกเลิกการเลือก
   </button>
@@ -378,6 +385,12 @@ require __DIR__ . '/../includes/header.php';
                 <span class="badge-teach" style="margin-bottom:4px;display:inline-block"><i class="bi bi-person-workspace me-1"></i><?= e($m['roleLabel']) ?></span><br>
               <?php endif; ?>
               <span class="<?= $m['badgeCls'] ?>"><?= e($m['statusLabel']) ?></span>
+              <?php if ($m['isSuspended'] && !empty($m['suspendReason'])): ?>
+                <div style="font-size:11px;color:var(--bs-secondary-color);margin-top:4px;max-width:240px" title="<?= e($m['suspendReason']) ?>"><i class="bi bi-chat-left-text me-1"></i><?= e(mb_strlen($m['suspendReason']) > 60 ? mb_substr($m['suspendReason'], 0, 60) . '…' : $m['suspendReason']) ?></div>
+              <?php endif; ?>
+              <?php if ($m['isSuspended'] && !empty($m['suspendUntilLabel'])): ?>
+                <div style="font-size:11px;color:#D97706;margin-top:2px"><i class="bi bi-clock me-1"></i>ปลดระงับ: <?= e($m['suspendUntilLabel']) ?></div>
+              <?php endif; ?>
               <?php if ($m['restricted']): ?><div><span class="badge-susp" style="margin-top:4px;display:inline-block;font-size:11px" title="มีรายงานการใช้งานค้างเกิน 7 วัน"><i class="bi bi-slash-circle me-1"></i>ระงับการจอง</span></div><?php endif; ?>
             </td>
             <td style="padding:12px 16px">
@@ -411,11 +424,13 @@ require __DIR__ . '/../includes/header.php';
                   <?php endif; ?>
                   <?= member_action_form($m['id'], 'impersonate', 'action-btn-blue', 'bi-person-badge', 'สวมสิทธิ์', ['title' => 'สวมสิทธิ์', 'msg' => 'ดูระบบในมุมมองของ ' . $m['name'] . ' (นักศึกษา) — กด "คืนสิทธิ์ Admin" บนแถบแจ้งเตือนเพื่อออก', 'icon' => 'bi-person-badge', 'color' => '#2563EB', 'btn' => 'สวมสิทธิ์', 'btnCls' => 'btn-primary']) ?>
                   <?= member_action_form($m['id'], 'promote_admin', 'action-btn-blue', 'bi-shield-lock', 'ตั้งเป็น Admin', ['title' => 'แต่งตั้งผู้ดูแลระบบ', 'msg' => 'แต่งตั้ง ' . $m['name'] . ' เป็นผู้ดูแลระบบ — จะเข้าถึงเมนูผู้ดูแลระบบได้ทั้งหมด และย้ายไปอยู่ในรายการ "ผู้ดูแลระบบ" ด้านบน', 'icon' => 'bi-shield-lock', 'color' => '#7C3AED', 'btn' => 'แต่งตั้ง', 'btnCls' => 'btn-primary']) ?>
-                  <?= member_action_form($m['id'], 'suspend', 'action-btn-warn', 'bi-slash-circle', 'ระงับ', ['title' => 'ระงับสิทธิ์', 'msg' => 'ระงับสิทธิ์ของ ' . $m['name'] . ' — ผู้ใช้จะไม่สามารถเข้าสู่ระบบและจองได้จนกว่าจะเปิดใช้งาน', 'icon' => 'bi-slash-circle', 'color' => '#D97706', 'btn' => 'ระงับ', 'btnCls' => 'btn-warning']) ?>
+                  <button type="button" class="action-btn-warn" data-suspend-member data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>"><i class="bi bi-slash-circle me-1"></i>ระงับ</button>
+                  <button type="button" class="action-btn-blue" data-send-msg data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>"><i class="bi bi-envelope me-1"></i>ส่งข้อความ</button>
                   <a href="<?= members_link(['edit' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-pencil-square me-1"></i>แก้ไขข้อมูล</a>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
                 <?php elseif ($m['isSuspended']): ?>
                   <?= member_action_form($m['id'], 'activate', 'action-btn-ok', 'bi-check-circle', 'เปิดใช้') ?>
+                  <button type="button" class="action-btn-blue" data-send-msg data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>"><i class="bi bi-envelope me-1"></i>ส่งข้อความ</button>
                   <a href="<?= members_link(['edit' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-pencil-square me-1"></i>แก้ไขข้อมูล</a>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
                   <?= member_action_form($m['id'], 'delete', 'action-btn-err', 'bi-trash', 'ลบ', ['title' => 'ลบสมาชิก', 'msg' => 'ลบ ' . $m['name'] . ' ออกจากระบบอย่างถาวร พร้อมประวัติการจองทั้งหมด ไม่สามารถเรียกคืนได้', 'icon' => 'bi-trash', 'color' => '#DC2626', 'btn' => 'ลบถาวร', 'btnCls' => 'btn-danger']) ?>
@@ -553,6 +568,115 @@ require __DIR__ . '/../includes/header.php';
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
           <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
           <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none">บันทึก</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Suspend member modal (reason required + optional scheduled lift time) -->
+<div class="modal fade" id="suspendModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="suspend">
+        <input type="hidden" name="id" id="suspendId">
+        <input type="hidden" name="search" value="<?= e($search) ?>">
+        <input type="hidden" name="status" value="<?= e($status) ?>">
+        <input type="hidden" name="group" value="<?= e($group) ?>">
+        <input type="hidden" name="page" value="<?= (int) $page ?>">
+        <input type="hidden" name="per_page" value="<?= (int) $perPage ?>">
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-slash-circle me-2" style="color:#D97706"></i>ระงับสิทธิ์ — <span id="suspendName"></span></h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+        </div>
+        <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+          <p style="font-size:13px;color:var(--bs-secondary-color);margin:0">ผู้ใช้จะไม่สามารถเข้าสู่ระบบและจองได้ และจะเห็นสาเหตุนี้เมื่อพยายามเข้าสู่ระบบ</p>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">สาเหตุของการระงับ <span style="color:#DC2626">*</span></label>
+            <textarea name="suspend_reason" required maxlength="500" rows="3" class="form-control" placeholder="ระบุสาเหตุที่ระงับสิทธิ์ผู้ใช้นี้" style="font-size:13px"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ปลดระงับอัตโนมัติเมื่อ <span style="font-weight:400;color:var(--bs-tertiary-color)">(เว้นว่างไว้ = ระงับถาวรจนกว่าจะปลดเอง)</span></label>
+            <input type="datetime-local" name="suspend_until" class="form-control" style="font-size:13px">
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-warning btn-sm" style="font-weight:600"><i class="bi bi-slash-circle me-1"></i>ระงับสิทธิ์</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Send message to one member -->
+<div class="modal fade" id="sendMsgModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="send_message">
+        <input type="hidden" name="id" id="sendMsgId">
+        <input type="hidden" name="search" value="<?= e($search) ?>">
+        <input type="hidden" name="status" value="<?= e($status) ?>">
+        <input type="hidden" name="group" value="<?= e($group) ?>">
+        <input type="hidden" name="page" value="<?= (int) $page ?>">
+        <input type="hidden" name="per_page" value="<?= (int) $perPage ?>">
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-envelope me-2" style="color:#2563EB"></i>ส่งข้อความถึง <span id="sendMsgName"></span></h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+        </div>
+        <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">หัวข้อ <span style="color:#DC2626">*</span></label>
+            <input type="text" name="subject" required maxlength="200" class="form-control" placeholder="หัวข้อข้อความ" style="font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">เนื้อหา <span style="color:#DC2626">*</span></label>
+            <textarea name="body" required maxlength="5000" rows="5" class="form-control" placeholder="พิมพ์ข้อความถึงสมาชิก" style="font-size:13px"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none"><i class="bi bi-send me-1"></i>ส่งข้อความ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Send message to all selected members (bulk) -->
+<div class="modal fade" id="bulkMsgModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post" id="bulkMsgForm">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="bulk_send_message">
+        <input type="hidden" name="search" value="<?= e($search) ?>">
+        <input type="hidden" name="status" value="<?= e($status) ?>">
+        <input type="hidden" name="group" value="<?= e($group) ?>">
+        <input type="hidden" name="page" value="<?= (int) $page ?>">
+        <input type="hidden" name="per_page" value="<?= (int) $perPage ?>">
+        <div id="bulkMsgIds"></div>
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-envelope me-2" style="color:#2563EB"></i>ส่งข้อความถึงสมาชิกที่เลือก (<span id="bulkMsgCount">0</span> คน)</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+        </div>
+        <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">หัวข้อ <span style="color:#DC2626">*</span></label>
+            <input type="text" name="subject" required maxlength="200" class="form-control" placeholder="หัวข้อข้อความ" style="font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">เนื้อหา <span style="color:#DC2626">*</span></label>
+            <textarea name="body" required maxlength="5000" rows="5" class="form-control" placeholder="พิมพ์ข้อความถึงสมาชิกที่เลือกทั้งหมด" style="font-size:13px"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary btn-sm" style="background:#2563EB;border:none"><i class="bi bi-send me-1"></i>ส่งข้อความ</button>
         </div>
       </form>
     </div>

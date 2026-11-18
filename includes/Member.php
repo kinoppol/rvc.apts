@@ -32,6 +32,11 @@ final class Member
             $row['displayMajor'] = $row['major_name_db'] ?? $row['major'] ?? '—';
         }
         $row['hours'] = self::hoursFor((int) $row['id']);
+        // Suspension detail (for the admin members list + member-facing reason display)
+        $row['suspendReason'] = $row['suspended_reason'] ?? null;
+        $row['suspendUntilLabel'] = !empty($row['suspended_until'])
+            ? self::suspensionUntilLabel($row['suspended_until'])
+            : null;
         $created = new DateTimeImmutable($row['created_at']);
         $row['joinDate'] = Booking::thaiDate($created);
         $row['groupName'] = $row['group_name'] ?? null;
@@ -51,6 +56,9 @@ final class Member
         ];
         $orderCol = $sortMap[$sort] ?? 'u.created_at';
         $orderDir = $dir === 'asc' ? 'ASC' : 'DESC';
+
+        // Lift any scheduled suspensions that have elapsed so counts/chips/rows are current.
+        self::expireScheduledSuspensions();
 
         $pdo = Database::pdo();
 
@@ -354,9 +362,10 @@ final class Member
         }
         $ph = implode(',', array_fill(0, count($ids), '?'));
         $stmt = Database::pdo()->prepare(
-            "UPDATE users SET status = 'suspended' WHERE role IN ('student','teacher') AND status = 'approved' AND id IN ({$ph})"
+            "UPDATE users SET status = 'suspended', suspended_reason = ?, suspended_until = NULL, suspended_at = NOW()
+             WHERE role IN ('student','teacher') AND status = 'approved' AND id IN ({$ph})"
         );
-        $stmt->execute($ids);
+        $stmt->execute(array_merge(['ระงับสิทธิ์โดยผู้ดูแลระบบ'], $ids));
         return $stmt->rowCount();
     }
 
@@ -369,7 +378,8 @@ final class Member
         }
         $ph = implode(',', array_fill(0, count($ids), '?'));
         $stmt = Database::pdo()->prepare(
-            "UPDATE users SET status = 'approved' WHERE role IN ('student','teacher') AND status = 'suspended' AND id IN ({$ph})"
+            "UPDATE users SET status = 'approved', suspended_reason = NULL, suspended_until = NULL, suspended_at = NULL
+             WHERE role IN ('student','teacher') AND status = 'suspended' AND id IN ({$ph})"
         );
         $stmt->execute($ids);
         return $stmt->rowCount();
@@ -409,14 +419,72 @@ final class Member
         Database::pdo()->prepare("DELETE FROM users WHERE id = ? AND role IN ('student','teacher') AND status = 'pending'")->execute([$id]);
     }
 
-    public static function suspend(int $id): void
+    /**
+     * Suspends a member with a required reason. $until (a 'Y-m-d H:i:s' timestamp in the
+     * future, or null for an indefinite suspension) makes it a *scheduled* suspension that
+     * auto-lifts once NOW() passes it — see expireScheduledSuspensions(). The reason is
+     * shown to the member when they try to sign in.
+     * @return array{ok:bool,error?:string}
+     */
+    public static function suspend(int $id, string $reason = '', ?string $until = null): array
     {
-        Database::pdo()->prepare("UPDATE users SET status = 'suspended' WHERE id = ? AND role IN ('student','teacher')")->execute([$id]);
+        $reason = trim($reason);
+        if ($reason === '') {
+            return ['ok' => false, 'error' => 'กรุณาระบุสาเหตุของการระงับสิทธิ์'];
+        }
+        if (mb_strlen($reason) > 500) {
+            return ['ok' => false, 'error' => 'สาเหตุยาวเกินกำหนด (ไม่เกิน 500 ตัวอักษร)'];
+        }
+        $untilSql = null;
+        if ($until !== null && trim($until) !== '') {
+            $dt = date_create($until);
+            if (!$dt) {
+                return ['ok' => false, 'error' => 'รูปแบบวันที่ปลดระงับไม่ถูกต้อง'];
+            }
+            if ($dt->getTimestamp() <= time()) {
+                return ['ok' => false, 'error' => 'เวลาปลดระงับต้องอยู่ในอนาคต'];
+            }
+            $untilSql = $dt->format('Y-m-d H:i:s');
+        }
+        Database::pdo()->prepare(
+            "UPDATE users SET status = 'suspended', suspended_reason = ?, suspended_until = ?, suspended_at = NOW()
+             WHERE id = ? AND role IN ('student','teacher')"
+        )->execute([$reason, $untilSql, $id]);
+        return ['ok' => true];
     }
 
     public static function activate(int $id): void
     {
-        Database::pdo()->prepare("UPDATE users SET status = 'approved' WHERE id = ? AND role IN ('student','teacher')")->execute([$id]);
+        Database::pdo()->prepare(
+            "UPDATE users SET status = 'approved', suspended_reason = NULL, suspended_until = NULL, suspended_at = NULL
+             WHERE id = ? AND role IN ('student','teacher')"
+        )->execute([$id]);
+    }
+
+    /**
+     * Lifts any scheduled suspension whose end time has passed, flipping the member back to
+     * 'approved'. This is the "derive state at read time" pattern (no cron): callers that
+     * care about current suspension state — Auth::attempt(), current_user(), the admin
+     * members list — run this first so the stored status is never stale. Fails open if the
+     * columns don't exist yet (deploy window before migrate.php runs).
+     */
+    public static function expireScheduledSuspensions(): void
+    {
+        try {
+            Database::pdo()->query(
+                "UPDATE users SET status = 'approved', suspended_reason = NULL, suspended_until = NULL, suspended_at = NULL
+                 WHERE status = 'suspended' AND suspended_until IS NOT NULL AND suspended_until <= NOW()"
+            );
+        } catch (PDOException $e) {
+            // columns not migrated yet — nothing to expire
+        }
+    }
+
+    /** Thai-formatted label for a scheduled-suspension end time, e.g. "3 ก.ค. 2569 เวลา 14:30 น." */
+    public static function suspensionUntilLabel(string $until): string
+    {
+        $dt = new DateTimeImmutable($until);
+        return Booking::thaiDate($dt) . ' เวลา ' . $dt->format('H:i') . ' น.';
     }
 
     /** Only suspended members may be hard-deleted, mirroring the prototype's member table actions. */

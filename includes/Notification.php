@@ -159,6 +159,21 @@ final class Notification
         $items = [];
         $now = new DateTimeImmutable();
 
+        try {
+            $unreadMsgs = AdminMessage::unreadCountForUser($userId);
+        } catch (PDOException $e) {
+            $unreadMsgs = 0;  // admin_messages not migrated yet (deploy window)
+        }
+        if ($unreadMsgs > 0) {
+            $items[] = [
+                'level' => 'info',
+                'icon' => 'bi-envelope-fill',
+                'title' => "มีข้อความจากผู้ดูแลระบบ {$unreadMsgs} ข้อความ",
+                'detail' => 'แตะเพื่ออ่านข้อความ',
+                'url' => url('student/messages.php'),
+            ];
+        }
+
         foreach (Booking::earlyAccessForUser($userId) as $ea) {
             $items[] = [
                 'level' => 'ok',

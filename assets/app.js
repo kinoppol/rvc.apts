@@ -472,6 +472,58 @@
     });
   });
 
+  // ── Suspend-member modal (admin/members.php) ──
+  document.querySelectorAll("[data-suspend-member]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var modalEl = document.getElementById("suspendModal");
+      if (!modalEl) return;
+      document.getElementById("suspendId").value = btn.dataset.id;
+      document.getElementById("suspendName").textContent = btn.dataset.name || "สมาชิก";
+      modalEl.querySelector("[name=suspend_reason]").value = "";
+      modalEl.querySelector("[name=suspend_until]").value = "";
+      new bootstrap.Modal(modalEl).show();
+    });
+  });
+
+  // ── Send-message modal — single member (admin/members.php) ──
+  document.querySelectorAll("[data-send-msg]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var modalEl = document.getElementById("sendMsgModal");
+      if (!modalEl) return;
+      document.getElementById("sendMsgId").value = btn.dataset.id;
+      document.getElementById("sendMsgName").textContent = btn.dataset.name || "สมาชิก";
+      modalEl.querySelector("[name=subject]").value = "";
+      modalEl.querySelector("[name=body]").value = "";
+      new bootstrap.Modal(modalEl).show();
+    });
+  });
+
+  // ── Send-message modal — bulk (admin/members.php) ──
+  document.querySelectorAll("[data-bulk-send-msg]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var modalEl = document.getElementById("bulkMsgModal");
+      if (!modalEl) return;
+      var checked = Array.prototype.slice.call(document.querySelectorAll(".bulk-check:checked"));
+      if (!checked.length) {
+        alert("กรุณาเลือกสมาชิกอย่างน้อย 1 คน");
+        return;
+      }
+      var holder = document.getElementById("bulkMsgIds");
+      holder.innerHTML = "";
+      checked.forEach(function (cb) {
+        var inp = document.createElement("input");
+        inp.type = "hidden";
+        inp.name = "ids[]";
+        inp.value = cb.value;
+        holder.appendChild(inp);
+      });
+      document.getElementById("bulkMsgCount").textContent = String(checked.length);
+      modalEl.querySelector("[name=subject]").value = "";
+      modalEl.querySelector("[name=body]").value = "";
+      new bootstrap.Modal(modalEl).show();
+    });
+  });
+
   // ── Report submission modal (student/my-bookings.php) ──
   document.querySelectorAll("[data-report-booking]").forEach(function (btn) {
     btn.addEventListener("click", function () {

@@ -27,6 +27,8 @@ final class Auth
     /** @return array{ok:bool,error?:string,user?:array} */
     public static function attempt(string $email, string $password): array
     {
+        // Lift elapsed scheduled suspensions before reading status (derive at read time).
+        Member::expireScheduledSuspensions();
         $user = self::findByEmail($email);
         if (!$user || !password_verify($password, $user['password_hash'])) {
             return ['ok' => false, 'error' => 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'];
@@ -34,7 +36,10 @@ final class Auth
         if ($user['status'] === 'pending') {
             return ['ok' => false, 'error' => 'บัญชีของคุณยังรอการอนุมัติจากผู้ดูแลระบบ'];
         }
-        if ($user['status'] === 'suspended' || OaUserSync::blocksUser($user)) {
+        if ($user['status'] === 'suspended') {
+            return ['ok' => false, 'error' => self::suspensionMessage($user)];
+        }
+        if (OaUserSync::blocksUser($user)) {
             return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับสิทธิ์การใช้งาน'];
         }
         // SSO-only mode: password sign-in stays open to admins only (fallback when ONE-RVC is down).
@@ -42,6 +47,24 @@ final class Auth
             return ['ok' => false, 'error' => 'ระบบเปิดให้เข้าสู่ระบบผ่าน ONE-RVC เท่านั้น'];
         }
         return ['ok' => true, 'user' => $user];
+    }
+
+    /**
+     * The sign-in error shown to a suspended member — it carries the admin-supplied reason
+     * and, for a scheduled suspension, the date it lifts, so the member can see why they
+     * are blocked and (if applicable) when access returns.
+     */
+    private static function suspensionMessage(array $user): string
+    {
+        $msg = 'บัญชีของคุณถูกระงับสิทธิ์การใช้งาน';
+        $reason = trim((string) ($user['suspended_reason'] ?? ''));
+        if ($reason !== '') {
+            $msg .= ' — เหตุผล: ' . $reason;
+        }
+        if (!empty($user['suspended_until'])) {
+            $msg .= ' · จะปลดระงับอัตโนมัติในวันที่ ' . Member::suspensionUntilLabel($user['suspended_until']);
+        }
+        return $msg;
     }
 
     /** @return array{ok:bool,error?:string} */
