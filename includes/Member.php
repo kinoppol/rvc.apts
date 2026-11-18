@@ -543,6 +543,42 @@ final class Member
         }
     }
 
+    /**
+     * Effective-suspension details for a member, or null if they are not currently suspended.
+     * "Effective" means the scheduled end time (if any) has not yet passed — so a lapsed
+     * scheduled suspension no longer blocks booking even before the status flag is flipped.
+     * A suspended member can still sign in; this only gates booking (see Booking::create).
+     * @return array{reason:?string,untilLabel:?string,files:array}|null
+     */
+    public static function suspensionInfo(int $id): ?array
+    {
+        try {
+            $stmt = Database::pdo()->prepare(
+                "SELECT suspended_reason, suspended_until FROM users
+                 WHERE id = ? AND role IN ('student','teacher') AND status = 'suspended'
+                   AND (suspended_until IS NULL OR suspended_until > NOW())"
+            );
+            $stmt->execute([$id]);
+            $row = $stmt->fetch();
+        } catch (PDOException $e) {
+            return null;   // columns not migrated yet
+        }
+        if (!$row) {
+            return null;
+        }
+        return [
+            'reason'     => $row['suspended_reason'] ?? null,
+            'untilLabel' => !empty($row['suspended_until']) ? self::suspensionUntilLabel($row['suspended_until']) : null,
+            'files'      => self::suspensionFiles($id),
+        ];
+    }
+
+    /** True when the member is currently (effectively) suspended and may not book. */
+    public static function isSuspended(int $id): bool
+    {
+        return self::suspensionInfo($id) !== null;
+    }
+
     /** Thai-formatted label for a scheduled-suspension end time, e.g. "3 ก.ค. 2569 เวลา 14:30 น." */
     public static function suspensionUntilLabel(string $until): string
     {

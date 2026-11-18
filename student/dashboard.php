@@ -14,6 +14,7 @@ $cancelledCount = count(array_filter($allBookings, fn ($b) => $b['displayStatus'
 $totalHours = array_sum(array_map(fn ($b) => $b['displayStatus'] === 'completed' ? $settings['slot_hours'] : 0, $allBookings));
 $utilization = count($allBookings) > 0 ? round($totalCount / count($allBookings) * 100, 1) : 0;
 $recent = array_slice($allBookings, 0, 5);
+$suspension = Member::suspensionInfo($user['id']);
 $restricted = Booking::isRestricted($user['id']);
 $pendingReports = Booking::pendingReportsForUser($user['id']);
 $earlyAccess = Booking::earlyAccessForUser($user['id']);
@@ -21,6 +22,37 @@ $earlyAccess = Booking::earlyAccessForUser($user['id']);
 $activeNav = 'student-dashboard';
 require __DIR__ . '/../includes/header.php';
 ?>
+<?php if ($suspension): ?>
+<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:16px 18px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
+  <i class="bi bi-slash-circle-fill" style="color:#DC2626;font-size:20px;flex-shrink:0;margin-top:1px"></i>
+  <div style="min-width:0">
+    <div style="font-weight:700;color:#991B1B;font-size:14px;margin-bottom:3px">บัญชีของคุณถูกระงับสิทธิ์การจอง</div>
+    <p style="color:#991B1B;font-size:12.5px;margin:0 0 8px">คุณยังเข้าใช้ระบบได้ แต่จะจองเวลาใช้งานใหม่ไม่ได้จนกว่าจะปลดระงับ</p>
+    <?php if (!empty($suspension['reason'])): ?>
+      <div style="background:#fff;border:1px solid #FECACA;border-radius:8px;padding:8px 11px;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;color:#991B1B;margin-bottom:2px">เหตุผล</div>
+        <div style="font-size:12.5px;color:#7F1D1D;white-space:pre-wrap;line-height:1.5"><?= e($suspension['reason']) ?></div>
+      </div>
+    <?php endif; ?>
+    <?php if (!empty($suspension['untilLabel'])): ?>
+      <p style="color:#991B1B;font-size:12px;margin:0 0 6px"><i class="bi bi-clock me-1"></i>จะปลดระงับอัตโนมัติในวันที่ <strong><?= e($suspension['untilLabel']) ?></strong></p>
+    <?php endif; ?>
+    <?php if (!empty($suspension['files'])): ?>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <?php foreach ($suspension['files'] as $sf):
+          $surl = url('uploads/suspensions/' . $sf['filename']);
+          $sImg = (bool) preg_match('/\.(jpe?g|png|gif|webp)$/i', $sf['filename']); ?>
+          <?php if ($sImg): ?>
+            <a href="<?= e($surl) ?>" target="_blank" rel="noopener"><img src="<?= e($surl) ?>" alt="<?= e($sf['original_name'] ?? '') ?>" style="max-width:110px;max-height:110px;border-radius:8px;border:1px solid #FECACA;object-fit:cover"></a>
+          <?php else: ?>
+            <a href="<?= e($surl) ?>" target="_blank" rel="noopener" style="font-size:12px;text-decoration:none;color:#991B1B;border:1px solid #FECACA;border-radius:8px;padding:6px 10px;display:inline-flex;align-items:center;gap:6px"><i class="bi bi-file-earmark-pdf" style="color:#DC2626"></i><?= e($sf['original_name'] ?? 'ไฟล์แนบ') ?></a>
+          <?php endif; ?>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
 <?php foreach ($earlyAccess as $ea): ?>
 <div style="background:#ECFDF5;border:1.5px solid #6EE7B7;border-radius:10px;padding:14px 16px;margin-bottom:16px">
   <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">

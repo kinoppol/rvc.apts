@@ -413,6 +413,9 @@ final class Booking
             return ['ok' => false, 'error' => 'กรุณาเลือกอย่างน้อย 1 Pool'];
         }
 
+        if (Member::isSuspended($userId)) {
+            return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับสิทธิ์การจอง — ไม่สามารถจองเวลาใช้งานได้ กรุณาติดต่อผู้ดูแลระบบ'];
+        }
         if (self::isRestricted($userId)) {
             return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับการจองชั่วคราว เนื่องจากมีรายงานการใช้งานค้างเกิน ' . self::REPORT_DEADLINE_DAYS . ' วัน กรุณารายงานการใช้งานที่ค้างให้ครบก่อน'];
         }

@@ -24,6 +24,7 @@ foreach (array_keys(SlotSettings::HIGH_DEMAND_RULES) as $rule) {
 }
 // The banner is itself a rule, and only shows when there is at least one booking rule to announce.
 $highDemand = $hdRules['banner'] && ($hdRules['no_early'] || $hdRules['no_adjacent'] || $hdRules['daily_limit']);
+$suspension = Member::suspensionInfo($user['id']);
 $restricted = Booking::isRestricted($user['id']);
 $pendingReports = Booking::pendingReportsForUser($user['id']);
 $allowedPools = Booking::allowedAccountsFor($user['id']);
@@ -34,6 +35,38 @@ $quotaRemaining = Booking::weeklyQuotaRemaining($user['id']);
 $activeNav = 'booking';
 require __DIR__ . '/../includes/header.php';
 ?>
+<?php if ($suspension): ?>
+  <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:20px;display:flex;gap:14px;align-items:flex-start;max-width:640px">
+    <i class="bi bi-slash-circle-fill" style="color:#DC2626;font-size:22px;flex-shrink:0;margin-top:2px"></i>
+    <div style="min-width:0">
+      <div style="font-weight:700;color:#991B1B;font-size:15px;margin-bottom:4px">บัญชีของคุณถูกระงับสิทธิ์การจอง</div>
+      <p style="color:#991B1B;font-size:13px;margin:0 0 10px">ขณะนี้คุณไม่สามารถจองเวลาใช้งานได้ แต่ยังเข้าใช้ส่วนอื่นของระบบได้ตามปกติ</p>
+      <?php if (!empty($suspension['reason'])): ?>
+        <div style="background:#fff;border:1px solid #FECACA;border-radius:8px;padding:10px 12px;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:700;color:#991B1B;margin-bottom:3px">เหตุผล</div>
+          <div style="font-size:13px;color:#7F1D1D;white-space:pre-wrap;line-height:1.5"><?= e($suspension['reason']) ?></div>
+        </div>
+      <?php endif; ?>
+      <?php if (!empty($suspension['untilLabel'])): ?>
+        <p style="color:#991B1B;font-size:12.5px;margin:0 0 10px"><i class="bi bi-clock me-1"></i>จะปลดระงับอัตโนมัติในวันที่ <strong><?= e($suspension['untilLabel']) ?></strong></p>
+      <?php endif; ?>
+      <?php if (!empty($suspension['files'])): ?>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+          <?php foreach ($suspension['files'] as $sf):
+            $surl = url('uploads/suspensions/' . $sf['filename']);
+            $sImg = (bool) preg_match('/\.(jpe?g|png|gif|webp)$/i', $sf['filename']); ?>
+            <?php if ($sImg): ?>
+              <a href="<?= e($surl) ?>" target="_blank" rel="noopener"><img src="<?= e($surl) ?>" alt="<?= e($sf['original_name'] ?? '') ?>" style="max-width:120px;max-height:120px;border-radius:8px;border:1px solid #FECACA;object-fit:cover"></a>
+            <?php else: ?>
+              <a href="<?= e($surl) ?>" target="_blank" rel="noopener" style="font-size:12.5px;text-decoration:none;color:#991B1B;border:1px solid #FECACA;border-radius:8px;padding:6px 10px;display:inline-flex;align-items:center;gap:6px"><i class="bi bi-file-earmark-pdf" style="color:#DC2626"></i><?= e($sf['original_name'] ?? 'ไฟล์แนบ') ?></a>
+            <?php endif; ?>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+  </div>
+<?php require __DIR__ . '/../includes/footer.php'; exit; ?>
+<?php endif; ?>
 <?php if ($restricted): ?>
   <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:20px;display:flex;gap:14px;align-items:flex-start;max-width:640px">
     <i class="bi bi-slash-circle-fill" style="color:#DC2626;font-size:22px;flex-shrink:0;margin-top:2px"></i>

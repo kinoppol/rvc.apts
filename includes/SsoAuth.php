@@ -216,17 +216,7 @@ final class SsoAuth
         if ($user['status'] === 'pending') {
             return ['ok' => false, 'error' => 'บัญชีของคุณยังรอการอนุมัติจากผู้ดูแลระบบ'];
         }
-        if ($user['status'] === 'suspended') {
-            $msg = 'บัญชีของคุณถูกระงับสิทธิ์การใช้งาน';
-            $reason = trim((string) ($user['suspended_reason'] ?? ''));
-            if ($reason !== '') {
-                $msg .= ' — เหตุผล: ' . $reason;
-            }
-            if (!empty($user['suspended_until'])) {
-                $msg .= ' · จะปลดระงับอัตโนมัติในวันที่ ' . Member::suspensionUntilLabel($user['suspended_until']);
-            }
-            return ['ok' => false, 'error' => $msg];
-        }
+        // A suspended member may still sign in; suspension only blocks booking (Booking::create).
         if (OaUserSync::blocksUser($user)) {
             return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับสิทธิ์การใช้งาน'];
         }
