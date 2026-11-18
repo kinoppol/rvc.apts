@@ -485,6 +485,19 @@
     });
   });
 
+  // ── Edit-suspension modal (admin/members.php) ──
+  document.querySelectorAll("[data-edit-suspension]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var modalEl = document.getElementById("editSuspendModal");
+      if (!modalEl) return;
+      document.getElementById("editSuspendId").value = btn.dataset.id;
+      document.getElementById("editSuspendName").textContent = btn.dataset.name || "สมาชิก";
+      document.getElementById("editSuspendReason").value = btn.dataset.reason || "";
+      document.getElementById("editSuspendUntil").value = btn.dataset.until || "";
+      new bootstrap.Modal(modalEl).show();
+    });
+  });
+
   // ── Send-message modal — single member (admin/members.php) ──
   document.querySelectorAll("[data-send-msg]").forEach(function (btn) {
     btn.addEventListener("click", function () {
@@ -519,6 +532,20 @@
       });
       document.getElementById("bulkMsgCount").textContent = String(checked.length);
       modalEl.querySelector("[name=subject]").value = "";
+      modalEl.querySelector("[name=body]").value = "";
+      new bootstrap.Modal(modalEl).show();
+    });
+  });
+
+  // ── Reply-to-member modal (admin/messages.php) ──
+  document.querySelectorAll("[data-reply-msg]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var modalEl = document.getElementById("replyMsgModal");
+      if (!modalEl) return;
+      document.getElementById("replyMemberId").value = btn.dataset.member;
+      document.getElementById("replyMemberName").textContent = btn.dataset.name || "สมาชิก";
+      var subj = btn.dataset.subject || "";
+      document.getElementById("replySubject").value = subj && subj.indexOf("ตอบกลับ:") !== 0 ? "ตอบกลับ: " + subj : subj;
       modalEl.querySelector("[name=body]").value = "";
       new bootstrap.Modal(modalEl).show();
     });

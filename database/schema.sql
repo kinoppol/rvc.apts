@@ -61,8 +61,9 @@ CREATE TABLE users (
 -- Direct messages an admin sends to a member (see includes/AdminMessage.php).
 CREATE TABLE admin_messages (
     id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id    INT UNSIGNED NOT NULL,                 -- recipient
-    admin_id   INT UNSIGNED NULL,                     -- sender (NULL if the admin account was later removed)
+    user_id    INT UNSIGNED NOT NULL,                 -- the member (recipient for to_member, sender for to_admin)
+    admin_id   INT UNSIGNED NULL,                     -- the admin sender for to_member (NULL for to_admin, or if later removed)
+    direction  ENUM('to_member','to_admin') NOT NULL DEFAULT 'to_member', -- admin→member or member→admins
     subject    VARCHAR(200) NOT NULL,
     body       TEXT NOT NULL,
     read_at    DATETIME NULL,                         -- NULL = unread

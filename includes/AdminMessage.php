@@ -33,8 +33,35 @@ final class AdminMessage
         }
         $pdo = Database::pdo();
         $pdo->prepare(
-            "INSERT INTO admin_messages (user_id, admin_id, subject, body) VALUES (?, ?, ?, ?)"
+            "INSERT INTO admin_messages (user_id, admin_id, direction, subject, body) VALUES (?, ?, 'to_member', ?, ?)"
         )->execute([$userId, $adminId, $v['subject'], $v['body']]);
+        self::attachFiles((int) $pdo->lastInsertId(), $stored['files']);
+        return ['ok' => true];
+    }
+
+    /**
+     * A member sends a message to the admins (direction = to_admin). admin_id is NULL; any
+     * admin can read and reply from admin/messages.php.
+     * @param array|null $rawFiles the raw $_FILES['attachments'] multi-file array (or null)
+     * @return array{ok:bool,error?:string}
+     */
+    public static function sendToAdmin(int $memberId, string $subject, string $body, ?array $rawFiles = null): array
+    {
+        $v = self::validate($subject, $body);
+        if (!$v['ok']) {
+            return $v;
+        }
+        if (!self::isMember($memberId)) {
+            return ['ok' => false, 'error' => 'ไม่พบบัญชีผู้ส่ง'];
+        }
+        $stored = self::storeFiles($rawFiles, $memberId);
+        if (!$stored['ok']) {
+            return $stored;
+        }
+        $pdo = Database::pdo();
+        $pdo->prepare(
+            "INSERT INTO admin_messages (user_id, admin_id, direction, subject, body) VALUES (?, NULL, 'to_admin', ?, ?)"
+        )->execute([$memberId, $v['subject'], $v['body']]);
         self::attachFiles((int) $pdo->lastInsertId(), $stored['files']);
         return ['ok' => true];
     }
@@ -104,7 +131,7 @@ final class AdminMessage
         if (!$valid) {
             return ['ok' => false, 'error' => 'ไม่พบสมาชิกผู้รับ'];
         }
-        $ins = $pdo->prepare("INSERT INTO admin_messages (user_id, admin_id, subject, body) VALUES (?, ?, ?, ?)");
+        $ins = $pdo->prepare("INSERT INTO admin_messages (user_id, admin_id, direction, subject, body) VALUES (?, ?, 'to_member', ?, ?)");
         $pdo->beginTransaction();
         foreach ($valid as $uid) {
             $ins->execute([$uid, $adminId, $v['subject'], $v['body']]);
@@ -137,7 +164,7 @@ final class AdminMessage
         return (bool) $stmt->fetchColumn();
     }
 
-    /** All messages for a member, newest first, with the sender's name joined in. */
+    /** The member's whole thread with the admins (both directions), newest first. */
     public static function forUser(int $userId): array
     {
         $stmt = Database::pdo()->prepare(
@@ -146,31 +173,50 @@ final class AdminMessage
              WHERE m.user_id = ? ORDER BY m.created_at DESC, m.id DESC"
         );
         $stmt->execute([$userId]);
-        $rows = $stmt->fetchAll();
-        if ($rows) {
-            $ids = array_map(fn ($r) => (int) $r['id'], $rows);
-            $ph  = implode(',', array_fill(0, count($ids), '?'));
-            $fstmt = Database::pdo()->prepare(
-                "SELECT message_id, filename, original_name FROM admin_message_files
-                 WHERE message_id IN ({$ph}) ORDER BY uploaded_at ASC, id ASC"
-            );
-            $fstmt->execute($ids);
-            $byMsg = [];
-            foreach ($fstmt->fetchAll() as $f) {
-                $byMsg[(int) $f['message_id']][] = $f;
-            }
-            foreach ($rows as &$r) {
-                $r['files'] = $byMsg[(int) $r['id']] ?? [];
-            }
-            unset($r);
+        return self::withFiles($stmt->fetchAll());
+    }
+
+    /** Incoming member→admin messages (newest first), with the sender's name/email joined in. */
+    public static function inboxForAdmin(): array
+    {
+        $stmt = Database::pdo()->query(
+            "SELECT m.*, s.name AS sender_name, s.email AS sender_email, s.role AS sender_role
+             FROM admin_messages m
+             JOIN users s ON s.id = m.user_id
+             WHERE m.direction = 'to_admin' ORDER BY m.created_at DESC, m.id DESC"
+        );
+        return self::withFiles($stmt->fetchAll());
+    }
+
+    /** Attaches each row's uploaded files as $row['files']. */
+    private static function withFiles(array $rows): array
+    {
+        if (!$rows) {
+            return $rows;
         }
+        $ids = array_map(fn ($r) => (int) $r['id'], $rows);
+        $ph  = implode(',', array_fill(0, count($ids), '?'));
+        $fstmt = Database::pdo()->prepare(
+            "SELECT message_id, filename, original_name FROM admin_message_files
+             WHERE message_id IN ({$ph}) ORDER BY uploaded_at ASC, id ASC"
+        );
+        $fstmt->execute($ids);
+        $byMsg = [];
+        foreach ($fstmt->fetchAll() as $f) {
+            $byMsg[(int) $f['message_id']][] = $f;
+        }
+        foreach ($rows as &$r) {
+            $r['files'] = $byMsg[(int) $r['id']] ?? [];
+        }
+        unset($r);
         return $rows;
     }
 
+    /** Unread messages addressed TO the member (admin → member). */
     public static function unreadCountForUser(int $userId): int
     {
         $stmt = Database::pdo()->prepare(
-            "SELECT COUNT(*) FROM admin_messages WHERE user_id = ? AND read_at IS NULL"
+            "SELECT COUNT(*) FROM admin_messages WHERE user_id = ? AND direction = 'to_member' AND read_at IS NULL"
         );
         $stmt->execute([$userId]);
         return (int) $stmt->fetchColumn();
@@ -179,7 +225,26 @@ final class AdminMessage
     public static function markAllRead(int $userId): void
     {
         Database::pdo()->prepare(
-            "UPDATE admin_messages SET read_at = NOW() WHERE user_id = ? AND read_at IS NULL"
+            "UPDATE admin_messages SET read_at = NOW() WHERE user_id = ? AND direction = 'to_member' AND read_at IS NULL"
         )->execute([$userId]);
+    }
+
+    /** Count of unread member→admin messages (shown to admins). */
+    public static function unreadAdminCount(): int
+    {
+        try {
+            return (int) Database::pdo()->query(
+                "SELECT COUNT(*) FROM admin_messages WHERE direction = 'to_admin' AND read_at IS NULL"
+            )->fetchColumn();
+        } catch (PDOException $e) {
+            return 0;   // table/column not migrated yet
+        }
+    }
+
+    public static function markAdminInboxRead(): void
+    {
+        Database::pdo()->query(
+            "UPDATE admin_messages SET read_at = NOW() WHERE direction = 'to_admin' AND read_at IS NULL"
+        );
     }
 }

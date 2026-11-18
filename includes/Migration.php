@@ -46,6 +46,7 @@ final class Migration
         'migrate_admin_messages.sql',
         'migrate_attachment_files.sql',
         'migrate_sso_registration.sql',
+        'migrate_member_messages.sql',
     ];
 
     /** Create the tracking table if it doesn't exist yet. */

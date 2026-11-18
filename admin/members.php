@@ -61,6 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'suspend') {
         $result = Member::suspend($id, $_POST['suspend_reason'] ?? '', $_POST['suspend_until'] ?? null, $_FILES['attachments'] ?? null);
         flash_set($result['ok'] ? 'warn' : 'err', $result['ok'] ? 'ระงับสิทธิ์สมาชิกเรียบร้อยแล้ว' : ($result['error'] ?? 'ระงับสิทธิ์ไม่สำเร็จ'));
+    } elseif ($action === 'edit_suspension') {
+        $result = Member::editSuspension($id, $_POST['suspend_reason'] ?? '', $_POST['suspend_until'] ?? null, $_FILES['attachments'] ?? null);
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'แก้ไขข้อมูลการระงับเรียบร้อยแล้ว' : ($result['error'] ?? 'แก้ไขไม่สำเร็จ'));
     } elseif ($action === 'send_message') {
         $result = AdminMessage::send((int) $user['id'], $id, $_POST['subject'] ?? '', $_POST['body'] ?? '', $_FILES['attachments'] ?? null);
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'ส่งข้อความเรียบร้อยแล้ว' : ($result['error'] ?? 'ส่งข้อความไม่สำเร็จ'));
@@ -440,6 +443,7 @@ require __DIR__ . '/../includes/header.php';
                   <?php if (!$m['isTeacher']): ?>
                     <?= member_action_form($m['id'], 'impersonate', 'action-btn-blue', 'bi-person-badge', 'สวมสิทธิ์', ['title' => 'สวมสิทธิ์ผู้ถูกระงับ', 'msg' => 'ดูระบบในมุมมองของ ' . $m['name'] . ' (ถูกระงับสิทธิ์การจอง) — กด "คืนสิทธิ์ Admin" บนแถบแจ้งเตือนเพื่อออก', 'icon' => 'bi-person-badge', 'color' => '#2563EB', 'btn' => 'สวมสิทธิ์', 'btnCls' => 'btn-primary']) ?>
                   <?php endif; ?>
+                  <button type="button" class="action-btn-warn" data-edit-suspension data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>" data-reason="<?= e($m['suspendReason'] ?? '') ?>" data-until="<?= e(!empty($m['suspended_until']) ? date('Y-m-d\TH:i', strtotime((string) $m['suspended_until'])) : '') ?>"><i class="bi bi-pencil me-1"></i>แก้ไขการระงับ</button>
                   <button type="button" class="action-btn-blue" data-send-msg data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>"><i class="bi bi-envelope me-1"></i>ส่งข้อความ</button>
                   <a href="<?= members_link(['edit' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-pencil-square me-1"></i>แก้ไขข้อมูล</a>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
@@ -619,6 +623,46 @@ require __DIR__ . '/../includes/header.php';
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
           <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
           <button type="submit" class="btn btn-warning btn-sm" style="font-weight:600"><i class="bi bi-slash-circle me-1"></i>ระงับสิทธิ์</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit suspension modal (reason / auto-lift time / replace attachments) -->
+<div class="modal fade" id="editSuspendModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:none;border-radius:14px">
+      <form method="post" enctype="multipart/form-data">
+        <?= Csrf::field() ?>
+        <input type="hidden" name="action" value="edit_suspension">
+        <input type="hidden" name="id" id="editSuspendId">
+        <input type="hidden" name="search" value="<?= e($search) ?>">
+        <input type="hidden" name="status" value="<?= e($status) ?>">
+        <input type="hidden" name="group" value="<?= e($group) ?>">
+        <input type="hidden" name="page" value="<?= (int) $page ?>">
+        <input type="hidden" name="per_page" value="<?= (int) $perPage ?>">
+        <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color)">
+          <h6 class="modal-title" style="font-weight:700"><i class="bi bi-pencil me-2" style="color:#D97706"></i>แก้ไขการระงับ — <span id="editSuspendName"></span></h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+        </div>
+        <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">สาเหตุของการระงับ <span style="color:#DC2626">*</span></label>
+            <textarea name="suspend_reason" id="editSuspendReason" required maxlength="500" rows="3" class="form-control" style="font-size:13px"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ปลดระงับอัตโนมัติเมื่อ <span style="font-weight:400;color:var(--bs-tertiary-color)">(เว้นว่าง = ระงับถาวร)</span></label>
+            <input type="datetime-local" name="suspend_until" id="editSuspendUntil" class="form-control" style="font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">แทนที่ไฟล์แนบ <span style="font-weight:400;color:var(--bs-tertiary-color)">(ไม่บังคับ · อัปโหลดใหม่เพื่อแทนที่ไฟล์เดิมทั้งหมด · รูปภาพหรือ PDF · ไม่เกิน 5 ไฟล์)</span></label>
+            <input type="file" name="attachments[]" multiple accept="image/*,.pdf" class="form-control" style="font-size:13px">
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-warning btn-sm" style="font-weight:600"><i class="bi bi-save me-1"></i>บันทึก</button>
         </div>
       </form>
     </div>

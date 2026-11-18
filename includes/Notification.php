@@ -45,6 +45,17 @@ final class Notification
             ];
         }
 
+        $memberMsgs = AdminMessage::unreadAdminCount();
+        if ($memberMsgs > 0) {
+            $items[] = [
+                'level' => 'info',
+                'icon' => 'bi-chat-dots',
+                'title' => "มีข้อความจากสมาชิก {$memberMsgs} ข้อความ",
+                'detail' => 'แตะเพื่ออ่านและตอบกลับ',
+                'url' => url('admin/messages.php'),
+            ];
+        }
+
         $issueCount = (int) Database::pdo()->query("SELECT COUNT(*) FROM bookings WHERE issue_text IS NOT NULL")->fetchColumn();
         if ($issueCount > 0) {
             $items[] = [

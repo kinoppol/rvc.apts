@@ -488,6 +488,69 @@ final class Member
         return ['ok' => true];
     }
 
+    /**
+     * Edits the reason / auto-lift time (and optionally the attachments) of an existing
+     * suspension, without changing when it was applied. Uploading new files replaces the
+     * old ones; uploading none keeps them.
+     * @return array{ok:bool,error?:string}
+     */
+    public static function editSuspension(int $id, string $reason = '', ?string $until = null, ?array $rawFiles = null): array
+    {
+        $cur = Database::pdo()->prepare("SELECT status FROM users WHERE id = ? AND role IN ('student','teacher')");
+        $cur->execute([$id]);
+        if ($cur->fetchColumn() !== 'suspended') {
+            return ['ok' => false, 'error' => 'สมาชิกนี้ไม่ได้อยู่ในสถานะถูกระงับ'];
+        }
+        $reason = trim($reason);
+        if ($reason === '') {
+            return ['ok' => false, 'error' => 'กรุณาระบุสาเหตุของการระงับสิทธิ์'];
+        }
+        if (mb_strlen($reason) > 500) {
+            return ['ok' => false, 'error' => 'สาเหตุยาวเกินกำหนด (ไม่เกิน 500 ตัวอักษร)'];
+        }
+        $untilSql = null;
+        if ($until !== null && trim($until) !== '') {
+            $dt = date_create($until);
+            if (!$dt) {
+                return ['ok' => false, 'error' => 'รูปแบบวันที่ปลดระงับไม่ถูกต้อง'];
+            }
+            if ($dt->getTimestamp() <= time()) {
+                return ['ok' => false, 'error' => 'เวลาปลดระงับต้องอยู่ในอนาคต'];
+            }
+            $untilSql = $dt->format('Y-m-d H:i:s');
+        }
+        $uploads = LmsFile::normalizeMultiple($rawFiles);
+        if (count($uploads) > self::SUSPEND_MAX_FILES) {
+            return ['ok' => false, 'error' => 'แนบไฟล์ได้ไม่เกิน ' . self::SUSPEND_MAX_FILES . ' ไฟล์'];
+        }
+        $stored = [];
+        foreach ($uploads as $u) {
+            $res = LmsFile::store($u, self::SUSPEND_SUBDIR, 'susp', $id, LmsFile::DOC_TYPES);
+            if (!$res['ok']) {
+                foreach ($stored as $f) {
+                    LmsFile::remove(self::SUSPEND_SUBDIR, $f['filename']);
+                }
+                return ['ok' => false, 'error' => $res['error'] ?? 'อัปโหลดไฟล์ไม่สำเร็จ'];
+            }
+            $stored[] = ['filename' => $res['file'], 'original_name' => $u['name']];
+        }
+
+        Database::pdo()->prepare(
+            "UPDATE users SET suspended_reason = ?, suspended_until = ? WHERE id = ? AND role IN ('student','teacher')"
+        )->execute([$reason, $untilSql, $id]);
+
+        if ($stored) {   // new uploads replace the old attachments
+            self::clearSuspensionFiles($id);
+            $ins = Database::pdo()->prepare(
+                "INSERT INTO user_suspension_files (user_id, filename, original_name) VALUES (?, ?, ?)"
+            );
+            foreach ($stored as $f) {
+                $ins->execute([$id, $f['filename'], $f['original_name']]);
+            }
+        }
+        return ['ok' => true];
+    }
+
     public static function activate(int $id): void
     {
         self::clearSuspensionFiles($id);

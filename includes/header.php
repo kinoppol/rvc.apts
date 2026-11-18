@@ -15,6 +15,7 @@ if (!$__isAdmin) {
 }
 $__lmsPending            = $__isAdmin ? LmsPromotion::pendingCount() : 0;
 $__reportReviewPending   = $__isAdmin ? Booking::pendingReviewCount() : 0;
+$__memberMsgUnread       = $__isAdmin ? AdminMessage::unreadAdminCount() : 0;
 $__initial = mb_substr($__user['name'], 0, 1);
 $__roleLabel = $__isAdmin ? 'Admin' : ('นักศึกษา' . (!empty($__user['group_name']) ? ' (กลุ่ม: ' . $__user['group_name'] . ')' : ''));
 $__notifications = Notification::forUser($__user);
@@ -183,6 +184,7 @@ if (!$__isAdmin && empty($__user['sso_user_id']) && SlotSettings::allowsSsoLogin
                 ]],
                 'members' => ['สมาชิก', [
                     ['member-management', 'admin/members.php', 'bi-people', 'จัดการสมาชิก', $__pendingCount],
+                    ['admin-messages', 'admin/messages.php', 'bi-chat-dots', 'ข้อความจากสมาชิก', $__memberMsgUnread],
                     ['groups', 'admin/groups.php', 'bi-diagram-3', 'จัดการกลุ่มผู้ใช้', 0],
                     ['majors', 'admin/majors.php', 'bi-mortarboard', 'สาขา / วิชาสอน', 0],
                     ['user-sync', 'admin/user-sync.php', 'bi-arrow-repeat', 'ซิงค์ผู้ใช้ ONE-RVC', 0],
