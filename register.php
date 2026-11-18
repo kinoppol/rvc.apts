@@ -6,9 +6,10 @@ if (current_user()) {
     exit;
 }
 
-// SSO-only mode: no self-registration — SsoAuth::provision() creates accounts on first SSO login.
-if (!SlotSettings::allowsPasswordLogin()) {
-    flash_set('err', 'ระบบเปิดให้เข้าสู่ระบบผ่าน ONE-RVC เท่านั้น — บัญชีจะถูกสร้างให้อัตโนมัติเมื่อเข้าสู่ระบบครั้งแรก');
+// No self-registration — either SSO-only mode, or the admin requires new sign-ups through SSO.
+// SsoAuth::provision() creates accounts on first ONE-RVC login.
+if (!SlotSettings::allowsSelfRegister()) {
+    flash_set('err', 'การสมัครสมาชิกใหม่ทำผ่าน ONE-RVC เท่านั้น — บัญชีจะถูกสร้างให้อัตโนมัติเมื่อเข้าสู่ระบบด้วย ONE-RVC ครั้งแรก');
     header('Location: ' . url('login.php'));
     exit;
 }

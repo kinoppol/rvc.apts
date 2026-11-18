@@ -23,6 +23,17 @@ function nav_cls(string $key, ?string $active): string
     return 'sb-link' . ($active === $key ? ' active' : '');
 }
 $__institutionName = SlotSettings::get()['institution_name'] ?? 'วิทยาลัย RVC';
+
+// SSO-link reminder: a non-admin account not yet linked to ONE-RVC, when the admin has set a
+// cutoff date after which password login is blocked for unlinked accounts.
+$__ssoReqFrom = null;
+if (!$__isAdmin && empty($__user['sso_user_id']) && SlotSettings::allowsSsoLogin()) {
+    $__from = SlotSettings::ssoRequiredFrom();
+    if ($__from !== null) {
+        $__ssoReqFrom     = Booking::thaiDate(new DateTimeImmutable($__from));
+        $__ssoReqReached  = SlotSettings::ssoLoginRequiredNow();
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -107,6 +118,19 @@ $__institutionName = SlotSettings::get()['institution_name'] ?? 'วิทยา
   <div style="background:#D97706;color:white;padding:8px 20px;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0">
     <span><i class="bi bi-person-badge me-2"></i>คุณกำลังดูในฐานะ <strong><?= e($__user['name']) ?></strong> (สิทธิ์นักศึกษา)</span>
     <a href="<?= url('logout.php') ?>" style="color:white;font-size:12px;text-decoration:none;border:1px solid rgba(255,255,255,.55);padding:3px 12px;border-radius:6px;white-space:nowrap"><i class="bi bi-arrow-return-left me-1"></i>คืนสิทธิ์ Admin</a>
+  </div>
+  <?php endif; ?>
+
+  <?php if ($__ssoReqFrom !== null): ?>
+  <div style="background:<?= $__ssoReqReached ? '#DC2626' : '#D97706' ?>;color:white;padding:8px 20px;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;flex-shrink:0">
+    <span><i class="bi bi-shield-exclamation me-2"></i>
+      <?php if ($__ssoReqReached): ?>
+        บัญชีของคุณยังไม่ได้ผูกกับ ONE-RVC — ตั้งแต่ <strong><?= e($__ssoReqFrom) ?></strong> ครั้งต่อไปต้องเข้าสู่ระบบผ่าน ONE-RVC กรุณาผูกบัญชีทันที
+      <?php else: ?>
+        กรุณาผูกบัญชีกับ ONE-RVC ก่อน <strong><?= e($__ssoReqFrom) ?></strong> — หลังจากนั้นบัญชีที่ยังไม่ผูกจะเข้าสู่ระบบด้วยรหัสผ่านไม่ได้
+      <?php endif; ?>
+    </span>
+    <a href="<?= url('student/profile.php') ?>#sso" style="color:white;font-size:12px;text-decoration:none;border:1px solid rgba(255,255,255,.55);padding:3px 12px;border-radius:6px;white-space:nowrap"><i class="bi bi-link-45deg me-1"></i>ผูกบัญชี ONE-RVC</a>
   </div>
   <?php endif; ?>
 

@@ -153,6 +153,67 @@ final class SlotSettings
         return ['ok' => true];
     }
 
+    /**
+     * Whether the email/password self-registration form is open. Independent of the login
+     * method: an admin can keep password *login* on while forcing new sign-ups through SSO.
+     * In password-only mode SSO doesn't exist, so self-registration must stay open regardless.
+     */
+    public static function allowsSelfRegister(): bool
+    {
+        if (!self::allowsPasswordLogin()) {
+            return false;                 // SSO-only: no self-registration at all
+        }
+        if (!self::allowsSsoLogin()) {
+            return true;                  // password-only: self-registration is the only way in
+        }
+        try {
+            return (int) Database::pdo()->query('SELECT allow_self_register FROM slot_settings WHERE id = 1')->fetchColumn() === 1;
+        } catch (PDOException $e) {
+            return true;                  // column not migrated yet — keep the form open
+        }
+    }
+
+    /** @return array{ok:bool} */
+    public static function updateAllowSelfRegister(bool $allow): array
+    {
+        Database::pdo()->prepare('UPDATE slot_settings SET allow_self_register = ? WHERE id = 1')
+            ->execute([$allow ? 1 : 0]);
+        return ['ok' => true];
+    }
+
+    /** The date (Y-m-d) from which an unlinked, non-admin account can no longer password-login, or null. */
+    public static function ssoRequiredFrom(): ?string
+    {
+        try {
+            $v = Database::pdo()->query('SELECT sso_required_from FROM slot_settings WHERE id = 1')->fetchColumn();
+        } catch (PDOException $e) {
+            return null;
+        }
+        return ($v !== null && $v !== '') ? substr((string) $v, 0, 10) : null;
+    }
+
+    /** True when the SSO-link requirement is active and its date has arrived (SSO must be an allowed method). */
+    public static function ssoLoginRequiredNow(): bool
+    {
+        $from = self::ssoRequiredFrom();
+        return $from !== null && self::allowsSsoLogin() && $from <= date('Y-m-d');
+    }
+
+    /** @return array{ok:bool,error?:string} $date is 'Y-m-d' or '' to clear the requirement. */
+    public static function updateSsoRequiredFrom(string $date): array
+    {
+        $date = trim($date);
+        if ($date !== '') {
+            $dt = DateTimeImmutable::createFromFormat('Y-m-d', $date);
+            if (!$dt || $dt->format('Y-m-d') !== $date) {
+                return ['ok' => false, 'error' => 'รูปแบบวันที่ไม่ถูกต้อง'];
+            }
+        }
+        Database::pdo()->prepare('UPDATE slot_settings SET sso_required_from = ? WHERE id = 1')
+            ->execute([$date !== '' ? $date : null]);
+        return ['ok' => true];
+    }
+
     /** Admin-configured private-IP override for the ONE-RVC verify-token call, or null if unset. */
     public static function getSsoVerifyIp(): ?string
     {

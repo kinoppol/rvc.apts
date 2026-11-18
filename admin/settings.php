@@ -8,6 +8,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'login_methods') {
         $result = SlotSettings::updateLoginMethods($_POST['login_methods'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกวิธีเข้าสู่ระบบเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
+    } elseif ($action === 'registration_sso') {
+        SlotSettings::updateAllowSelfRegister(!empty($_POST['allow_self_register']));
+        $result = SlotSettings::updateSsoRequiredFrom($_POST['sso_required_from'] ?? '');
+        flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกการตั้งค่าการสมัคร/การผูก ONE-RVC เรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
     } elseif ($action === 'sso_verify_ip') {
         $result = SlotSettings::updateSsoVerifyIp($_POST['sso_verify_ip'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกการตั้งค่า ONE-RVC เรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
@@ -27,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = SlotSettings::updateInstitutionName($_POST['institution_name'] ?? '');
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'บันทึกชื่อสถานศึกษาเรียบร้อยแล้ว' : ($result['error'] ?? 'บันทึกไม่สำเร็จ'));
     }
-    $tabOf = ['login_methods' => 'login', 'sso_verify_ip' => 'login', 'type_add' => 'ai-types', 'type_rename' => 'ai-types', 'type_delete' => 'ai-types'];
+    $tabOf = ['login_methods' => 'login', 'registration_sso' => 'login', 'sso_verify_ip' => 'login', 'type_add' => 'ai-types', 'type_rename' => 'ai-types', 'type_delete' => 'ai-types'];
     header('Location: ' . url('admin/settings.php') . '?tab=' . ($tabOf[$action] ?? 'general'));
     exit;
 }
@@ -109,6 +113,28 @@ require __DIR__ . '/../includes/header.php';
       <i class="bi bi-info-circle me-1"></i>ลิงก์สำรองสำหรับผู้ดูแลระบบ: <code><?= e(url('login.php')) ?>?admin=1</code>
     </div>
     <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px"><i class="bi bi-save me-1"></i>บันทึก</button>
+  </form>
+</div>
+<div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;max-width:700px;margin-top:16px">
+  <h6 style="font-weight:700;margin:0 0 14px"><i class="bi bi-person-badge me-2" style="color:#2563EB"></i>การสมัครสมาชิก และการผูกบัญชี ONE-RVC</h6>
+  <form method="post">
+    <?= Csrf::field() ?>
+    <input type="hidden" name="action" value="registration_sso">
+    <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--bs-border-color);border-radius:8px;margin-bottom:14px;cursor:pointer">
+      <input type="checkbox" name="allow_self_register" value="1" class="form-check-input" style="margin-top:3px;flex-shrink:0" <?= (int) ($settings['allow_self_register'] ?? 1) === 0 ? 'checked' : '' ?>>
+      <span>
+        <span style="font-size:13px;font-weight:600">สมัครสมาชิกใหม่ผ่าน ONE-RVC เท่านั้น</span><br>
+        <span style="font-size:11.5px;color:var(--bs-secondary-color)">ซ่อนแบบฟอร์มสมัครด้วยอีเมล/รหัสผ่าน — บัญชีใหม่จะถูกสร้างอัตโนมัติเมื่อเข้าสู่ระบบด้วย ONE-RVC ครั้งแรก (การลงชื่อเข้าใช้ยังคงเลือกได้ตามที่ตั้งไว้ด้านบน) · มีผลเฉพาะเมื่อเปิดใช้ทั้งรหัสผ่านและ ONE-RVC</span>
+      </span>
+    </label>
+    <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:5px">บังคับผูกบัญชีกับ ONE-RVC ตั้งแต่วันที่</label>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <input type="date" name="sso_required_from" value="<?= e((string) ($settings['sso_required_from'] ?? '')) ?>" class="form-control" style="flex:1;min-width:200px;font-size:13px">
+      <button type="submit" class="btn btn-primary" style="background:#2563EB;border:none;font-size:13px;white-space:nowrap"><i class="bi bi-save me-1"></i>บันทึก</button>
+    </div>
+    <div style="font-size:11px;color:var(--bs-secondary-color);margin-top:6px;line-height:1.7">
+      ตั้งแต่วันที่นี้ ผู้ใช้ที่ยังไม่ได้ผูกบัญชีกับ ONE-RVC จะเข้าสู่ระบบด้วยรหัสผ่านไม่ได้ (ต้องเข้าผ่าน ONE-RVC ซึ่งจะผูกบัญชีให้อัตโนมัติ) · ระบบจะแสดงข้อความเตือนผู้ที่ยังไม่ผูกบัญชีล่วงหน้า · เว้นว่างไว้ = ไม่บังคับ · ผู้ดูแลระบบไม่ได้รับผลกระทบ
+    </div>
   </form>
 </div>
 <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04);padding:24px;max-width:700px;margin-top:16px">

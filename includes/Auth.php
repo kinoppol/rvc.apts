@@ -42,6 +42,11 @@ final class Auth
         if (OaUserSync::blocksUser($user)) {
             return ['ok' => false, 'error' => 'บัญชีของคุณถูกระงับสิทธิ์การใช้งาน'];
         }
+        // SSO-link requirement reached: a non-admin account not yet linked to ONE-RVC must sign
+        // in through ONE-RVC (which auto-links by matching email) instead of with a password.
+        if ($user['role'] !== 'admin' && empty($user['sso_user_id']) && SlotSettings::ssoLoginRequiredNow()) {
+            return ['ok' => false, 'error' => 'บัญชีของคุณยังไม่ได้ผูกกับ ONE-RVC — กรุณาเข้าสู่ระบบด้วยปุ่ม "ONE-RVC" เพื่อผูกบัญชีให้อัตโนมัติ (ตั้งแต่วันที่กำหนด บัญชีที่ยังไม่ผูกจะเข้าสู่ระบบด้วยรหัสผ่านไม่ได้)'];
+        }
         // SSO-only mode: password sign-in stays open to admins only (fallback when ONE-RVC is down).
         if ($user['role'] !== 'admin' && !SlotSettings::allowsPasswordLogin()) {
             return ['ok' => false, 'error' => 'ระบบเปิดให้เข้าสู่ระบบผ่าน ONE-RVC เท่านั้น'];

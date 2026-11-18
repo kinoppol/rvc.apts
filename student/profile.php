@@ -107,7 +107,7 @@ require __DIR__ . '/../includes/header.php';
       </form>
     </div>
   </div>
-  <div class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
+  <div id="sso" class="card" style="border:1px solid var(--bs-border-color);box-shadow:0 1px 4px rgba(0,0,0,.04)">
     <div class="card-body" style="padding:20px">
       <h6 style="font-weight:700;margin:0 0 14px">บัญชี ONE-RVC</h6>
       <?php if (!empty($user['sso_user_id'])): ?>

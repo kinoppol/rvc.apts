@@ -11,6 +11,10 @@ $notice = null;
 
 $allowPassword = SlotSettings::allowsPasswordLogin();
 $allowSso      = SlotSettings::allowsSsoLogin();
+$allowSelfReg  = SlotSettings::allowsSelfRegister();
+$ssoReqFrom    = SlotSettings::ssoRequiredFrom();
+$ssoReqLabel   = ($ssoReqFrom && $allowSso) ? Booking::thaiDate(new DateTimeImmutable($ssoReqFrom)) : null;
+$ssoReqReached = SlotSettings::ssoLoginRequiredNow();
 // SSO-only mode hides the password form, except behind ?admin=1 — the admin's way in
 // when ONE-RVC is down (Auth::attempt() rejects non-admins in that mode regardless).
 $adminFallback = !$allowPassword && isset($_GET['admin']);
@@ -57,6 +61,16 @@ require __DIR__ . '/includes/guest-header.php';
   <?php if ($notice): ?>
     <div class="alert alert-success" style="font-size:13px"><?= e($notice) ?></div>
   <?php endif; ?>
+  <?php if ($ssoReqLabel): ?>
+    <div class="alert alert-warning" style="font-size:12.5px;line-height:1.6">
+      <i class="bi bi-shield-exclamation me-1"></i>
+      <?php if ($ssoReqReached): ?>
+        บัญชีที่ยังไม่ได้ผูกกับ ONE-RVC ต้องเข้าสู่ระบบผ่าน <strong>ONE-RVC</strong> เท่านั้น (มีผลตั้งแต่ <?= e($ssoReqLabel) ?>) — เข้าสู่ระบบด้วยปุ่ม ONE-RVC เพื่อผูกบัญชีให้อัตโนมัติ
+      <?php else: ?>
+        ตั้งแต่วันที่ <strong><?= e($ssoReqLabel) ?></strong> บัญชีที่ยังไม่ได้ผูกกับ ONE-RVC จะเข้าสู่ระบบด้วยรหัสผ่านไม่ได้ กรุณาเข้าสู่ระบบผ่าน ONE-RVC เพื่อผูกบัญชีไว้ล่วงหน้า
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
 
   <?php if ($allowSso): ?>
   <a href="<?= url('sso-login.php') ?>" class="btn w-100" style="background:#0F172A;color:#fff;font-weight:600;padding:11px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none">
@@ -85,9 +99,13 @@ require __DIR__ . '/includes/guest-header.php';
     </button>
   </form>
   <?php endif; ?>
-  <?php if ($allowPassword): ?>
+  <?php if ($allowSelfReg): ?>
   <p style="text-align:center;font-size:13px;color:var(--bs-secondary-color);margin:0">
     ยังไม่มีบัญชี? <a href="<?= url('register.php') ?>" style="color:#2563EB;font-weight:600;text-decoration:none">สมัครสมาชิก</a>
+  </p>
+  <?php elseif ($allowPassword && $allowSso): ?>
+  <p style="text-align:center;font-size:12.5px;color:var(--bs-secondary-color);margin:0">
+    <i class="bi bi-info-circle me-1"></i>สมัครใหม่ผ่าน ONE-RVC — บัญชีจะถูกสร้างให้อัตโนมัติเมื่อเข้าสู่ระบบด้วย ONE-RVC ครั้งแรก
   </p>
   <?php elseif ($adminFallback): ?>
   <p style="text-align:center;font-size:12px;margin:0">

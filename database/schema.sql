@@ -152,6 +152,8 @@ CREATE TABLE slot_settings (
     sso_verify_ip     VARCHAR(45) NULL DEFAULT NULL,               -- optional private IP override for the server-to-server ONE-RVC token-verify call (see includes/SsoAuth.php); NULL = resolve ONE_RVC_VERIFY_URL's hostname normally
     oa_client_secret  VARCHAR(255) NULL DEFAULT NULL,              -- ONE-RVC User-sync API client_secret set from admin/user-sync.php (write-only in the UI); NULL = fall back to config.local.php / env OA_CLIENT_SECRET
     login_methods     ENUM('both','password','sso') NOT NULL DEFAULT 'both', -- allowed sign-in methods (admin/settings.php); 'sso' still lets admins use password via login.php?admin=1
+    allow_self_register TINYINT(1) NOT NULL DEFAULT 1,       -- 0 = hide email/password self-registration; new accounts only via first ONE-RVC login
+    sso_required_from  DATE NULL DEFAULT NULL,               -- from this date, non-admin accounts not linked to ONE-RVC can't password-login (NULL = no requirement)
     CONSTRAINT chk_slot_settings_singleton CHECK (id = 1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
