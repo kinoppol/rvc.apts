@@ -47,6 +47,7 @@ final class Migration
         'migrate_attachment_files.sql',
         'migrate_sso_registration.sql',
         'migrate_member_messages.sql',
+        'migrate_suspension_appeals.sql',
     ];
 
     /** Create the tracking table if it doesn't exist yet. */

@@ -537,6 +537,33 @@
     });
   });
 
+  // ── Review-appeal modal (admin/appeals.php) ──
+  (function () {
+    var modalEl = document.getElementById("reviewAppealModal");
+    if (!modalEl) return;
+    var statusSel = document.getElementById("reviewStatus");
+    var liftWrap = document.getElementById("reviewLiftWrap");
+    var curSuspended = false;
+    function syncLift() {
+      var show = curSuspended && statusSel.value === "accepted";
+      liftWrap.style.display = show ? "flex" : "none";
+      if (!show) liftWrap.querySelector("input[type=checkbox]").checked = false;
+    }
+    if (statusSel) statusSel.addEventListener("change", syncLift);
+    document.querySelectorAll("[data-review-appeal]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.getElementById("reviewAppealId").value = btn.dataset.id;
+        document.getElementById("reviewAppealName").textContent = btn.dataset.name || "สมาชิก";
+        var st = btn.dataset.status;
+        statusSel.value = (st === "accepted" || st === "rejected" || st === "reviewing") ? st : "reviewing";
+        document.getElementById("reviewResponse").value = btn.dataset.response || "";
+        curSuspended = btn.dataset.suspended === "1";
+        syncLift();
+        new bootstrap.Modal(modalEl).show();
+      });
+    });
+  })();
+
   // ── Reply-to-member modal (admin/messages.php) ──
   document.querySelectorAll("[data-reply-msg]").forEach(function (btn) {
     btn.addEventListener("click", function () {

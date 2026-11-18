@@ -45,6 +45,17 @@ final class Notification
             ];
         }
 
+        $appeals = SuspensionAppeal::pendingCount();
+        if ($appeals > 0) {
+            $items[] = [
+                'level' => 'warn',
+                'icon' => 'bi-megaphone',
+                'title' => "มีคำอุทธรณ์รอพิจารณา {$appeals} รายการ",
+                'detail' => 'แตะเพื่อตรวจสอบและพิจารณา',
+                'url' => url('admin/appeals.php') . '?status=pending',
+            ];
+        }
+
         $memberMsgs = AdminMessage::unreadAdminCount();
         if ($memberMsgs > 0) {
             $items[] = [
@@ -182,6 +193,16 @@ final class Notification
                 'title' => "มีข้อความจากผู้ดูแลระบบ {$unreadMsgs} ข้อความ",
                 'detail' => 'แตะเพื่ออ่านข้อความ',
                 'url' => url('student/messages.php'),
+            ];
+        }
+
+        if (SuspensionAppeal::hasOpen($userId)) {
+            $items[] = [
+                'level' => 'info',
+                'icon' => 'bi-megaphone',
+                'title' => 'คำอุทธรณ์ของคุณอยู่ระหว่างการพิจารณา',
+                'detail' => 'แตะเพื่อติดตามสถานะการอุทธรณ์',
+                'url' => url('student/appeal.php'),
             ];
         }
 

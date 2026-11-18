@@ -16,6 +16,8 @@ if (!$__isAdmin) {
 $__lmsPending            = $__isAdmin ? LmsPromotion::pendingCount() : 0;
 $__reportReviewPending   = $__isAdmin ? Booking::pendingReviewCount() : 0;
 $__memberMsgUnread       = $__isAdmin ? AdminMessage::unreadAdminCount() : 0;
+$__appealPending         = $__isAdmin ? SuspensionAppeal::pendingCount() : 0;
+$__suspended             = !$__isAdmin && Member::isSuspended((int) $__user['id']);
 $__initial = mb_substr($__user['name'], 0, 1);
 $__roleLabel = $__isAdmin ? 'Admin' : ('นักศึกษา' . (!empty($__user['group_name']) ? ' (กลุ่ม: ' . $__user['group_name'] . ')' : ''));
 $__notifications = Notification::forUser($__user);
@@ -163,6 +165,11 @@ if (!$__isAdmin && empty($__user['sso_user_id']) && SlotSettings::allowsSsoLogin
             <i class="bi bi-file-earmark-text" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ข้อตกลงการใช้งาน</span>
           </a>
           <?php endif; ?>
+          <?php if ($__suspended): ?>
+          <a class="<?= nav_cls('appeal', $activeNav ?? null) ?>" href="<?= url('student/appeal.php') ?>">
+            <i class="bi bi-megaphone" style="font-size:17px;flex-shrink:0;width:20px;text-align:center;color:#DC2626"></i><span class="sb-label" style="color:#DC2626">ยื่นอุทธรณ์</span>
+          </a>
+          <?php endif; ?>
           <a class="<?= nav_cls('profile', $activeNav ?? null) ?>" href="<?= url('student/profile.php') ?>">
             <i class="bi bi-person-circle" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">โปรไฟล์</span>
           </a>
@@ -185,6 +192,7 @@ if (!$__isAdmin && empty($__user['sso_user_id']) && SlotSettings::allowsSsoLogin
                 'members' => ['สมาชิก', [
                     ['member-management', 'admin/members.php', 'bi-people', 'จัดการสมาชิก', $__pendingCount],
                     ['admin-messages', 'admin/messages.php', 'bi-chat-dots', 'ข้อความจากสมาชิก', $__memberMsgUnread],
+                    ['admin-appeals', 'admin/appeals.php', 'bi-megaphone', 'คำอุทธรณ์การระงับ', $__appealPending],
                     ['groups', 'admin/groups.php', 'bi-diagram-3', 'จัดการกลุ่มผู้ใช้', 0],
                     ['majors', 'admin/majors.php', 'bi-mortarboard', 'สาขา / วิชาสอน', 0],
                     ['user-sync', 'admin/user-sync.php', 'bi-arrow-repeat', 'ซิงค์ผู้ใช้ ONE-RVC', 0],

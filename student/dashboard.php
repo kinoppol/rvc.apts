@@ -15,6 +15,7 @@ $totalHours = array_sum(array_map(fn ($b) => $b['displayStatus'] === 'completed'
 $utilization = count($allBookings) > 0 ? round($totalCount / count($allBookings) * 100, 1) : 0;
 $recent = array_slice($allBookings, 0, 5);
 $suspension = Member::suspensionInfo($user['id']);
+$latestAppeal = $suspension ? (SuspensionAppeal::forUser($user['id'])[0] ?? null) : null;
 $restricted = Booking::isRestricted($user['id']);
 $pendingReports = Booking::pendingReportsForUser($user['id']);
 $earlyAccess = Booking::earlyAccessForUser($user['id']);
@@ -50,6 +51,12 @@ require __DIR__ . '/../includes/header.php';
         <?php endforeach; ?>
       </div>
     <?php endif; ?>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <a href="<?= url('student/appeal.php') ?>" class="btn btn-sm" style="background:#DC2626;border:none;color:#fff;font-size:12px"><i class="bi bi-megaphone me-1"></i><?= $latestAppeal && in_array($latestAppeal['status'], ['pending','reviewing'], true) ? 'ติดตามการอุทธรณ์' : 'ยื่นอุทธรณ์' ?></a>
+      <?php if ($latestAppeal): ?>
+        <span style="font-size:12px;color:#991B1B">สถานะอุทธรณ์ล่าสุด: <strong><?= e(SuspensionAppeal::STATUS_LABELS[$latestAppeal['status']] ?? $latestAppeal['status']) ?></strong></span>
+      <?php endif; ?>
+    </div>
   </div>
 </div>
 <?php endif; ?>

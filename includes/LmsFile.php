@@ -29,7 +29,7 @@ final class LmsFile
      * (Also reused by AdminMessage and Member for message/suspension attachments; the
      * store() validation sequence is generic, only SUBDIRS is a fixed allow-list.)
      */
-    private const SUBDIRS = ['lms/missions', 'lms/blocks', 'messages', 'suspensions'];
+    private const SUBDIRS = ['lms/missions', 'lms/blocks', 'messages', 'suspensions', 'appeals'];
 
     /**
      * Validates and moves one uploaded file.
