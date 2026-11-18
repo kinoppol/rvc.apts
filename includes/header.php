@@ -7,9 +7,11 @@ $__user = current_user();
 $__isAdmin = $__user['role'] === 'admin';
 $__pendingCount          = $__isAdmin ? Member::pendingCount() : 0;
 $__unreadMsgs            = 0;
+$__termsFile             = null;
 if (!$__isAdmin) {
     try { $__unreadMsgs = AdminMessage::unreadCountForUser((int) $__user['id']); }
     catch (PDOException $e) { $__unreadMsgs = 0; }
+    $__termsFile = SlotSettings::getTermsFile();
 }
 $__lmsPending            = $__isAdmin ? LmsPromotion::pendingCount() : 0;
 $__reportReviewPending   = $__isAdmin ? Booking::pendingReviewCount() : 0;
@@ -155,6 +157,11 @@ if (!$__isAdmin && empty($__user['sso_user_id']) && SlotSettings::allowsSsoLogin
             <i class="bi bi-envelope" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ข้อความ</span>
             <?php if ($__unreadMsgs > 0): ?><span style="background:#EF4444;color:white;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:auto"><?= (int) $__unreadMsgs ?></span><?php endif; ?>
           </a>
+          <?php if ($__termsFile): ?>
+          <a class="<?= nav_cls('terms', $activeNav ?? null) ?>" href="<?= url('student/terms.php') ?>">
+            <i class="bi bi-file-earmark-text" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">ข้อตกลงการใช้งาน</span>
+          </a>
+          <?php endif; ?>
           <a class="<?= nav_cls('profile', $activeNav ?? null) ?>" href="<?= url('student/profile.php') ?>">
             <i class="bi bi-person-circle" style="font-size:17px;flex-shrink:0;width:20px;text-align:center"></i><span class="sb-label">โปรไฟล์</span>
           </a>

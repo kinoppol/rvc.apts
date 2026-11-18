@@ -123,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash_set($result['ok'] ? 'warn' : 'err', $result['ok'] ? 'ถอดสิทธิ์ผู้ดูแลระบบเรียบร้อยแล้ว' : ($result['error'] ?? 'ถอดสิทธิ์ไม่สำเร็จ'));
     } elseif ($action === 'impersonate') {
         $target = Member::find($id);
-        if ($target && $target['role'] === 'student' && $target['status'] === 'approved') {
+        if ($target && $target['role'] === 'student' && in_array($target['status'], ['approved', 'suspended'], true)) {
             $_SESSION['admin_id'] = $user['id'];
             $_SESSION['impersonating'] = true;
             $_SESSION['user_id'] = $id;
@@ -437,6 +437,9 @@ require __DIR__ . '/../includes/header.php';
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
                 <?php elseif ($m['isSuspended']): ?>
                   <?= member_action_form($m['id'], 'activate', 'action-btn-ok', 'bi-check-circle', 'เปิดใช้') ?>
+                  <?php if (!$m['isTeacher']): ?>
+                    <?= member_action_form($m['id'], 'impersonate', 'action-btn-blue', 'bi-person-badge', 'สวมสิทธิ์', ['title' => 'สวมสิทธิ์ผู้ถูกระงับ', 'msg' => 'ดูระบบในมุมมองของ ' . $m['name'] . ' (ถูกระงับสิทธิ์การจอง) — กด "คืนสิทธิ์ Admin" บนแถบแจ้งเตือนเพื่อออก', 'icon' => 'bi-person-badge', 'color' => '#2563EB', 'btn' => 'สวมสิทธิ์', 'btnCls' => 'btn-primary']) ?>
+                  <?php endif; ?>
                   <button type="button" class="action-btn-blue" data-send-msg data-id="<?= (int) $m['id'] ?>" data-name="<?= e($m['name']) ?>"><i class="bi bi-envelope me-1"></i>ส่งข้อความ</button>
                   <a href="<?= members_link(['edit' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-pencil-square me-1"></i>แก้ไขข้อมูล</a>
                   <a href="<?= members_link(['history' => $m['id']]) ?>" class="action-btn-blue" style="text-decoration:none"><i class="bi bi-clock-history me-1"></i>ประวัติ</a>
