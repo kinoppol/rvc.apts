@@ -37,6 +37,7 @@ final class Member
         $row['suspendUntilLabel'] = !empty($row['suspended_until'])
             ? self::suspensionUntilLabel($row['suspended_until'])
             : null;
+        $row['suspendFiles'] = $row['status'] === 'suspended' ? self::suspensionFiles((int) $row['id']) : [];
         $created = new DateTimeImmutable($row['created_at']);
         $row['joinDate'] = Booking::thaiDate($created);
         $row['groupName'] = $row['group_name'] ?? null;
@@ -382,6 +383,9 @@ final class Member
              WHERE role IN ('student','teacher') AND status = 'suspended' AND id IN ({$ph})"
         );
         $stmt->execute($ids);
+        foreach ($ids as $uid) {
+            self::clearSuspensionFiles((int) $uid);
+        }
         return $stmt->rowCount();
     }
 
@@ -426,7 +430,10 @@ final class Member
      * shown to the member when they try to sign in.
      * @return array{ok:bool,error?:string}
      */
-    public static function suspend(int $id, string $reason = '', ?string $until = null): array
+    public const SUSPEND_SUBDIR = 'suspensions';
+    private const SUSPEND_MAX_FILES = 5;
+
+    public static function suspend(int $id, string $reason = '', ?string $until = null, ?array $rawFiles = null): array
     {
         $reason = trim($reason);
         if ($reason === '') {
@@ -446,19 +453,75 @@ final class Member
             }
             $untilSql = $dt->format('Y-m-d H:i:s');
         }
+        // Validate + move any attachments before touching the DB.
+        $uploads = LmsFile::normalizeMultiple($rawFiles);
+        if (count($uploads) > self::SUSPEND_MAX_FILES) {
+            return ['ok' => false, 'error' => 'แนบไฟล์ได้ไม่เกิน ' . self::SUSPEND_MAX_FILES . ' ไฟล์'];
+        }
+        $stored = [];
+        foreach ($uploads as $u) {
+            $res = LmsFile::store($u, self::SUSPEND_SUBDIR, 'susp', $id, LmsFile::DOC_TYPES);
+            if (!$res['ok']) {
+                foreach ($stored as $f) {
+                    LmsFile::remove(self::SUSPEND_SUBDIR, $f['filename']);
+                }
+                return ['ok' => false, 'error' => $res['error'] ?? 'อัปโหลดไฟล์ไม่สำเร็จ'];
+            }
+            $stored[] = ['filename' => $res['file'], 'original_name' => $u['name']];
+        }
+
         Database::pdo()->prepare(
             "UPDATE users SET status = 'suspended', suspended_reason = ?, suspended_until = ?, suspended_at = NOW()
              WHERE id = ? AND role IN ('student','teacher')"
         )->execute([$reason, $untilSql, $id]);
+
+        // A new suspension replaces any files left over from a previous one.
+        self::clearSuspensionFiles($id);
+        if ($stored) {
+            $ins = Database::pdo()->prepare(
+                "INSERT INTO user_suspension_files (user_id, filename, original_name) VALUES (?, ?, ?)"
+            );
+            foreach ($stored as $f) {
+                $ins->execute([$id, $f['filename'], $f['original_name']]);
+            }
+        }
         return ['ok' => true];
     }
 
     public static function activate(int $id): void
     {
+        self::clearSuspensionFiles($id);
         Database::pdo()->prepare(
             "UPDATE users SET status = 'approved', suspended_reason = NULL, suspended_until = NULL, suspended_at = NULL
              WHERE id = ? AND role IN ('student','teacher')"
         )->execute([$id]);
+    }
+
+    /** @return array<int,array{filename:string,original_name:?string}> attachments on the member's current suspension */
+    public static function suspensionFiles(int $id): array
+    {
+        try {
+            $stmt = Database::pdo()->prepare(
+                "SELECT filename, original_name FROM user_suspension_files WHERE user_id = ? ORDER BY uploaded_at ASC, id ASC"
+            );
+            $stmt->execute([$id]);
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            return [];   // table not migrated yet
+        }
+    }
+
+    /** Deletes a member's suspension attachments from disk and the DB. */
+    private static function clearSuspensionFiles(int $id): void
+    {
+        try {
+            foreach (self::suspensionFiles($id) as $f) {
+                LmsFile::remove(self::SUSPEND_SUBDIR, $f['filename']);
+            }
+            Database::pdo()->prepare("DELETE FROM user_suspension_files WHERE user_id = ?")->execute([$id]);
+        } catch (PDOException $e) {
+            // table not migrated yet — nothing to clear
+        }
     }
 
     /**

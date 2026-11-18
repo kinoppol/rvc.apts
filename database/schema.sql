@@ -72,6 +72,28 @@ CREATE TABLE admin_messages (
     KEY idx_admin_messages_user (user_id, read_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- File/image attachments on an admin message.
+CREATE TABLE admin_message_files (
+    id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    message_id    INT UNSIGNED NOT NULL,
+    filename      VARCHAR(200) NOT NULL,
+    original_name VARCHAR(255) NULL,
+    uploaded_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_amf_message FOREIGN KEY (message_id) REFERENCES admin_messages(id) ON DELETE CASCADE,
+    INDEX idx_amf_message (message_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- File/image attachments for the current suspension of a member.
+CREATE TABLE user_suspension_files (
+    id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id       INT UNSIGNED NOT NULL,
+    filename      VARCHAR(200) NOT NULL,
+    original_name VARCHAR(255) NULL,
+    uploaded_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_usf_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_usf_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Admin-managed list of AI account types (Claude Pro, ChatGPT Plus, ...).
 CREATE TABLE ai_providers (
     id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

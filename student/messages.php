@@ -41,6 +41,23 @@ require __DIR__ . '/../includes/header.php';
             </div>
           </div>
           <div style="font-size:14px;color:var(--bs-body-color);margin-top:12px;white-space:pre-wrap;line-height:1.6"><?= e($m['body']) ?></div>
+          <?php if (!empty($m['files'])): ?>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px">
+              <?php foreach ($m['files'] as $f):
+                $furl = url('uploads/messages/' . $f['filename']);
+                $isImg = (bool) preg_match('/\.(jpe?g|png|gif|webp)$/i', $f['filename']); ?>
+                <?php if ($isImg): ?>
+                  <a href="<?= e($furl) ?>" target="_blank" rel="noopener" title="<?= e($f['original_name'] ?? '') ?>">
+                    <img src="<?= e($furl) ?>" alt="<?= e($f['original_name'] ?? 'รูปภาพแนบ') ?>" style="max-width:160px;max-height:160px;border-radius:8px;border:1px solid var(--bs-border-color);object-fit:cover">
+                  </a>
+                <?php else: ?>
+                  <a href="<?= e($furl) ?>" target="_blank" rel="noopener" style="font-size:13px;text-decoration:none;color:#2563EB;border:1px solid var(--bs-border-color);border-radius:8px;padding:8px 12px;display:inline-flex;align-items:center;gap:6px">
+                    <i class="bi bi-file-earmark-pdf" style="color:#DC2626"></i><?= e($f['original_name'] ?? 'ไฟล์แนบ') ?>
+                  </a>
+                <?php endif; ?>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
         </div>
       </div>
     <?php endforeach; ?>

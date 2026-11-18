@@ -59,10 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         Member::reject($id);
         flash_set('warn', 'ปฏิเสธคำขอสมัครเรียบร้อยแล้ว');
     } elseif ($action === 'suspend') {
-        $result = Member::suspend($id, $_POST['suspend_reason'] ?? '', $_POST['suspend_until'] ?? null);
+        $result = Member::suspend($id, $_POST['suspend_reason'] ?? '', $_POST['suspend_until'] ?? null, $_FILES['attachments'] ?? null);
         flash_set($result['ok'] ? 'warn' : 'err', $result['ok'] ? 'ระงับสิทธิ์สมาชิกเรียบร้อยแล้ว' : ($result['error'] ?? 'ระงับสิทธิ์ไม่สำเร็จ'));
     } elseif ($action === 'send_message') {
-        $result = AdminMessage::send((int) $user['id'], $id, $_POST['subject'] ?? '', $_POST['body'] ?? '');
+        $result = AdminMessage::send((int) $user['id'], $id, $_POST['subject'] ?? '', $_POST['body'] ?? '', $_FILES['attachments'] ?? null);
         flash_set($result['ok'] ? 'ok' : 'err', $result['ok'] ? 'ส่งข้อความเรียบร้อยแล้ว' : ($result['error'] ?? 'ส่งข้อความไม่สำเร็จ'));
     } elseif ($action === 'bulk_send_message') {
         $result = AdminMessage::sendToMany((int) $user['id'], $_POST['ids'] ?? [], $_POST['subject'] ?? '', $_POST['body'] ?? '');
@@ -391,6 +391,13 @@ require __DIR__ . '/../includes/header.php';
               <?php if ($m['isSuspended'] && !empty($m['suspendUntilLabel'])): ?>
                 <div style="font-size:11px;color:#D97706;margin-top:2px"><i class="bi bi-clock me-1"></i>ปลดระงับ: <?= e($m['suspendUntilLabel']) ?></div>
               <?php endif; ?>
+              <?php if ($m['isSuspended'] && !empty($m['suspendFiles'])): ?>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+                  <?php foreach ($m['suspendFiles'] as $sf): ?>
+                    <a href="<?= e(url('uploads/suspensions/' . $sf['filename'])) ?>" target="_blank" rel="noopener" title="<?= e($sf['original_name'] ?? $sf['filename']) ?>" style="font-size:11px;text-decoration:none;color:#2563EB;border:1px solid var(--bs-border-color);border-radius:6px;padding:1px 6px"><i class="bi bi-paperclip me-1"></i><?= e(mb_strlen($sf['original_name'] ?? '') > 18 ? mb_substr($sf['original_name'], 0, 18) . '…' : ($sf['original_name'] ?? 'ไฟล์แนบ')) ?></a>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
               <?php if ($m['restricted']): ?><div><span class="badge-susp" style="margin-top:4px;display:inline-block;font-size:11px" title="มีรายงานการใช้งานค้างเกิน 7 วัน"><i class="bi bi-slash-circle me-1"></i>ระงับการจอง</span></div><?php endif; ?>
             </td>
             <td style="padding:12px 16px">
@@ -578,7 +585,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="modal fade" id="suspendModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="border:none;border-radius:14px">
-      <form method="post">
+      <form method="post" enctype="multipart/form-data">
         <?= Csrf::field() ?>
         <input type="hidden" name="action" value="suspend">
         <input type="hidden" name="id" id="suspendId">
@@ -601,6 +608,10 @@ require __DIR__ . '/../includes/header.php';
             <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">ปลดระงับอัตโนมัติเมื่อ <span style="font-weight:400;color:var(--bs-tertiary-color)">(เว้นว่างไว้ = ระงับถาวรจนกว่าจะปลดเอง)</span></label>
             <input type="datetime-local" name="suspend_until" class="form-control" style="font-size:13px">
           </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">แนบไฟล์/รูปภาพ <span style="font-weight:400;color:var(--bs-tertiary-color)">(ไม่บังคับ · รูปภาพหรือ PDF · ไม่เกิน 5 ไฟล์)</span></label>
+            <input type="file" name="attachments[]" multiple accept="image/*,.pdf" class="form-control" style="font-size:13px">
+          </div>
         </div>
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">
           <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
@@ -615,7 +626,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="modal fade" id="sendMsgModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="border:none;border-radius:14px">
-      <form method="post">
+      <form method="post" enctype="multipart/form-data">
         <?= Csrf::field() ?>
         <input type="hidden" name="action" value="send_message">
         <input type="hidden" name="id" id="sendMsgId">
@@ -636,6 +647,10 @@ require __DIR__ . '/../includes/header.php';
           <div>
             <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">เนื้อหา <span style="color:#DC2626">*</span></label>
             <textarea name="body" required maxlength="5000" rows="5" class="form-control" placeholder="พิมพ์ข้อความถึงสมาชิก" style="font-size:13px"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--bs-secondary-color);display:block;margin-bottom:4px">แนบไฟล์/รูปภาพ <span style="font-weight:400;color:var(--bs-tertiary-color)">(ไม่บังคับ · รูปภาพหรือ PDF · ไม่เกิน 5 ไฟล์)</span></label>
+            <input type="file" name="attachments[]" multiple accept="image/*,.pdf" class="form-control" style="font-size:13px">
           </div>
         </div>
         <div class="modal-footer" style="border-top:1px solid var(--bs-border-color)">

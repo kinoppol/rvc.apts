@@ -24,8 +24,12 @@ final class LmsFile
 
     public const MAX_BYTES = 5 * 1024 * 1024;
 
-    /** Whitelist of writable sub-directories under uploads/ — kills path traversal. */
-    private const SUBDIRS = ['lms/missions', 'lms/blocks'];
+    /**
+     * Whitelist of writable sub-directories under uploads/ — kills path traversal.
+     * (Also reused by AdminMessage and Member for message/suspension attachments; the
+     * store() validation sequence is generic, only SUBDIRS is a fixed allow-list.)
+     */
+    private const SUBDIRS = ['lms/missions', 'lms/blocks', 'messages', 'suspensions'];
 
     /**
      * Validates and moves one uploaded file.

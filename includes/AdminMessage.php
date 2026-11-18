@@ -11,8 +11,14 @@ final class AdminMessage
     private const SUBJECT_MAX = 200;
     private const BODY_MAX    = 5000;
 
-    /** @return array{ok:bool,error?:string} */
-    public static function send(int $adminId, int $userId, string $subject, string $body): array
+    public const SUBDIR   = 'messages';
+    private const MAX_FILES = 5;
+
+    /**
+     * @param array|null $rawFiles the raw $_FILES['attachments'] multi-file array (or null)
+     * @return array{ok:bool,error?:string}
+     */
+    public static function send(int $adminId, int $userId, string $subject, string $body, ?array $rawFiles = null): array
     {
         $v = self::validate($subject, $body);
         if (!$v['ok']) {
@@ -21,10 +27,57 @@ final class AdminMessage
         if (!self::isMember($userId)) {
             return ['ok' => false, 'error' => 'ไม่พบสมาชิกผู้รับ'];
         }
-        Database::pdo()->prepare(
+        $stored = self::storeFiles($rawFiles, $adminId);
+        if (!$stored['ok']) {
+            return $stored;
+        }
+        $pdo = Database::pdo();
+        $pdo->prepare(
             "INSERT INTO admin_messages (user_id, admin_id, subject, body) VALUES (?, ?, ?, ?)"
         )->execute([$userId, $adminId, $v['subject'], $v['body']]);
+        self::attachFiles((int) $pdo->lastInsertId(), $stored['files']);
         return ['ok' => true];
+    }
+
+    /**
+     * Validates and moves message attachments (images + PDF, ≤5 files).
+     * @return array{ok:bool,error?:string,files?:array<int,array{filename:string,original_name:string}>}
+     */
+    private static function storeFiles(?array $rawFiles, int $adminId): array
+    {
+        $uploads = LmsFile::normalizeMultiple($rawFiles);
+        if (!$uploads) {
+            return ['ok' => true, 'files' => []];
+        }
+        if (count($uploads) > self::MAX_FILES) {
+            return ['ok' => false, 'error' => 'แนบไฟล์ได้ไม่เกิน ' . self::MAX_FILES . ' ไฟล์'];
+        }
+        $files = [];
+        foreach ($uploads as $u) {
+            $res = LmsFile::store($u, self::SUBDIR, 'msg', $adminId, LmsFile::DOC_TYPES);
+            if (!$res['ok']) {
+                foreach ($files as $f) {   // roll back files already moved
+                    LmsFile::remove(self::SUBDIR, $f['filename']);
+                }
+                return ['ok' => false, 'error' => $res['error'] ?? 'อัปโหลดไฟล์ไม่สำเร็จ'];
+            }
+            $files[] = ['filename' => $res['file'], 'original_name' => $u['name']];
+        }
+        return ['ok' => true, 'files' => $files];
+    }
+
+    /** @param array<int,array{filename:string,original_name:string}> $files */
+    private static function attachFiles(int $messageId, array $files): void
+    {
+        if (!$files) {
+            return;
+        }
+        $ins = Database::pdo()->prepare(
+            "INSERT INTO admin_message_files (message_id, filename, original_name) VALUES (?, ?, ?)"
+        );
+        foreach ($files as $f) {
+            $ins->execute([$messageId, $f['filename'], $f['original_name']]);
+        }
     }
 
     /**
@@ -93,7 +146,25 @@ final class AdminMessage
              WHERE m.user_id = ? ORDER BY m.created_at DESC, m.id DESC"
         );
         $stmt->execute([$userId]);
-        return $stmt->fetchAll();
+        $rows = $stmt->fetchAll();
+        if ($rows) {
+            $ids = array_map(fn ($r) => (int) $r['id'], $rows);
+            $ph  = implode(',', array_fill(0, count($ids), '?'));
+            $fstmt = Database::pdo()->prepare(
+                "SELECT message_id, filename, original_name FROM admin_message_files
+                 WHERE message_id IN ({$ph}) ORDER BY uploaded_at ASC, id ASC"
+            );
+            $fstmt->execute($ids);
+            $byMsg = [];
+            foreach ($fstmt->fetchAll() as $f) {
+                $byMsg[(int) $f['message_id']][] = $f;
+            }
+            foreach ($rows as &$r) {
+                $r['files'] = $byMsg[(int) $r['id']] ?? [];
+            }
+            unset($r);
+        }
+        return $rows;
     }
 
     public static function unreadCountForUser(int $userId): int
